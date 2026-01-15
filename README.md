@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TravX - 360° Travel Agency Inquiry Management System
+
+A production-ready Inquiry Module for a Travel Agency Management System built with Next.js 16, TypeScript, Tailwind CSS, and Supabase.
+
+## Features
+
+### Inquiry Management
+- **Complete Inquiry Capture**: Client information, trip details, travelers, preferences, and budget
+- **Status Tracking**: New, In Progress, Quoted, Confirmed, Cancelled, Completed
+- **Priority Levels**: Low, Medium, High, Urgent
+- **Activity Logging**: Track all changes and updates to inquiries
+
+### Technology Stack
+- **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS
+- **Backend**: Supabase (PostgreSQL + Auth + RLS)
+- **Validation**: Zod
+- **Date Handling**: date-fns
+
+### Database Schema
+- `profiles` - User profiles linked to Supabase Auth
+- `inquiries` - Main inquiry records with all travel details
+- `travelers` - Individual traveler information per inquiry
+- `inquiry_activities` - Activity log for audit trail
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- Supabase account
 
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repository-url>
+cd "Trav X"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Set up environment variables:
+```bash
+# Create .env.local file with:
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Run the development server:
+```bash
+npm run dev
+```
 
-## Learn More
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-To learn more about Next.js, take a look at the following resources:
+## Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/
+│   ├── api/inquiries/      # API routes
+│   ├── auth/               # Auth callback handlers
+│   ├── dashboard/          # Dashboard page
+│   ├── inquiries/          # Inquiry pages (list, detail, new)
+│   ├── login/              # Login/Signup page
+│   ├── globals.css         # Global styles with Tailwind
+│   ├── layout.tsx          # Root layout
+│   └── page.tsx            # Home redirect
+├── components/
+│   ├── forms/              # Form components
+│   ├── layout/             # Layout components (Sidebar, Header)
+│   └── ui/                 # Reusable UI components
+├── lib/
+│   ├── supabase/           # Supabase client utilities
+│   └── validations/        # Zod validation schemas
+├── types/
+│   └── database.ts         # TypeScript types
+└── proxy.ts                # Auth session management
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Security
 
-## Deploy on Vercel
+- **Row Level Security (RLS)**: All database tables have RLS policies enabled
+- **Authentication**: Supabase Auth with email/password
+- **Authorization**: Role-based access (admin, agent, viewer)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Design Principles
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Minimalistic, professional travel-industry UI
+- Single unified theme across all components
+- No emojis or decorative icons
+- Clean, enterprise-ready design
+
+## License
+
+MIT
