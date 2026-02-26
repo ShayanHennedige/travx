@@ -49,6 +49,13 @@ export async function PUT(request: Request, { params }: RouteParams) {
     const body = await request.json();
     const { id: _, created_at, drivers, itineraries, ...updateData } = body;
 
+    // Get current tour to check previous driver_id
+    const { data: currentTour } = await supabase
+      .from("tours")
+      .select("driver_id")
+      .eq("id", id)
+      .single();
+
     const { data: tour, error } = await supabase
       .from("tours")
       .update({
@@ -64,12 +71,21 @@ export async function PUT(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // If driver is assigned, update driver status
+    // If driver is being assigned, update driver status
+    // If driver is being unassigned (driver_id is null), handle accordingly
     if (updateData.driver_id) {
+      // Driver is being assigned
       await supabase
         .from("drivers")
         .update({ status: "on_tour" })
         .eq("id", updateData.driver_id);
+    } else if (updateData.driver_id === null && currentTour?.driver_id) {
+      // Driver is being unassigned - clear driver status if needed
+      // Note: This assumes drivers table has a status field, adjust if needed
+      await supabase
+        .from("drivers")
+        .update({ status: null })
+        .eq("id", currentTour.driver_id);
     }
 
     return NextResponse.json({ success: true, tour });

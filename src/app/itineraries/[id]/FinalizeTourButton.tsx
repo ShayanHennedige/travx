@@ -70,7 +70,7 @@ export function FinalizeTourButton({
       <Button
         variant="secondary"
         onClick={() => router.push("/dashboard")}
-        className="flex items-center gap-2"
+        className="flex items-center gap-2 hover:bg-accent-500 hover:text-black hover:border-accent-500"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -84,7 +84,7 @@ export function FinalizeTourButton({
     <>
       <Button
         onClick={() => setShowConfirm(true)}
-        className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+        className="flex items-center gap-2 bg-green-600 hover:bg-accent-500 hover:text-black"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -95,39 +95,39 @@ export function FinalizeTourButton({
       {/* Confirmation Modal */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <div className="rounded-xl shadow-xl max-w-md w-full p-6" style={{ backgroundColor: "var(--bg-surface)" }}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-12 h-12 rounded-full bg-green-900/50 light:bg-green-100 flex items-center justify-center border border-green-700/50 light:border-transparent">
+                <svg className="w-6 h-6 text-green-300 light:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-surface-900">Finalize Tour</h3>
-                <p className="text-sm text-surface-500">Add to Tour Tracker</p>
+                <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">Finalize Tour</h3>
+                <p className="text-sm text-surface-400 light:text-surface-500">Add to Tour Tracker</p>
               </div>
             </div>
 
-            <div className="bg-surface-50 rounded-lg p-4 mb-6 space-y-2">
+            <div className="bg-surface-800 light:bg-surface-50 rounded-lg p-4 mb-6 space-y-2 border border-surface-700 light:border-transparent">
               <div className="flex justify-between text-sm">
-                <span className="text-surface-500">Client</span>
-                <span className="font-medium text-surface-900">{clientName}</span>
+                <span className="text-surface-400 light:text-surface-500">Client</span>
+                <span className="font-medium text-surface-100 light:text-surface-900">{clientName}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-surface-500">Dates</span>
-                <span className="font-medium text-surface-900">
+                <span className="text-surface-400 light:text-surface-500">Dates</span>
+                <span className="font-medium text-surface-100 light:text-surface-900">
                   {new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {new Date(endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-surface-500">Travelers</span>
-                <span className="font-medium text-surface-900">
+                <span className="text-surface-400 light:text-surface-500">Travelers</span>
+                <span className="font-medium text-surface-100 light:text-surface-900">
                   {paxAdults} adults{paxChildren > 0 && `, ${paxChildren} children`}
                 </span>
               </div>
             </div>
 
-            <p className="text-surface-600 mb-6">
+            <p className="text-surface-400 light:text-surface-600 mb-6">
               This will add the tour to the Tour Tracker where you can assign a driver and monitor the trip.
             </p>
 

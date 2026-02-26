@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Select, RoomQuantitySelector } from "@/components/ui";
+import { FormSection, AnimatedSuccessCard } from "@/components/ui/FormSection";
 import {
   countries,
   hotelTypes,
@@ -193,46 +194,46 @@ export function GroupInquiryForm() {
 
   if (submitted) {
     return (
-      <div className="card max-w-md mx-auto p-8 text-center animate-fade-in">
-        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
-          <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <AnimatedSuccessCard className="card max-w-md mx-auto p-8 text-center">
+        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-900/50 light:bg-green-100 border border-green-700 light:border-green-200 flex items-center justify-center">
+          <svg className="w-8 h-8 text-green-400 light:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-2xl font-semibold text-surface-900 mb-2">
+        <h1 className="text-2xl font-semibold text-surface-100 light:text-surface-900 mb-2">
           Thank You!
         </h1>
-        <p className="text-surface-600 mb-6">
+        <p className="text-surface-300 light:text-surface-600 mb-6">
           Your group travel inquiry has been submitted successfully. Our team will review your request and get back to you shortly.
         </p>
         <Button variant="primary" onClick={() => router.refresh()}>
           Submit Another Inquiry
         </Button>
-      </div>
+      </AnimatedSuccessCard>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="p-4 bg-red-900/30 light:bg-red-50 border border-red-700 light:border-red-200 rounded-lg">
+          <p className="text-sm text-red-300 light:text-red-700">{error}</p>
         </div>
       )}
 
       {/* Head of Group Information */}
-      <div className="card p-6 animate-slide-up">
+      <FormSection index={0} className="card p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-            <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-8 h-8 rounded-full bg-primary-900/50 flex items-center justify-center border border-primary-700/50">
+            <svg className="w-4 h-4 text-primary-300 light:text-primary-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-surface-900">
+            <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">
               Head of Group / Contact Person
             </h3>
-            <p className="text-sm text-surface-500">Main contact for this group booking</p>
+            <p className="text-sm text-surface-400 light:text-surface-500">Main contact for this group booking</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -293,11 +294,11 @@ export function GroupInquiryForm() {
             required
           />
         </div>
-      </div>
+      </FormSection>
 
       {/* Travel Dates */}
-      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">
+      <FormSection index={1} className="card p-6">
+        <h3 className="text-lg font-semibold text-surface-100 mb-4">
           Travel Dates
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -321,16 +322,16 @@ export function GroupInquiryForm() {
           />
           <div>
             <label className="label">No. of Nights</label>
-            <div className="input bg-surface-50 text-surface-700 flex items-center">
+            <div className="input bg-surface-800 light:bg-surface-100 text-surface-200 light:text-surface-800 flex items-center border-surface-600 light:border-surface-300">
               {calculateNights()} nights
             </div>
           </div>
         </div>
-      </div>
+      </FormSection>
 
       {/* Group Size */}
-      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.15s" }}>
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">
+      <FormSection index={2} className="card p-6">
+        <h3 className="text-lg font-semibold text-surface-100 mb-4">
           Group Size
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -357,26 +358,26 @@ export function GroupInquiryForm() {
           />
           <div>
             <label className="label">Total Pax</label>
-            <div className="input bg-primary-50 text-primary-700 font-semibold flex items-center border-primary-200">
+            <div className="input bg-primary-900/50 light:bg-primary-50 text-primary-300 light:text-primary-800 font-semibold flex items-center border-primary-700/50 light:border-primary-200 border">
               {Number(formData.no_of_adults) + Number(formData.no_of_children)} travelers
             </div>
           </div>
         </div>
-      </div>
+      </FormSection>
 
       {/* Adult Members Names */}
-      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.2s" }}>
+      <FormSection index={3} className="card p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-            <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-8 h-8 rounded-full bg-primary-900/50 flex items-center justify-center border border-primary-700/50">
+            <svg className="w-4 h-4 text-primary-300 light:text-primary-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-surface-900">
+            <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">
               Adult Members ({formData.no_of_adults})
             </h3>
-            <p className="text-sm text-surface-500">Enter the full names of all adult travelers</p>
+            <p className="text-sm text-surface-400 light:text-surface-500">Enter the full names of all adult travelers</p>
           </div>
         </div>
         
@@ -387,7 +388,7 @@ export function GroupInquiryForm() {
         <div className="space-y-3">
           {adultMembers.map((member, index) => (
             <div key={index} className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-surface-100 flex items-center justify-center text-sm font-medium text-surface-600 flex-shrink-0">
+              <span className="w-8 h-8 rounded-full bg-surface-700 light:bg-surface-200 flex items-center justify-center text-sm font-medium text-surface-300 light:text-surface-600 flex-shrink-0">
                 {index + 1}
               </span>
               <Input
@@ -402,22 +403,22 @@ export function GroupInquiryForm() {
             </div>
           ))}
         </div>
-      </div>
+      </FormSection>
 
       {/* Child Members Names */}
       {Number(formData.no_of_children) > 0 && (
-        <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.25s" }}>
+        <FormSection index={4} className="card p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-              <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-8 h-8 rounded-full bg-amber-900/50 light:bg-amber-100 flex items-center justify-center border border-amber-700/50 light:border-amber-200">
+              <svg className="w-4 h-4 text-amber-300 light:text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-surface-900">
+              <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">
                 Children ({formData.no_of_children})
               </h3>
-              <p className="text-sm text-surface-500">Enter the full names of all children</p>
+              <p className="text-sm text-surface-400 light:text-surface-500">Enter the full names of all children</p>
             </div>
           </div>
           
@@ -428,7 +429,7 @@ export function GroupInquiryForm() {
           <div className="space-y-3">
             {childMembers.map((member, index) => (
               <div key={index} className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-sm font-medium text-amber-600 flex-shrink-0">
+                <span className="w-8 h-8 rounded-full bg-amber-900/50 light:bg-amber-100 flex items-center justify-center text-sm font-medium text-amber-300 light:text-amber-700 flex-shrink-0 border border-amber-700/50 light:border-amber-200">
                   {index + 1}
                 </span>
                 <Input
@@ -443,12 +444,12 @@ export function GroupInquiryForm() {
               </div>
             ))}
           </div>
-        </div>
+        </FormSection>
       )}
 
       {/* Accommodation */}
-      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.3s" }}>
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">
+      <FormSection index={5} className="card p-6">
+        <h3 className="text-lg font-semibold text-surface-100 mb-4">
           Accommodation Preferences
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -475,14 +476,14 @@ export function GroupInquiryForm() {
         </div>
 
         {/* Room Quantities */}
-        <div className="border-t border-surface-200 pt-6">
+        <div className="border-t border-surface-600 light:border-surface-200 pt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h4 className="font-medium text-surface-900">Number of Rooms</h4>
-              <p className="text-sm text-surface-500">Select the number of each room type you need</p>
+              <h4 className="font-medium text-surface-100">Number of Rooms</h4>
+              <p className="text-sm text-surface-400 light:text-surface-500">Select the number of each room type you need</p>
             </div>
             {totalRooms > 0 && (
-              <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
+              <span className="px-3 py-1 bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800 rounded-full text-sm font-medium border border-primary-700/50 light:border-primary-200">
                 {totalRooms} room{totalRooms !== 1 ? "s" : ""} selected
               </span>
             )}
@@ -523,14 +524,14 @@ export function GroupInquiryForm() {
             />
           </div>
         </div>
-      </div>
+      </FormSection>
 
       {/* Activities */}
-      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.35s" }}>
-        <h3 className="text-lg font-semibold text-surface-900 mb-2">
+      <FormSection index={6} className="card p-6">
+        <h3 className="text-lg font-semibold text-surface-100 mb-2">
           Activities
         </h3>
-        <p className="text-sm text-surface-500 mb-4">
+        <p className="text-sm text-surface-400 mb-4">
           Select the activities your group is interested in
         </p>
         {fieldErrors.activities && (
@@ -542,8 +543,8 @@ export function GroupInquiryForm() {
               key={activity}
               className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
                 selectedActivities.includes(activity)
-                  ? "border-primary-500 bg-primary-50"
-                  : "border-surface-200 hover:border-surface-300 bg-white"
+                  ? "border-primary-500 bg-primary-900/50 light:bg-primary-50"
+                  : "border-surface-600 light:border-surface-300 hover:border-surface-500 light:hover:border-surface-400 bg-surface-800 light:bg-white"
               }`}
             >
               <input
@@ -554,15 +555,15 @@ export function GroupInquiryForm() {
               />
               <span className={`text-sm font-medium ${
                 selectedActivities.includes(activity)
-                  ? "text-primary-700"
-                  : "text-surface-700"
+                  ? "text-primary-300 light:text-primary-700"
+                  : "text-surface-300 light:text-surface-600"
               }`}>
                 {activity}
               </span>
             </label>
           ))}
         </div>
-      </div>
+      </FormSection>
 
       {/* Submit */}
       <div className="flex justify-center pt-4">

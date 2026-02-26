@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { Button, Badge } from "@/components/ui";
 
@@ -65,14 +66,13 @@ interface Driver {
 interface TourTrackerProps {
   tours: Tour[];
   drivers: Driver[];
-  onAssignDriver?: (tourId: string, driverId: string) => Promise<void>;
 }
 
 const statusColors = {
-  upcoming: "bg-blue-100 text-blue-700 border-blue-300",
-  ongoing: "bg-green-100 text-green-700 border-green-300",
-  completed: "bg-surface-100 text-surface-700 border-surface-300",
-  cancelled: "bg-red-100 text-red-700 border-red-300",
+  upcoming: "bg-primary-900/50 text-primary-300 border border-primary-700/50",
+  ongoing: "bg-green-900/50 text-green-300 border border-green-700/50",
+  completed: "bg-surface-800 text-surface-300 border border-surface-600",
+  cancelled: "bg-red-900/50 text-red-300 border border-red-700/50",
 };
 
 const statusLabels = {
@@ -82,10 +82,9 @@ const statusLabels = {
   cancelled: "Cancelled",
 };
 
-export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps) {
+export function TourTracker({ tours, drivers }: TourTrackerProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
-  const [assigningDriver, setAssigningDriver] = useState(false);
 
   // Generate days for current month view
   const monthDays = useMemo(() => {
@@ -160,19 +159,6 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
     return colors[index % colors.length];
   };
 
-  const handleAssignDriver = async (driverId: string) => {
-    if (!selectedTour || !onAssignDriver) return;
-    setAssigningDriver(true);
-    try {
-      await onAssignDriver(selectedTour.id, driverId);
-      setSelectedTour(null);
-    } catch (error) {
-      console.error("Error assigning driver:", error);
-    } finally {
-      setAssigningDriver(false);
-    }
-  };
-
   // Weekday headers
   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -180,33 +166,38 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
   const startOffset = startOfMonth(currentMonth).getDay();
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      className="space-y-6"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+    >
       {/* Calendar Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold text-surface-900">
+          <h2 className="text-2xl font-bold text-surface-100 light:text-surface-900">
             {format(currentMonth, "MMMM yyyy")}
           </h2>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="p-2 hover:bg-surface-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-surface-800 light:hover:bg-surface-200 rounded-lg transition-colors"
             >
-              <svg className="w-5 h-5 text-surface-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 text-surface-400 light:text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <button
               onClick={() => setCurrentMonth(new Date())}
-              className="px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-sm font-medium text-accent-400 light:text-accent-600 hover:bg-accent-500/20 light:hover:bg-accent-100 rounded-lg transition-colors"
             >
               Today
             </button>
             <button
               onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="p-2 hover:bg-surface-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-surface-800 light:hover:bg-surface-200 rounded-lg transition-colors"
             >
-              <svg className="w-5 h-5 text-surface-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 text-surface-400 light:text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -216,16 +207,16 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
         {/* Legend */}
         <div className="flex items-center gap-4 text-xs">
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-blue-500"></div>
-            <span className="text-surface-600">Tour Active</span>
+            <div className="w-3 h-3 rounded bg-primary-500"></div>
+            <span className="text-surface-400 light:text-surface-600">Tour Active</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-white border-2 border-green-500"></div>
-            <span className="text-surface-600">Arrival</span>
+            <div className="w-3 h-3 rounded-full bg-surface-900 light:bg-white border-2 border-green-500"></div>
+            <span className="text-surface-400 light:text-surface-600">Arrival</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-white border-2 border-red-500"></div>
-            <span className="text-surface-600">Departure</span>
+            <div className="w-3 h-3 rounded-full bg-surface-900 light:bg-white border-2 border-red-500"></div>
+            <span className="text-surface-400 light:text-surface-600">Departure</span>
           </div>
         </div>
       </div>
@@ -233,9 +224,9 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
       {/* Calendar Grid */}
       <div className="card overflow-hidden">
         {/* Weekday Headers */}
-        <div className="grid grid-cols-7 bg-surface-50 border-b border-surface-200">
+        <div className="grid grid-cols-7 bg-surface-800/50 light:bg-surface-100 border-b border-surface-700 light:border-surface-200">
           {weekdays.map((day) => (
-            <div key={day} className="px-2 py-3 text-center text-sm font-medium text-surface-600">
+            <div key={day} className="px-2 py-3 text-center text-sm font-medium text-surface-400 light:text-surface-600">
               {day}
             </div>
           ))}
@@ -245,7 +236,7 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
         <div className="grid grid-cols-7">
           {/* Empty cells for offset */}
           {Array.from({ length: startOffset }).map((_, i) => (
-            <div key={`offset-${i}`} className="min-h-[120px] bg-surface-50/50 border-b border-r border-surface-100" />
+            <div key={`offset-${i}`} className="min-h-[120px] bg-surface-800/30 light:bg-surface-50 border-b border-r border-surface-700 light:border-surface-200" />
           ))}
 
           {/* Day cells */}
@@ -256,8 +247,8 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-[160px] border-b border-r border-surface-100 p-1 ${
-                  isCurrentDay ? "bg-primary-50/50" : "bg-white"
+                className={`min-h-[160px] border-b border-r border-surface-700 light:border-surface-200 p-1 ${
+                  isCurrentDay ? "bg-primary-900/20 light:bg-primary-100" : ""
                 }`}
               >
                 {/* Day Number */}
@@ -265,8 +256,8 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
                   <span
                     className={`text-sm font-medium ${
                       isCurrentDay
-                        ? "w-7 h-7 rounded-full bg-primary-600 text-white flex items-center justify-center"
-                        : "text-surface-700"
+                        ? "w-7 h-7 rounded-full bg-accent-500 text-white light:text-black flex items-center justify-center"
+                        : "text-surface-400 light:text-surface-600"
                     }`}
                   >
                     {format(day, "d")}
@@ -311,7 +302,7 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
                         
                         {/* Day info - Location and Hotel */}
                         {hasDayInfo && (
-                          <div className="px-2 py-1 text-[10px] text-surface-600 bg-surface-50 rounded-b-md border-t border-surface-200">
+                          <div className="px-2 py-1 text-[10px] text-surface-400 light:text-surface-600 bg-surface-800 light:bg-surface-50 rounded-b-md border-t border-surface-700 light:border-surface-200">
                             {itineraryDay.overnight_location && (
                               <div className="truncate mb-0.5" title={itineraryDay.overnight_location}>
                                 <span className="mr-1">📍</span>
@@ -330,7 +321,7 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
                     );
                   })}
                   {dayTours.length > 2 && (
-                    <div className="px-2 text-xs text-surface-500">
+                    <div className="px-2 text-xs text-surface-400 light:text-surface-500">
                       +{dayTours.length - 2} more
                     </div>
                   )}
@@ -343,28 +334,28 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
 
       {/* Upcoming Tours List */}
       <div className="card">
-        <div className="px-6 py-4 border-b border-surface-200">
-          <h3 className="text-lg font-semibold text-surface-900">Active & Upcoming Tours</h3>
+        <div className="px-6 py-4 border-b border-surface-700 light:border-surface-200">
+          <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">Active & Upcoming Tours</h3>
         </div>
-        <div className="divide-y divide-surface-100">
+        <div className="divide-y divide-surface-700 light:divide-surface-200">
           {tours
             .filter((t) => t.status === "upcoming" || t.status === "ongoing")
             .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
             .map((tour) => (
               <div
                 key={tour.id}
-                className="p-4 hover:bg-surface-50 transition-colors cursor-pointer"
+                className="p-4 hover:bg-surface-800/50 light:hover:bg-surface-50 transition-colors cursor-pointer"
                 onClick={() => setSelectedTour(tour)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-lg bg-primary-100 flex items-center justify-center text-primary-700 font-bold">
+                    <div className="w-12 h-12 rounded-lg bg-primary-900/50 light:bg-primary-100 border border-primary-700/50 light:border-transparent flex items-center justify-center text-primary-300 light:text-primary-700 font-bold">
                       {format(parseISO(tour.start_date), "dd")}
                       <span className="text-xs ml-0.5">{format(parseISO(tour.start_date), "MMM")}</span>
                     </div>
                     <div>
-                      <h4 className="font-medium text-surface-900">{tour.client_name}</h4>
-                      <p className="text-sm text-surface-500">
+                      <h4 className="font-medium text-surface-100 light:text-surface-900">{tour.client_name}</h4>
+                      <p className="text-sm text-surface-400 light:text-surface-500">
                         {format(parseISO(tour.start_date), "MMM d")} - {format(parseISO(tour.end_date), "MMM d, yyyy")}
                         <span className="mx-2">•</span>
                         {tour.pax_adults + tour.pax_children} pax
@@ -374,8 +365,8 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
                   <div className="flex items-center gap-3">
                     {tour.driver ? (
                       <div className="text-right">
-                        <p className="text-sm font-medium text-surface-900">{tour.driver.name}</p>
-                        <p className="text-xs text-surface-500">{tour.driver.vehicle_number}</p>
+                        <p className="text-sm font-medium text-surface-100 light:text-surface-900">{tour.driver.name}</p>
+                        <p className="text-xs text-surface-400 light:text-surface-500">{tour.driver.vehicle_number}</p>
                       </div>
                     ) : (
                       <Badge variant="yellow">No Driver</Badge>
@@ -388,7 +379,7 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
               </div>
             ))}
           {tours.filter((t) => t.status === "upcoming" || t.status === "ongoing").length === 0 && (
-            <div className="p-8 text-center text-surface-500">
+            <div className="p-8 text-center text-surface-400 light:text-surface-500">
               No active or upcoming tours
             </div>
           )}
@@ -398,22 +389,22 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
       {/* Tour Detail Modal */}
       {selectedTour && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-surface-200">
+          <div className="rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" style={{ backgroundColor: "var(--bg-surface)" }}>
+            <div className="p-6 border-b border-surface-700 light:border-surface-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-surface-900">
+                  <h2 className="text-xl font-semibold text-surface-100 light:text-surface-900">
                     {selectedTour.client_name}
                   </h2>
-                  <p className="text-sm text-surface-500">
+                  <p className="text-sm text-surface-500 light:text-surface-600">
                     {format(parseISO(selectedTour.start_date), "MMMM d")} - {format(parseISO(selectedTour.end_date), "MMMM d, yyyy")}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedTour(null)}
-                  className="p-2 hover:bg-surface-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-surface-800 light:hover:bg-surface-200 rounded-lg transition-colors"
                 >
-                  <svg className="w-5 h-5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-5 h-5 text-surface-400 light:text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -424,14 +415,14 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
               {/* Tour Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-surface-500 uppercase tracking-wider mb-1">Status</p>
-                  <Badge variant={selectedTour.status === "ongoing" ? "green" : selectedTour.status === "upcoming" ? "blue" : "default"}>
+                  <p className="text-xs text-surface-400 light:text-surface-500 uppercase tracking-wider mb-1">Status</p>
+                  <Badge variant={selectedTour.status === "ongoing" ? "green" : selectedTour.status === "upcoming" ? "blue" : "secondary"}>
                     {statusLabels[selectedTour.status]}
                   </Badge>
                 </div>
                 <div>
-                  <p className="text-xs text-surface-500 uppercase tracking-wider mb-1">Passengers</p>
-                  <p className="text-sm font-medium text-surface-900">
+                  <p className="text-xs text-surface-400 light:text-surface-500 uppercase tracking-wider mb-1">Passengers</p>
+                  <p className="text-sm font-medium text-surface-100 light:text-surface-900">
                     {selectedTour.pax_adults} adults
                     {selectedTour.pax_children > 0 && `, ${selectedTour.pax_children} children`}
                   </p>
@@ -440,58 +431,25 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
 
               {/* Driver Section */}
               <div>
-                <p className="text-xs text-surface-500 uppercase tracking-wider mb-2">Assigned Driver</p>
+                <p className="text-xs text-surface-400 light:text-surface-500 uppercase tracking-wider mb-2">Assigned Driver</p>
                 {selectedTour.driver ? (
-                  <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold">
+                  <div className="flex items-center gap-3 p-3 bg-green-900/30 light:bg-green-50 border border-green-700/50 light:border-green-200 rounded-lg">
+                    <div className="w-10 h-10 rounded-full bg-green-900/50 light:bg-green-100 flex items-center justify-center text-green-300 light:text-green-700 font-bold">
                       {selectedTour.driver.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                     </div>
                     <div>
-                      <p className="font-medium text-surface-900">{selectedTour.driver.name}</p>
-                      <p className="text-sm text-surface-500">
+                      <p className="font-medium text-surface-100 light:text-surface-900">{selectedTour.driver.name}</p>
+                      <p className="text-sm text-surface-400 light:text-surface-500">
                         {selectedTour.driver.contact_number}
                         {selectedTour.driver.vehicle_number && ` • ${selectedTour.driver.vehicle_number}`}
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <p className="text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
-                      No driver assigned yet
+                  <div className="p-3 bg-accent-900/30 light:bg-accent-50 border border-accent-700/50 light:border-accent-200 rounded-lg">
+                    <p className="text-sm text-accent-300 light:text-accent-800">
+                      No driver assigned. Assign a driver from the Drivers section.
                     </p>
-                    <div>
-                      <p className="text-sm font-medium text-surface-700 mb-2">Available Drivers:</p>
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {drivers.map((driver) => (
-                            <button
-                              key={driver.id}
-                              onClick={() => handleAssignDriver(driver.id)}
-                              disabled={assigningDriver}
-                              className="w-full flex items-center justify-between p-3 bg-surface-50 hover:bg-surface-100 border border-surface-200 rounded-lg transition-colors disabled:opacity-50"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-sm">
-                                  {driver.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                                </div>
-                                <div className="text-left">
-                                  <p className="text-sm font-medium text-surface-900">{driver.name}</p>
-                                  <p className="text-xs text-surface-500">
-                                    {driver.vehicle_type} {driver.vehicle_number && `• ${driver.vehicle_number}`}
-                                  </p>
-                                </div>
-                              </div>
-                              <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                              </svg>
-                            </button>
-                          ))}
-                        {drivers.length === 0 && (
-                          <p className="text-sm text-surface-500 text-center py-4">
-                            No available drivers
-                          </p>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
@@ -499,10 +457,10 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
               {/* Itinerary Preview */}
               {selectedTour.itinerary && (
                 <div>
-                  <p className="text-xs text-surface-500 uppercase tracking-wider mb-2">Itinerary</p>
-                  <div className="p-3 bg-surface-50 border border-surface-200 rounded-lg">
-                    <p className="font-medium text-surface-900">{selectedTour.itinerary.content.title}</p>
-                    <p className="text-sm text-surface-500">
+                  <p className="text-xs text-surface-400 light:text-surface-500 uppercase tracking-wider mb-2">Itinerary</p>
+                  <div className="p-3 bg-surface-800 light:bg-surface-50 border border-surface-700 light:border-surface-200 rounded-lg">
+                    <p className="font-medium text-surface-100 light:text-surface-900">{selectedTour.itinerary.content.title}</p>
+                    <p className="text-sm text-surface-400 light:text-surface-500">
                       {selectedTour.itinerary.content.days?.length || 0} days
                     </p>
                   </div>
@@ -510,7 +468,7 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
               )}
             </div>
 
-            <div className="p-6 border-t border-surface-200">
+            <div className="p-6 border-t border-surface-700 light:border-surface-200">
               <Button variant="secondary" className="w-full" onClick={() => setSelectedTour(null)}>
                 Close
               </Button>
@@ -518,6 +476,6 @@ export function TourTracker({ tours, drivers, onAssignDriver }: TourTrackerProps
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

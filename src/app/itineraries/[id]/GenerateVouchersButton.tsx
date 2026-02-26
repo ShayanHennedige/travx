@@ -81,13 +81,14 @@ export function GenerateVouchersButton({
       <Button
         variant="secondary"
         onClick={() => setShowModal(true)}
+        className="hover:bg-accent-500 hover:text-black hover:border-accent-500"
       >
         <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" />
         </svg>
         Generate Vouchers
         {existingVouchersCount > 0 && (
-          <span className="ml-2 px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full text-xs">
+          <span className="ml-2 px-2 py-0.5 bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-700 rounded-full text-xs border border-primary-700/50 light:border-transparent">
             {existingVouchersCount} existing
           </span>
         )}
@@ -95,47 +96,47 @@ export function GenerateVouchersButton({
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+          <div className="rounded-xl shadow-xl max-w-lg w-full p-6" style={{ backgroundColor: "var(--bg-surface)" }}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 rounded-full bg-primary-900/50 light:bg-primary-100 flex items-center justify-center border border-primary-700/50 light:border-transparent">
+                <svg className="w-5 h-5 text-primary-300 light:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-surface-900">Generate Hotel Vouchers</h3>
-                <p className="text-sm text-surface-500">Create vouchers for each hotel in the itinerary</p>
+                <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">Generate Hotel Vouchers</h3>
+                <p className="text-sm text-surface-400 light:text-surface-500">Create vouchers for each hotel in the itinerary</p>
               </div>
             </div>
 
             <div className="mb-6">
-              <p className="text-surface-600 mb-4">
+              <p className="text-surface-400 light:text-surface-600 mb-4">
                 This will create <strong>{hotels.length} hotel voucher{hotels.length !== 1 ? "s" : ""}</strong> for:
               </p>
-              <div className="bg-surface-50 rounded-lg p-4 max-h-48 overflow-y-auto">
+              <div className="bg-surface-800 light:bg-surface-50 rounded-lg p-4 max-h-48 overflow-y-auto border border-surface-700 light:border-transparent">
                 <ul className="space-y-2">
                   {hotels.map((hotel, index) => (
                     <li key={index} className="flex items-center gap-2 text-sm">
-                      <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-medium">
+                      <span className="w-6 h-6 rounded-full bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-700 flex items-center justify-center text-xs font-medium border border-primary-700/50 light:border-transparent">
                         {index + 1}
                       </span>
-                      <span className="font-medium text-surface-900">{hotel.hotel_name}</span>
-                      <span className="text-surface-500">({hotel.no_of_nights} nights)</span>
+                      <span className="font-medium text-surface-100 light:text-surface-900">{hotel.hotel_name}</span>
+                      <span className="text-surface-400 light:text-surface-500">({hotel.no_of_nights} nights)</span>
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6">
-              <p className="text-sm text-yellow-700">
+            <div className="bg-accent-900/30 light:bg-yellow-50 border border-accent-700/50 light:border-yellow-200 rounded-lg p-3 mb-6">
+              <p className="text-sm text-accent-300 light:text-yellow-700">
                 <strong>Guest:</strong> {guestName} ({paxAdults} adults{paxChildren > 0 ? `, ${paxChildren} children` : ""})
               </p>
             </div>
 
             {existingVouchersCount > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-                <p className="text-sm text-blue-700">
+              <div className="bg-primary-900/30 light:bg-blue-50 border border-primary-700/50 light:border-blue-200 rounded-lg p-3 mb-6">
+                <p className="text-sm text-primary-300 light:text-blue-700">
                   ⓘ There are already {existingVouchersCount} vouchers for this itinerary. New vouchers will be added.
                 </p>
               </div>

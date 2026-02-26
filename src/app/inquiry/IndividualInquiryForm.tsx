@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Select, RoomQuantitySelector } from "@/components/ui";
+import { FormSection, AnimatedSuccessCard } from "@/components/ui/FormSection";
 import {
   publicInquirySchema,
   countries,
@@ -143,36 +144,36 @@ export function IndividualInquiryForm() {
 
   if (submitted) {
     return (
-      <div className="card max-w-md mx-auto p-8 text-center animate-fade-in">
-        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
-          <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <AnimatedSuccessCard className="card max-w-md mx-auto p-8 text-center">
+        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-900/50 light:bg-green-100 border border-green-700 light:border-green-200 flex items-center justify-center">
+          <svg className="w-8 h-8 text-green-400 light:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-2xl font-semibold text-surface-900 mb-2">
+        <h1 className="text-2xl font-semibold text-surface-100 light:text-surface-900 mb-2">
           Thank You!
         </h1>
-        <p className="text-surface-600 mb-6">
+        <p className="text-surface-300 light:text-surface-600 mb-6">
           Your travel inquiry has been submitted successfully. Our team will review your request and get back to you shortly.
         </p>
         <Button variant="primary" onClick={() => router.refresh()}>
           Submit Another Inquiry
         </Button>
-      </div>
+      </AnimatedSuccessCard>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="p-4 bg-red-900/30 light:bg-red-50 border border-red-700 light:border-red-200 rounded-lg">
+          <p className="text-sm text-red-300 light:text-red-700">{error}</p>
         </div>
       )}
 
       {/* Personal Information */}
-      <div className="card p-6 animate-slide-up">
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">
+      <FormSection index={0} className="card p-6">
+        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
           Personal Information
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -233,11 +234,11 @@ export function IndividualInquiryForm() {
             required
           />
         </div>
-      </div>
+      </FormSection>
 
       {/* Travel Dates */}
-      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">
+      <FormSection index={1} className="card p-6">
+        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
           Travel Dates
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -261,16 +262,16 @@ export function IndividualInquiryForm() {
           />
           <div>
             <label className="label">No. of Nights</label>
-            <div className="input bg-surface-50 text-surface-700 flex items-center">
+            <div className="input bg-surface-800 light:bg-surface-100 text-surface-200 light:text-surface-800 flex items-center border-surface-600 light:border-surface-300">
               {calculateNights()} nights
             </div>
           </div>
         </div>
-      </div>
+      </FormSection>
 
       {/* Travelers */}
-      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.15s" }}>
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">
+      <FormSection index={2} className="card p-6">
+        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
           Number of Travelers
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -296,11 +297,11 @@ export function IndividualInquiryForm() {
             error={fieldErrors.no_of_children}
           />
         </div>
-      </div>
+      </FormSection>
 
       {/* Accommodation */}
-      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.2s" }}>
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">
+      <FormSection index={3} className="card p-6">
+        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
           Accommodation Preferences
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -327,14 +328,14 @@ export function IndividualInquiryForm() {
         </div>
 
         {/* Room Quantities */}
-        <div className="border-t border-surface-200 pt-6">
+        <div className="border-t border-surface-600 light:border-surface-200 pt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h4 className="font-medium text-surface-900">Number of Rooms</h4>
-              <p className="text-sm text-surface-500">Select the number of each room type you need</p>
+              <h4 className="font-medium text-surface-100 light:text-surface-900">Number of Rooms</h4>
+              <p className="text-sm text-surface-400 light:text-surface-500">Select the number of each room type you need</p>
             </div>
             {totalRooms > 0 && (
-              <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
+              <span className="px-3 py-1 bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800 rounded-full text-sm font-medium border border-primary-700/50 light:border-primary-200">
                 {totalRooms} room{totalRooms !== 1 ? "s" : ""} selected
               </span>
             )}
@@ -371,14 +372,14 @@ export function IndividualInquiryForm() {
             />
           </div>
         </div>
-      </div>
+      </FormSection>
 
       {/* Activities */}
-      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.25s" }}>
-        <h3 className="text-lg font-semibold text-surface-900 mb-2">
+      <FormSection index={4} className="card p-6">
+        <h3 className="text-lg font-semibold text-surface-100 mb-2">
           Activities
         </h3>
-        <p className="text-sm text-surface-500 mb-4">
+        <p className="text-sm text-surface-400 light:text-surface-500 mb-4">
           Select the activities you are interested in
         </p>
         {fieldErrors.activities && (
@@ -390,8 +391,8 @@ export function IndividualInquiryForm() {
               key={activity}
               className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
                 selectedActivities.includes(activity)
-                  ? "border-primary-500 bg-primary-50"
-                  : "border-surface-200 hover:border-surface-300 bg-white"
+                  ? "border-primary-500 bg-primary-900/50 light:bg-primary-50"
+                  : "border-surface-600 light:border-surface-300 hover:border-surface-500 light:hover:border-surface-400 bg-surface-800 light:bg-white"
               }`}
             >
               <input
@@ -402,15 +403,15 @@ export function IndividualInquiryForm() {
               />
               <span className={`text-sm font-medium ${
                 selectedActivities.includes(activity)
-                  ? "text-primary-700"
-                  : "text-surface-700"
+                  ? "text-primary-300 light:text-primary-700"
+                  : "text-surface-300 light:text-surface-600"
               }`}>
                 {activity}
               </span>
             </label>
           ))}
         </div>
-      </div>
+      </FormSection>
 
       {/* Submit */}
       <div className="flex justify-center pt-4">

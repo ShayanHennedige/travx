@@ -234,7 +234,7 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
               inquiryNumber={inquiry?.inquiry_number}
             />
             <Link href="/itineraries">
-              <Button variant="secondary">Back to List</Button>
+              <Button variant="secondary" className="hover:bg-accent-500 hover:text-black hover:border-accent-500">Back to List</Button>
             </Link>
           </div>
         }
@@ -254,55 +254,55 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
           {/* Linked Inquiry Info */}
           {inquiry && (
             <div className="card p-6">
-              <h3 className="text-sm font-semibold text-surface-900 mb-4 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-surface-100 light:text-surface-900 mb-4 flex items-center gap-2">
                 Linked Inquiry
                 {isGroup && (
-                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">Group</span>
+                  <span className="px-2 py-0.5 bg-purple-900/50 light:bg-purple-100 text-purple-300 light:text-purple-700 rounded text-xs border border-purple-700/50 light:border-transparent">Group</span>
                 )}
               </h3>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-surface-500 uppercase tracking-wider">Client</p>
-                  <p className="text-sm font-medium text-surface-900">{guestName}</p>
-                  <p className="text-xs text-surface-500">{inquiry.client_email}</p>
+                  <p className="text-xs text-surface-400 light:text-surface-500 uppercase tracking-wider">Client</p>
+                  <p className="text-sm font-medium text-surface-100 light:text-surface-900">{guestName}</p>
+                  <p className="text-xs text-surface-400 light:text-surface-500">{inquiry.client_email}</p>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-surface-500">Inquiry #</span>
-                  <Link href={inquiryLink} className="text-primary-600 hover:text-primary-700 font-medium">
+                  <span className="text-surface-400 light:text-surface-500">Inquiry #</span>
+                  <Link href={inquiryLink} className="text-primary-400 light:text-primary-600 hover:text-primary-300 light:hover:text-primary-700 font-medium">
                     {inquiry.inquiry_number}
                   </Link>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-surface-500">Travel Dates</span>
-                  <span className="text-surface-900">
+                  <span className="text-surface-400 light:text-surface-500">Travel Dates</span>
+                  <span className="text-surface-100 light:text-surface-900">
                     {format(new Date(inquiry.arriving_date), "MMM d")} - {format(new Date(inquiry.departure_date), "MMM d")}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-surface-500">Duration</span>
-                  <span className="text-surface-900">{inquiry.no_of_nights} nights</span>
+                  <span className="text-surface-400 light:text-surface-500">Duration</span>
+                  <span className="text-surface-100 light:text-surface-900">{inquiry.no_of_nights} nights</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-surface-500">Travelers</span>
-                  <span className="text-surface-900">
+                  <span className="text-surface-400 light:text-surface-500">Travelers</span>
+                  <span className="text-surface-100 light:text-surface-900">
                     {paxAdults} adults{paxChildren > 0 && `, ${paxChildren} children`}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-surface-500">Hotel Type</span>
-                  <span className="text-surface-900">{inquiry.hotel_type || "Not specified"}</span>
+                  <span className="text-surface-400 light:text-surface-500">Hotel Type</span>
+                  <span className="text-surface-100 light:text-surface-900">{inquiry.hotel_type || "Not specified"}</span>
                 </div>
               </div>
 
               {/* Activities */}
               {inquiry.activities && inquiry.activities.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-surface-200">
-                  <p className="text-xs text-surface-500 uppercase tracking-wider mb-2">Requested Activities</p>
+                <div className="mt-4 pt-4 border-t border-surface-600 light:border-surface-200">
+                  <p className="text-xs text-surface-400 light:text-surface-500 uppercase tracking-wider mb-2">Requested Activities</p>
                   <div className="flex flex-wrap gap-1">
                     {inquiry.activities.map((activity: string) => (
                       <span
                         key={activity}
-                        className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded text-xs"
+                        className="px-2 py-0.5 bg-primary-900/50 light:bg-primary-50 text-primary-300 light:text-primary-700 rounded text-xs border border-primary-700/50 light:border-transparent"
                       >
                         {activity}
                       </span>
@@ -316,28 +316,28 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
           {/* Hotels in Itinerary */}
           {hotels.length > 0 && (
             <div className="card p-6">
-              <h3 className="text-sm font-semibold text-surface-900 mb-4 flex items-center gap-2">
-                <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <h3 className="text-sm font-semibold text-surface-100 light:text-surface-900 mb-4 flex items-center gap-2">
+                <svg className="w-4 h-4 text-primary-400 light:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
                 Hotels ({hotels.length})
               </h3>
               <div className="space-y-3">
                 {hotels.map((hotel, index) => (
-                  <div key={index} className="flex items-center gap-3 p-2 bg-surface-50 rounded-lg">
-                    <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-medium">
+                  <div key={index} className="flex items-center gap-3 p-2 bg-surface-800 light:bg-surface-50 rounded-lg border border-surface-700 light:border-transparent">
+                    <span className="w-6 h-6 rounded-full bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-700 flex items-center justify-center text-xs font-medium border border-primary-700/50 light:border-transparent">
                       {index + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-surface-900 truncate">{hotel.hotel_name}</p>
-                      <p className="text-xs text-surface-500">{hotel.no_of_nights} nights • {hotel.location}</p>
+                      <p className="text-sm font-medium text-surface-100 light:text-surface-900 truncate">{hotel.hotel_name}</p>
+                      <p className="text-xs text-surface-400 light:text-surface-500">{hotel.no_of_nights} nights • {hotel.location}</p>
                     </div>
                   </div>
                 ))}
               </div>
               {(vouchersCount || 0) > 0 && (
-                <div className="mt-4 pt-4 border-t border-surface-200">
-                  <Link href={`/vouchers?itinerary_id=${itinerary.id}`} className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                <div className="mt-4 pt-4 border-t border-surface-600 light:border-surface-200">
+                  <Link href={`/vouchers?itinerary_id=${itinerary.id}`} className="text-sm text-primary-400 light:text-primary-600 hover:text-primary-300 light:hover:text-primary-700 font-medium">
                     View {vouchersCount} existing voucher{vouchersCount !== 1 ? "s" : ""} →
                   </Link>
                 </div>
@@ -347,21 +347,21 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
 
           {/* Quick Stats */}
           <div className="card p-6">
-            <h3 className="text-sm font-semibold text-surface-900 mb-4">
+            <h3 className="text-sm font-semibold text-surface-100 light:text-surface-900 mb-4">
               Itinerary Summary
             </h3>
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-surface-500">Total Days</span>
-                <span className="text-surface-900 font-medium">{content.days.length}</span>
+                <span className="text-surface-400 light:text-surface-500">Total Days</span>
+                <span className="text-surface-100 light:text-surface-900 font-medium">{content.days.length}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-surface-500">Total Driving</span>
-                <span className="text-surface-900 font-medium">{content.total_driving_hours}</span>
+                <span className="text-surface-400 light:text-surface-500">Total Driving</span>
+                <span className="text-surface-100 light:text-surface-900 font-medium">{content.total_driving_hours}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-surface-500">Last Updated</span>
-                <span className="text-surface-900">
+                <span className="text-surface-400 light:text-surface-500">Last Updated</span>
+                <span className="text-surface-100 light:text-surface-900">
                   {format(new Date(itinerary.updated_at), "MMM d, yyyy")}
                 </span>
               </div>
@@ -371,16 +371,16 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
           {/* Practical Tips */}
           {content.practical_notes && content.practical_notes.length > 0 && (
             <div className="card p-6">
-              <h3 className="text-sm font-semibold text-surface-900 mb-4 flex items-center gap-2">
-                <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <h3 className="text-sm font-semibold text-surface-100 light:text-surface-900 mb-4 flex items-center gap-2">
+                <svg className="w-4 h-4 text-primary-400 light:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Practical Tips
               </h3>
               <ul className="space-y-2">
                 {content.practical_notes.map((note, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm text-surface-700">
-                    <svg className="w-4 h-4 text-primary-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <li key={idx} className="flex items-start gap-2 text-sm text-surface-300 light:text-surface-700">
+                    <svg className="w-4 h-4 text-primary-500 light:text-primary-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <span>{note}</span>

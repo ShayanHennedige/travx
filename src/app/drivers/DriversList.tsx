@@ -137,7 +137,7 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
           <div className="flex-1 max-w-md">
             <div className="relative">
               <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400 light:text-surface-500"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -149,7 +149,7 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
                 placeholder="Search drivers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-surface-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white text-surface-100 light:text-surface-900 placeholder:text-surface-500 light:placeholder:text-surface-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm"
               />
             </div>
           </div>
@@ -165,127 +165,132 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
       {/* Stats */}
       <div className="card p-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-10 h-10 rounded-lg bg-primary-900/50 light:bg-primary-100 border border-primary-700/50 light:border-transparent flex items-center justify-center">
+            <svg className="w-5 h-5 text-primary-300 light:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
           </div>
           <div>
-            <p className="text-2xl font-bold text-surface-900">{drivers.length}</p>
-            <p className="text-sm text-surface-500">Total Drivers</p>
+            <p className="text-2xl font-bold text-surface-100 light:text-surface-900">{drivers.length}</p>
+            <p className="text-sm text-surface-400 light:text-surface-500">Total Drivers</p>
           </div>
         </div>
       </div>
 
-      {/* Drivers Grid */}
-      {filteredDrivers.length === 0 ? (
-        <div className="card p-12 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-100 flex items-center justify-center">
-            <svg className="w-8 h-8 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-surface-900 mb-1">No drivers found</h3>
-          <p className="text-surface-500 mb-6">
-            {searchQuery ? "Try a different search term" : "Add your first driver to get started"}
-          </p>
-          {!searchQuery && (
-            <Button onClick={handleAdd}>Add Driver</Button>
-          )}
+      {/* Drivers List - Compact Table */}
+      <div className="card overflow-hidden">
+        <div className="px-6 py-4 border-b border-surface-700 light:border-surface-200 bg-surface-800/50 light:bg-surface-50 flex items-center justify-between">
+          <h3 className="font-semibold text-surface-100 light:text-surface-900">Driver Directory ({filteredDrivers.length})</h3>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredDrivers.map((driver) => (
-            <div key={driver.id} className="card p-5 hover:shadow-lg transition-shadow">
-              <div className="flex items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-lg">
-                    {driver.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-surface-900">{driver.name}</h3>
-                    <p className="text-sm text-surface-500">{driver.contact_number}</p>
-                  </div>
-                </div>
-              </div>
 
-              {(driver.vehicle_type || driver.vehicle_number) && (
-                <div className="flex items-center gap-2 text-sm text-surface-600 mb-3">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                  </svg>
-                  <span>
-                    {driver.vehicle_type}
-                    {driver.vehicle_number && ` • ${driver.vehicle_number}`}
-                  </span>
-                </div>
-              )}
-
-              {driver.languages && driver.languages.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {driver.languages.map((lang) => (
-                    <span key={lang} className="px-2 py-0.5 bg-surface-100 text-surface-600 rounded text-xs">
-                      {lang}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 pt-3 border-t border-surface-100">
-                <Button variant="secondary" size="sm" className="flex-1" onClick={() => handleEdit(driver)}>
-                  Edit
-                </Button>
-                <button
-                  onClick={() => setDeleteConfirm(driver.id)}
-                  className="p-2 text-surface-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
+        {filteredDrivers.length === 0 ? (
+          <div className="p-12 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-800 light:bg-surface-200 flex items-center justify-center">
+              <svg className="w-8 h-8 text-surface-500 light:text-surface-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
             </div>
-          ))}
-        </div>
-      )}
+            <h3 className="text-lg font-medium text-surface-100 light:text-surface-900 mb-1">No drivers found</h3>
+            <p className="text-surface-400 light:text-surface-500 mb-6">
+              {searchQuery ? "Try a different search term" : "Add your first driver to get started"}
+            </p>
+            {!searchQuery && (
+              <Button onClick={handleAdd}>Add Driver</Button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-surface-400 light:text-surface-500 uppercase bg-surface-800/50 light:bg-surface-50 border-b border-surface-700 light:border-surface-200">
+                <tr>
+                  <th className="px-6 py-3 font-medium">Driver Name</th>
+                  <th className="px-6 py-3 font-medium">Contact</th>
+                  <th className="px-6 py-3 font-medium">Vehicle</th>
+                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-700 light:divide-surface-200">
+                {filteredDrivers.map((driver) => (
+                  <tr key={driver.id} className="hover:bg-surface-800/50 light:hover:bg-surface-50 transition-colors">
+                    <td className="px-6 py-3 font-medium text-surface-100 light:text-surface-900">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary-900/50 light:bg-primary-100 flex items-center justify-center text-primary-300 light:text-primary-700 font-bold text-xs">
+                          {driver.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                        {driver.name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-3 text-surface-400 light:text-surface-500">{driver.contact_number}</td>
+                    <td className="px-6 py-3 text-surface-400 light:text-surface-500">
+                      {driver.vehicle_type ? (
+                        <span>
+                          {driver.vehicle_type}
+                          {driver.vehicle_number && <span className="text-surface-400 light:text-surface-500"> • {driver.vehicle_number}</span>}
+                        </span>
+                      ) : (
+                        <span className="text-surface-400 light:text-surface-500">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(driver)}>
+                          Edit
+                        </Button>
+                        <button
+                          onClick={() => setDeleteConfirm(driver.id)}
+                          className="p-1.5 text-surface-400 light:text-surface-500 hover:text-red-400 light:hover:text-red-600 hover:bg-red-900/30 light:hover:bg-red-50 rounded transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Add/Edit Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-surface-200">
-              <h2 className="text-xl font-semibold text-surface-900">
+          <div className="rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" style={{ backgroundColor: "var(--bg-surface)" }}>
+            <div className="p-6 border-b border-surface-700 light:border-surface-200">
+              <h2 className="text-xl font-semibold text-surface-100 light:text-surface-900">
                 {editingDriver ? "Edit Driver" : "Add New Driver"}
               </h2>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-surface-700 mb-1">
+                  <label className="block text-sm font-medium text-surface-300 light:text-surface-700 mb-1">
                     Name *
                   </label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                    className="w-full px-3 py-2 border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white text-surface-100 light:text-surface-900 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                     required
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-surface-700 mb-1">
+                  <label className="block text-sm font-medium text-surface-300 light:text-surface-700 mb-1">
                     Contact Number *
                   </label>
                   <input
                     type="text"
                     value={formData.contact_number}
                     onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
-                    className="w-full px-3 py-2 border border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                    className="w-full px-3 py-2 border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white text-surface-100 light:text-surface-900 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-surface-700 mb-1">
+                  <label className="block text-sm font-medium text-surface-300 light:text-surface-700 mb-1">
                     Vehicle Type
                   </label>
                   <input
@@ -293,11 +298,11 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
                     value={formData.vehicle_type}
                     onChange={(e) => setFormData({ ...formData, vehicle_type: e.target.value })}
                     placeholder="e.g., Toyota HiAce"
-                    className="w-full px-3 py-2 border border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                    className="w-full px-3 py-2 border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white text-surface-100 light:text-surface-900 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-surface-700 mb-1">
+                  <label className="block text-sm font-medium text-surface-300 light:text-surface-700 mb-1">
                     Vehicle Number
                   </label>
                   <input
@@ -305,7 +310,7 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
                     value={formData.vehicle_number}
                     onChange={(e) => setFormData({ ...formData, vehicle_number: e.target.value })}
                     placeholder="e.g., CAI-7756"
-                    className="w-full px-3 py-2 border border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
+                    className="w-full px-3 py-2 border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white text-surface-100 light:text-surface-900 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
                   />
                 </div>
               </div>
@@ -333,19 +338,19 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <div className="rounded-xl shadow-xl max-w-md w-full p-6" style={{ backgroundColor: "var(--bg-surface)" }}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 rounded-full bg-red-900/50 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-surface-900">Delete Driver</h3>
-                <p className="text-sm text-surface-500">This action cannot be undone</p>
+                <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">Delete Driver</h3>
+                <p className="text-sm text-surface-400 light:text-surface-500">This action cannot be undone</p>
               </div>
             </div>
-            <p className="text-surface-600 mb-6">
+            <p className="text-surface-400 light:text-surface-500 mb-6">
               Are you sure you want to delete this driver?
             </p>
             <div className="flex items-center justify-end gap-3">

@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppLayout, Header } from "@/components/layout";
-import { StatusBadge, PriorityBadge, Button } from "@/components/ui";
+import { StatusBadge, Button } from "@/components/ui";
 import Link from "next/link";
 import { format } from "date-fns";
 import { InquiryStatus } from "@/types/database";
-import { InquiryStatusUpdate } from "./InquiryStatusUpdate";
 import { ItineraryQuickActions } from "./ItineraryQuickActions";
+import { GenerateFeedbackLinkButton } from "./GenerateFeedbackLinkButton";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -43,6 +43,13 @@ export default async function InquiryDetailPage({ params }: PageProps) {
     .limit(1)
     .single();
 
+  // Fetch tour if exists
+  const { data: tour } = await supabase
+    .from("tours")
+    .select("id")
+    .eq("inquiry_id", id)
+    .single();
+
   return (
     <AppLayout>
       <Header
@@ -50,6 +57,11 @@ export default async function InquiryDetailPage({ params }: PageProps) {
         subtitle={`Submitted on ${format(new Date(inquiry.created_at), "MMMM d, yyyy 'at' h:mm a")}`}
         action={
           <div className="flex items-center gap-3">
+            <GenerateFeedbackLinkButton
+              inquiryId={inquiry.id}
+              itineraryId={existingItinerary?.id}
+              tourId={tour?.id}
+            />
             <Link href="/inquiries">
               <Button variant="secondary">Back to List</Button>
             </Link>
@@ -60,23 +72,16 @@ export default async function InquiryDetailPage({ params }: PageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Status & Priority */}
+          {/* Status */}
           <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <StatusBadge status={inquiry.status as InquiryStatus} />
-                <PriorityBadge priority={inquiry.priority} />
-              </div>
-              <InquiryStatusUpdate
-                inquiryId={inquiry.id}
-                currentStatus={inquiry.status as InquiryStatus}
-              />
+            <div className="flex items-center gap-4">
+              <StatusBadge status={inquiry.status as InquiryStatus} />
             </div>
           </div>
 
           {/* Client Information */}
           <div className="card p-6">
-            <h2 className="text-lg font-semibold text-surface-900 mb-4">
+            <h2 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
               Client Information
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -91,7 +96,7 @@ export default async function InquiryDetailPage({ params }: PageProps) {
 
           {/* Travel Details */}
           <div className="card p-6">
-            <h2 className="text-lg font-semibold text-surface-900 mb-4">
+            <h2 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
               Travel Details
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -131,7 +136,7 @@ export default async function InquiryDetailPage({ params }: PageProps) {
 
           {/* Accommodation */}
           <div className="card p-6">
-            <h2 className="text-lg font-semibold text-surface-900 mb-4">
+            <h2 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
               Accommodation Preferences
             </h2>
             <div className="grid grid-cols-2 gap-4 mb-6">
@@ -140,27 +145,27 @@ export default async function InquiryDetailPage({ params }: PageProps) {
             </div>
             
             {/* Room Quantities */}
-            <div className="border-t border-surface-200 pt-4">
-              <h3 className="text-sm font-medium text-surface-700 mb-3">Room Selection</h3>
+            <div className="border-t border-surface-600 light:border-surface-200 pt-4">
+              <h3 className="text-sm font-medium text-surface-300 light:text-surface-700 mb-3">Room Selection</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-surface-50 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-surface-900">{inquiry.rooms_dbl || 0}</div>
-                  <div className="text-xs text-surface-500">Double (DBL)</div>
+                <div className="bg-surface-800 light:bg-surface-50 rounded-lg p-3 text-center border border-surface-700 light:border-transparent">
+                  <div className="text-xl font-bold text-surface-100 light:text-surface-900">{inquiry.rooms_dbl || 0}</div>
+                  <div className="text-xs text-surface-400 light:text-surface-500">Double (DBL)</div>
                 </div>
-                <div className="bg-surface-50 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-surface-900">{inquiry.rooms_sgl || 0}</div>
-                  <div className="text-xs text-surface-500">Single (SGL)</div>
+                <div className="bg-surface-800 light:bg-surface-50 rounded-lg p-3 text-center border border-surface-700 light:border-transparent">
+                  <div className="text-xl font-bold text-surface-100 light:text-surface-900">{inquiry.rooms_sgl || 0}</div>
+                  <div className="text-xs text-surface-400 light:text-surface-500">Single (SGL)</div>
                 </div>
-                <div className="bg-surface-50 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-surface-900">{inquiry.rooms_tpl || 0}</div>
-                  <div className="text-xs text-surface-500">Triple (TPL)</div>
+                <div className="bg-surface-800 light:bg-surface-50 rounded-lg p-3 text-center border border-surface-700 light:border-transparent">
+                  <div className="text-xl font-bold text-surface-100 light:text-surface-900">{inquiry.rooms_tpl || 0}</div>
+                  <div className="text-xs text-surface-400 light:text-surface-500">Triple (TPL)</div>
                 </div>
-                <div className="bg-surface-50 rounded-lg p-3 text-center">
-                  <div className="text-xl font-bold text-surface-900">{inquiry.rooms_qtpl || 0}</div>
-                  <div className="text-xs text-surface-500">Quad (QTPL)</div>
+                <div className="bg-surface-800 light:bg-surface-50 rounded-lg p-3 text-center border border-surface-700 light:border-transparent">
+                  <div className="text-xl font-bold text-surface-100 light:text-surface-900">{inquiry.rooms_qtpl || 0}</div>
+                  <div className="text-xs text-surface-400 light:text-surface-500">Quad (QTPL)</div>
                 </div>
               </div>
-              <p className="text-sm text-surface-500 mt-2">
+              <p className="text-sm text-surface-400 light:text-surface-500 mt-2">
                 Total: {(inquiry.rooms_dbl || 0) + (inquiry.rooms_sgl || 0) + (inquiry.rooms_tpl || 0) + (inquiry.rooms_qtpl || 0)} rooms
               </p>
             </div>
@@ -168,7 +173,7 @@ export default async function InquiryDetailPage({ params }: PageProps) {
 
           {/* Activities */}
           <div className="card p-6">
-            <h2 className="text-lg font-semibold text-surface-900 mb-4">
+            <h2 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
               Selected Activities
             </h2>
             {inquiry.activities && (inquiry.activities as string[]).length > 0 ? (
@@ -176,14 +181,14 @@ export default async function InquiryDetailPage({ params }: PageProps) {
                 {(inquiry.activities as string[]).map((activity: string) => (
                   <span
                     key={activity}
-                    className="px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium"
+                    className="px-3 py-1.5 bg-primary-900/50 light:bg-primary-50 text-primary-300 light:text-primary-700 rounded-full text-sm font-medium border border-primary-700/50 light:border-transparent"
                   >
                     {activity}
                   </span>
                 ))}
               </div>
             ) : (
-              <p className="text-surface-500">No activities selected</p>
+              <p className="text-surface-400 light:text-surface-500">No activities selected</p>
             )}
           </div>
 
@@ -201,10 +206,10 @@ export default async function InquiryDetailPage({ params }: PageProps) {
           {/* Notes */}
           {inquiry.notes && (
             <div className="card p-6">
-              <h2 className="text-lg font-semibold text-surface-900 mb-4">
+              <h2 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
                 Internal Notes
               </h2>
-              <p className="text-surface-700 whitespace-pre-wrap">
+              <p className="text-surface-300 light:text-surface-700 whitespace-pre-wrap">
                 {inquiry.notes}
               </p>
             </div>
@@ -215,31 +220,31 @@ export default async function InquiryDetailPage({ params }: PageProps) {
         <div className="space-y-6">
           {/* Quick Info */}
           <div className="card p-6">
-            <h3 className="text-sm font-semibold text-surface-900 mb-4">
+            <h3 className="text-sm font-semibold text-surface-100 light:text-surface-900 mb-4">
               Quick Info
             </h3>
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-surface-500">Source</span>
-                <span className="text-surface-900 capitalize">
+                <span className="text-surface-400 light:text-surface-500">Source</span>
+                <span className="text-surface-100 light:text-surface-900 capitalize">
                   {inquiry.source?.replace("_", " ") || "Web Form"}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-surface-500">Total Travelers</span>
-                <span className="text-surface-900">
+                <span className="text-surface-400 light:text-surface-500">Total Travelers</span>
+                <span className="text-surface-100 light:text-surface-900">
                   {(inquiry.no_of_pax || 0) + (inquiry.no_of_children || 0)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-surface-500">Duration</span>
-                <span className="text-surface-900">
+                <span className="text-surface-400 light:text-surface-500">Duration</span>
+                <span className="text-surface-100 light:text-surface-900">
                   {inquiry.no_of_nights ? `${inquiry.no_of_nights} nights` : "N/A"}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-surface-500">Last Updated</span>
-                <span className="text-surface-900">
+                <span className="text-surface-400 light:text-surface-500">Last Updated</span>
+                <span className="text-surface-100 light:text-surface-900">
                   {format(new Date(inquiry.updated_at), "MMM d, yyyy")}
                 </span>
               </div>
@@ -248,7 +253,7 @@ export default async function InquiryDetailPage({ params }: PageProps) {
 
           {/* Activity Log */}
           <div className="card p-6">
-            <h3 className="text-sm font-semibold text-surface-900 mb-4">
+            <h3 className="text-sm font-semibold text-surface-100 light:text-surface-900 mb-4">
               Recent Activity
             </h3>
             {activities && activities.length > 0 ? (
@@ -260,12 +265,12 @@ export default async function InquiryDetailPage({ params }: PageProps) {
                   >
                     <div className="w-2 h-2 mt-1.5 rounded-full bg-primary-500 flex-shrink-0" />
                     <div>
-                      <p className="text-surface-700">
+                      <p className="text-surface-300 light:text-surface-700">
                         <span className="font-medium capitalize">
                           {activity.action.replace("_", " ")}
                         </span>
                         {activity.profiles && (
-                          <span className="text-surface-500">
+                          <span className="text-surface-400 light:text-surface-500">
                             {" "}
                             by {(activity.profiles as { full_name?: string; email?: string }).full_name || (activity.profiles as { full_name?: string; email?: string }).email}
                           </span>
@@ -279,7 +284,7 @@ export default async function InquiryDetailPage({ params }: PageProps) {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-surface-500">No activity recorded</p>
+              <p className="text-sm text-surface-400 light:text-surface-500">No activity recorded</p>
             )}
           </div>
         </div>
@@ -296,10 +301,10 @@ interface InfoItemProps {
 function InfoItem({ label, value }: InfoItemProps) {
   return (
     <div>
-      <dt className="text-xs font-medium text-surface-500 uppercase tracking-wider mb-1">
+      <dt className="text-xs font-medium text-surface-400 light:text-surface-500 uppercase tracking-wider mb-1">
         {label}
       </dt>
-      <dd className="text-sm text-surface-900">{value}</dd>
+      <dd className="text-sm text-surface-100 light:text-surface-900">{value}</dd>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Input } from "@/components/ui";
@@ -89,10 +90,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-950 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--color-primary-700)_0%,_transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--color-accent-900)_0%,_transparent_40%)] opacity-30" />
+      {/* Left side - Branding (blue + gold gradient) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-900 via-primary-950 to-black relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--color-primary-600)_0%,_transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--color-accent-600)_0%,_transparent_35%)] opacity-40" />
         
         {/* Decorative grid pattern */}
         <div className="absolute inset-0 opacity-10">
@@ -101,60 +102,67 @@ export default function LoginPage() {
           }} />
         </div>
 
-        <div className="relative z-10 flex flex-col justify-center px-12 lg:px-16">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center">
-              <span className="text-white font-bold text-xl">TX</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">TravX</h1>
-              <p className="text-primary-200 text-sm">Travel Agency Management</p>
+        <div className="relative z-10 flex flex-col justify-start px-12 lg:px-16 py-12">
+          <div className="flex items-start justify-start mb-2">
+            <div className="relative w-full max-w-lg h-80 -ml-12 lg:-ml-16">
+              <Image
+                src="/Travex_logo.png"
+                alt="TravX Logo"
+                fill
+                className="object-contain drop-shadow-2xl"
+                priority
+              />
             </div>
           </div>
 
-          <h2 className="text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
+          <h2 className="text-4xl lg:text-5xl font-bold text-white leading-tight mb-1">
             Streamline Your<br />Travel Inquiries
           </h2>
-          <p className="text-primary-200 text-lg max-w-md leading-relaxed">
+          <p className="text-primary-300 text-lg max-w-md leading-relaxed mb-8">
             Capture, manage, and convert travel inquiries with our professional 
             inquiry management system built for modern travel agencies.
           </p>
 
-          <div className="mt-12 grid grid-cols-2 gap-6">
+          <div className="mt-8 grid grid-cols-2 gap-6">
             <div className="bg-white/5 backdrop-blur rounded-xl p-4 border border-white/10">
               <div className="text-3xl font-bold text-white mb-1">100%</div>
-              <div className="text-sm text-primary-200">Inquiry Capture Rate</div>
+              <div className="text-sm text-primary-300">Inquiry Capture Rate</div>
             </div>
             <div className="bg-white/5 backdrop-blur rounded-xl p-4 border border-white/10">
               <div className="text-3xl font-bold text-white mb-1">2x</div>
-              <div className="text-sm text-primary-200">Faster Processing</div>
+              <div className="text-sm text-primary-300">Faster Processing</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Right side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8" style={{ backgroundColor: "var(--bg-base)" }}>
         <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
-              <span className="text-white font-bold">TX</span>
+          <div className="lg:hidden flex items-center justify-center mb-10">
+            <div className="relative w-full max-w-xs h-20">
+              <Image
+                src="/Travex_logo.png"
+                alt="TravX Logo"
+                fill
+                className="object-contain drop-shadow-lg"
+                priority
+              />
             </div>
-            <h1 className="text-xl font-bold text-surface-900">TravX</h1>
           </div>
 
-          <h2 className="text-2xl font-semibold text-surface-900 mb-2">
+          <h2 className="text-2xl font-semibold text-surface-100 light:text-surface-900 mb-2">
             {isLogin ? "Welcome back" : "Create your account"}
           </h2>
-          <p className="text-surface-500 mb-8">
+          <p className="text-surface-400 light:text-surface-500 mb-8">
             {isLogin
               ? "Sign in to access your inquiry dashboard"
               : "Get started with TravX Inquiry Management"}
           </p>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="mb-6 p-4 bg-red-900/30 light:bg-red-50 border border-red-700/50 light:border-red-200 rounded-lg">
+              <p className="text-sm text-red-300 light:text-red-700">{error}</p>
             </div>
           )}
 
@@ -196,7 +204,7 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              variant="primary"
+              variant="accent"
               size="lg"
               loading={loading}
               className="w-full"
@@ -206,6 +214,9 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 text-center">
+            <span className="text-sm text-surface-400 light:text-surface-500">
+              {isLogin ? "Don't have an account? " : "Already have an account? "}
+            </span>
             <button
               type="button"
               onClick={() => {
@@ -213,11 +224,9 @@ export default function LoginPage() {
                 setError(null);
                 setFieldErrors({});
               }}
-              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              className="text-sm text-accent-400 light:text-accent-600 hover:text-accent-300 light:hover:text-accent-700 font-medium underline-offset-2 hover:underline"
             >
-              {isLogin
-                ? "Don't have an account? Sign up"
-                : "Already have an account? Sign in"}
+              {isLogin ? "Sign up" : "Sign in"}
             </button>
           </div>
         </div>

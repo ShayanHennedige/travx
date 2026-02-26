@@ -6,12 +6,14 @@ interface ItineraryDay {
   title: string;
   overnight_location: string;
   hotel_suggestion: string;
+  day_total_km?: string;
   activities: {
     time: string;
     activity: string;
     location: string;
     duration: string;
     driving_time?: string;
+    driving_distance_km?: string;
   }[];
   meals: {
     breakfast: string;
@@ -27,6 +29,7 @@ interface ItineraryContent {
   days: ItineraryDay[];
   practical_notes: string[];
   total_driving_hours: string;
+  total_distance_km?: string;
 }
 
 interface InquiryData {
@@ -65,8 +68,8 @@ function generateDayHTML(day: ItineraryDay, isLastDay: boolean = false): string 
   const dateFormatted = dayDate ? formatDateWithSuffix(day.date) : "";
   const dayOfWeek = dayDate ? format(dayDate, "EEEE") : "";
 
-  // Extract travel times from activities
-  const travelActivities = day.activities.filter(a => a.driving_time);
+  // Extract travel times and distances from activities
+  const travelActivities = day.activities.filter(a => a.driving_time || a.driving_distance_km);
   
   const activitiesList = day.activities
     .map(a => `<li>${a.activity}</li>`)
@@ -74,9 +77,14 @@ function generateDayHTML(day: ItineraryDay, isLastDay: boolean = false): string 
 
   const travelTimesList = travelActivities.length > 0 
     ? `
-      <p class="label">Travel Time:</p>
+      <p class="label">Travel Time & Distance:</p>
       <ul>
-        ${travelActivities.map(a => `<li>${a.location}: approx. <strong>${a.driving_time}</strong></li>`).join("")}
+        ${travelActivities.map(a => {
+          const timePart = a.driving_time ? `approx. <strong>${a.driving_time}</strong>` : "";
+          const distancePart = a.driving_distance_km ? `<strong>${a.driving_distance_km}</strong>` : "";
+          const parts = [timePart, distancePart].filter(Boolean);
+          return `<li>${a.location}: ${parts.join(" • ")}</li>`;
+        }).join("")}
       </ul>
     ` 
     : "";
@@ -99,6 +107,8 @@ function generateDayHTML(day: ItineraryDay, isLastDay: boolean = false): string 
       </ul>
 
       ${travelTimesList}
+
+      ${day.day_total_km ? `<p class="label">Total Distance for Day: <strong>${day.day_total_km}</strong></p>` : ""}
 
       ${overnightSection}
     </div>
@@ -403,6 +413,7 @@ export function generateItineraryHTML(
       <p><strong>Basis:</strong> ${inquiry?.hotel_type || "Bed & Breakfast"} | <strong>Guests:</strong> ${String(totalPax).padStart(2, "0")} Pax</p>
       <p><strong>Arrival:</strong> ${format(arrivalDate, "EEEE, dd MMMM")}</p>
       <p><strong>Departure:</strong> ${format(departureDate, "EEEE, dd MMMM")}</p>
+      ${itinerary.total_distance_km ? `<p><strong>Total Distance:</strong> ${itinerary.total_distance_km}</p>` : ""}
     </div>
   </div>
 

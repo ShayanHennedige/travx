@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { Button, Badge } from "@/components/ui";
+
+type ComponentStatus = "new" | "in_progress" | "completed";
 
 interface ItineraryContent {
   title: string;
@@ -32,6 +35,7 @@ interface Itinerary {
   updated_at: string;
   inquiry_id: string | null;
   group_inquiry_id: string | null;
+  status: "new" | "in_progress" | "completed" | null;
   type: "individual" | "group";
   inquiry: InquiryInfo | null;
 }
@@ -144,15 +148,15 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
   if (itineraries.length === 0) {
     return (
       <div className="card p-12 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-100 flex items-center justify-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-700 light:bg-surface-200 flex items-center justify-center">
           <svg className="w-8 h-8 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-surface-900 mb-1">
+        <h3 className="text-lg font-medium text-surface-100 light:text-surface-900 mb-1">
           No itineraries yet
         </h3>
-        <p className="text-surface-500 mb-6">
+        <p className="text-surface-400 light:text-surface-500 mb-6">
           Generate itineraries from inquiry details to see them here
         </p>
         <Link href="/inquiries">
@@ -183,19 +187,19 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                 placeholder="Search by client, inquiry #, or title..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-surface-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm text-surface-100 light:text-surface-900 placeholder:text-surface-500 light:placeholder:text-surface-400"
               />
             </div>
           </div>
 
           {/* View Mode Toggle */}
-          <div className="flex items-center gap-2 bg-surface-100 rounded-lg p-1">
+          <div className="flex items-center gap-2 bg-surface-700 light:bg-surface-200 rounded-lg p-1 border border-surface-600 light:border-surface-300">
             <button
               onClick={() => setViewMode("grouped")}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 viewMode === "grouped"
-                  ? "bg-white text-surface-900 shadow-sm"
-                  : "text-surface-600 hover:text-surface-900"
+                  ? "bg-accent-500 text-white light:text-black shadow-sm"
+                  : "text-surface-400 light:text-surface-600 hover:text-surface-100 light:hover:text-surface-900"
               }`}
             >
               <span className="flex items-center gap-1.5">
@@ -209,8 +213,8 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
               onClick={() => setViewMode("list")}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 viewMode === "list"
-                  ? "bg-white text-surface-900 shadow-sm"
-                  : "text-surface-600 hover:text-surface-900"
+                  ? "bg-accent-500 text-white light:text-black shadow-sm"
+                  : "text-surface-400 light:text-surface-600 hover:text-surface-100 light:hover:text-surface-900"
               }`}
             >
               <span className="flex items-center gap-1.5">
@@ -226,7 +230,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortBy)}
-            className="px-3 py-2 rounded-lg border border-surface-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm bg-white"
+            className="px-3 py-2 rounded-lg border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm text-surface-100 light:text-surface-900"
           >
             <option value="newest">Newest First</option>
             <option value="oldest">Oldest First</option>
@@ -235,7 +239,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
         </div>
 
         {/* Results count */}
-        <div className="mt-3 text-sm text-surface-500">
+        <div className="mt-3 text-sm text-surface-400 light:text-surface-500">
           Showing {filteredItineraries.length} of {itineraries.length} itineraries
           {searchQuery && ` matching "${searchQuery}"`}
         </div>
@@ -244,39 +248,45 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
       {/* Grouped View */}
       {viewMode === "grouped" && (
         <div className="space-y-6">
-          {groupedItineraries.map(([key, group]) => (
-            <div key={key} className="card overflow-hidden">
+          {groupedItineraries.map(([key, group], index) => (
+            <motion.div
+              key={key}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05, duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="card overflow-hidden"
+            >
               {/* Group Header */}
-              <div className="bg-surface-50 px-6 py-4 border-b border-surface-200">
+              <div className="bg-surface-700 light:bg-surface-100 px-6 py-4 border-b border-surface-600 light:border-surface-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {group.inquiry ? (
                       <>
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${
                           group.type === "group" 
-                            ? "bg-purple-100 text-purple-700" 
-                            : "bg-primary-100 text-primary-700"
+                            ? "bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800" 
+                            : "bg-primary-800/80 light:bg-primary-100 text-primary-300 light:text-primary-700"
                         }`}>
                           {group.inquiry.first_name.charAt(0)}{group.inquiry.last_name.charAt(0)}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-surface-900">
+                            <h3 className="font-semibold text-surface-100 light:text-surface-900">
                               {group.inquiry.first_name} {group.inquiry.last_name}
                             </h3>
                             {group.type === "group" && (
                               <Badge variant="purple">Group</Badge>
                             )}
                           </div>
-                          <p className="text-sm text-surface-500">
+                          <p className="text-sm text-surface-400 light:text-surface-500">
                             {group.inquiry.inquiry_number} • {format(new Date(group.inquiry.arriving_date), "MMM d")} - {format(new Date(group.inquiry.departure_date), "MMM d, yyyy")} • {group.inquiry.total_pax} pax
                           </p>
                         </div>
                       </>
                     ) : (
                       <div>
-                        <h3 className="font-semibold text-surface-900">Unlinked Itineraries</h3>
-                        <p className="text-sm text-surface-500">No inquiry associated</p>
+                        <h3 className="font-semibold text-surface-100">Unlinked Itineraries</h3>
+                        <p className="text-sm text-surface-500 light:text-surface-600">No inquiry associated</p>
                       </div>
                     )}
                   </div>
@@ -290,21 +300,21 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                 </div>
               </div>
 
-              {/* Itineraries in Group */}
-              <div className="divide-y divide-surface-100">
+              {/* Itineraries in Group - nested rows with distinct background */}
+              <div className="divide-y divide-surface-600 light:divide-surface-200 bg-surface-800/50 light:bg-surface-50">
                 {group.itineraries.map((itinerary) => (
-                  <div key={itinerary.id} className="p-4 hover:bg-surface-50 transition-colors">
+                  <div key={itinerary.id} className="p-4 hover:bg-surface-700/70 light:hover:bg-surface-100 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
                         <Link href={`/itineraries/${itinerary.id}`} className="block group">
-                          <h4 className="font-medium text-surface-900 group-hover:text-primary-600 transition-colors truncate">
+                          <h4 className="font-medium text-surface-100 light:text-surface-900 group-hover:text-primary-400 light:group-hover:text-primary-600 transition-colors truncate">
                             {itinerary.content.title}
                           </h4>
-                          <p className="text-sm text-surface-500 line-clamp-1 mt-0.5">
+                          <p className="text-sm text-surface-400 light:text-surface-500 line-clamp-1 mt-0.5">
                             {itinerary.content.summary}
                           </p>
                         </Link>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-surface-400">
+                        <div className="flex items-center gap-4 mt-2 text-xs text-surface-400 light:text-surface-500">
                           <span className="flex items-center gap-1">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -321,7 +331,13 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 ml-4">
+                      <div className="flex items-center gap-3 ml-4">
+                        <ItineraryStatusSelector
+                          itineraryId={itinerary.id}
+                          currentStatus={itinerary.status}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 ml-2">
                         <Link href={`/itineraries/${itinerary.id}`}>
                           <Button variant="secondary" size="sm">
                             View
@@ -329,7 +345,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                         </Link>
                         <button
                           onClick={() => setDeleteConfirm(itinerary.id)}
-                          className="p-2 text-surface-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-2 text-surface-400 hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
                           title="Delete itinerary"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -341,7 +357,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
@@ -351,30 +367,39 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
         <div className="card overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-surface-200 bg-surface-50">
-                <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+              <tr className="border-b border-surface-600 light:border-surface-200 bg-surface-700 light:bg-surface-100">
+                <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 light:text-surface-600 uppercase tracking-wider">
                   Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 light:text-surface-600 uppercase tracking-wider">
                   Itinerary
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 light:text-surface-600 uppercase tracking-wider">
                   Client
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 light:text-surface-600 uppercase tracking-wider">
                   Days
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 light:text-surface-600 uppercase tracking-wider">
                   Created
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-surface-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 light:text-surface-600 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-surface-500 light:text-surface-600 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-surface-100 bg-white">
-              {filteredItineraries.map((itinerary) => (
-                <tr key={itinerary.id} className="hover:bg-surface-50 transition-colors">
+            <tbody className="divide-y divide-surface-600 light:divide-surface-200">
+              {filteredItineraries.map((itinerary, index) => (
+                <motion.tr
+                  key={itinerary.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.03, duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  className="hover:bg-surface-700/50 light:hover:bg-surface-100 transition-colors"
+                >
                   <td className="px-6 py-4">
                     <Badge variant={itinerary.type === "group" ? "purple" : "blue"}>
                       {itinerary.type === "group" ? "Group" : "Individual"}
@@ -382,10 +407,10 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                   </td>
                   <td className="px-6 py-4">
                     <Link href={`/itineraries/${itinerary.id}`} className="block group">
-                      <p className="font-medium text-surface-900 group-hover:text-primary-600 transition-colors truncate max-w-xs">
+                      <p className="font-medium text-surface-100 light:text-surface-900 group-hover:text-primary-400 light:group-hover:text-primary-600 transition-colors truncate max-w-xs">
                         {itinerary.content.title}
                       </p>
-                      <p className="text-sm text-surface-500 truncate max-w-xs">
+                      <p className="text-sm text-surface-400 light:text-surface-500 truncate max-w-xs">
                         {itinerary.content.summary}
                       </p>
                     </Link>
@@ -393,10 +418,10 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                   <td className="px-6 py-4">
                     {itinerary.inquiry ? (
                       <div>
-                        <p className="text-sm font-medium text-surface-900">
+                        <p className="text-sm font-medium text-surface-100 light:text-surface-900">
                           {itinerary.inquiry.first_name} {itinerary.inquiry.last_name}
                         </p>
-                        <p className="text-xs text-surface-500">
+                        <p className="text-xs text-surface-400 light:text-surface-500">
                           {itinerary.inquiry.inquiry_number}
                         </p>
                       </div>
@@ -405,12 +430,18 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800">
                       {itinerary.content.days?.length || 0} days
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-surface-500">
+                    <td className="px-6 py-4 text-sm text-surface-400 light:text-surface-500">
                     {format(new Date(itinerary.created_at), "MMM d, yyyy")}
+                  </td>
+                  <td className="px-6 py-4">
+                    <ItineraryStatusSelector
+                      itineraryId={itinerary.id}
+                      currentStatus={itinerary.status}
+                    />
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -421,7 +452,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                       </Link>
                       <button
                         onClick={() => setDeleteConfirm(itinerary.id)}
-                        className="p-2 text-surface-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-surface-400 hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
                         title="Delete itinerary"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -430,7 +461,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                       </button>
                     </div>
                   </td>
-                </tr>
+                </motion.tr>
               ))}
             </tbody>
           </table>
@@ -443,13 +474,13 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
           <svg className="w-12 h-12 mx-auto text-surface-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <h3 className="text-lg font-medium text-surface-900 mb-1">No results found</h3>
-          <p className="text-surface-500">
+          <h3 className="text-lg font-medium text-surface-100 light:text-surface-900 mb-1">No results found</h3>
+          <p className="text-surface-400 light:text-surface-500">
             Try adjusting your search query
           </p>
           <button
             onClick={() => setSearchQuery("")}
-            className="mt-4 text-primary-600 hover:text-primary-700 font-medium text-sm"
+            className="mt-4 text-primary-400 hover:text-primary-300 font-medium text-sm"
           >
             Clear search
           </button>
@@ -459,19 +490,19 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <div className="rounded-xl shadow-xl max-w-md w-full p-6" style={{ backgroundColor: "var(--bg-surface)" }}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 rounded-full bg-red-900/50 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-surface-900">Delete Itinerary</h3>
-                <p className="text-sm text-surface-500">This action cannot be undone</p>
+                <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">Delete Itinerary</h3>
+                <p className="text-sm text-surface-400 light:text-surface-500">This action cannot be undone</p>
               </div>
             </div>
-            <p className="text-surface-600 mb-6">
+            <p className="text-surface-400 light:text-surface-500 mb-6">
               Are you sure you want to delete this itinerary? This will permanently remove the travel plan and cannot be recovered.
             </p>
             <div className="flex items-center justify-end gap-3">
@@ -493,6 +524,75 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface ItineraryStatusSelectorProps {
+  itineraryId: string;
+  currentStatus: ComponentStatus | null;
+}
+
+function ItineraryStatusSelector({ itineraryId, currentStatus }: ItineraryStatusSelectorProps) {
+  const router = useRouter();
+  const [status, setStatus] = useState<ComponentStatus>(currentStatus || "new");
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleStatusChange = async (newStatus: ComponentStatus) => {
+    if (newStatus === currentStatus) return;
+    
+    setStatus(newStatus);
+    setIsUpdating(true);
+    
+    try {
+      const response = await fetch(`/api/itinerary/${itineraryId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update status");
+      
+      router.refresh();
+    } catch (error) {
+      console.error("Error updating status:", error);
+      setStatus(currentStatus || "new"); // Revert on error
+      alert("Failed to update status");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const getStatusColor = (s: ComponentStatus | null) => {
+    if (!s) return "bg-surface-700 light:bg-surface-200 text-surface-400 light:text-surface-600";
+    if (s === "completed") return "bg-green-900/50 light:bg-green-100 text-green-300 light:text-green-800 border border-green-700/50 light:border-green-200";
+    if (s === "in_progress") return "bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800 border border-primary-700/50 light:border-primary-200";
+    return "bg-amber-900/50 light:bg-amber-100 text-amber-300 light:text-amber-800 border border-amber-700/50 light:border-amber-200";
+  };
+
+  const statusOptions: { value: ComponentStatus; label: string }[] = [
+    { value: "new", label: "New" },
+    { value: "in_progress", label: "In Progress" },
+    { value: "completed", label: "Completed" },
+  ];
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
+        {status === "completed" ? "✓" : status === "in_progress" ? "⟳" : "○"} {statusOptions.find(o => o.value === status)?.label || "New"}
+      </span>
+      <select
+        value={status}
+        onChange={(e) => handleStatusChange(e.target.value as ComponentStatus)}
+        disabled={isUpdating}
+        className="px-2 py-1 text-xs border border-surface-600 light:border-surface-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none bg-surface-800 light:bg-white text-surface-100 light:text-surface-900 disabled:opacity-50"
+      >
+        {statusOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

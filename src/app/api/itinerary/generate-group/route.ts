@@ -15,12 +15,25 @@ Core Rules (Must Follow Strictly):
 2. Each day must include:
    - Morning, afternoon, and evening activities
    - Driving times between locations (be realistic - Sri Lanka roads can be slow)
+   - Accurate driving distances in kilometers (km) between locations
    - Overnight location with hotel recommendation matching the star category
 3. Geographic Logic: Plan routes that minimize backtracking
 4. Activity Distribution: Spread selected activities logically across days
 5. Realistic Pacing: Don't overload days - factor in rest, meals, and travel fatigue (especially important for groups)
 6. Hotel Recommendations: Suggest specific hotels or areas matching the star category that can accommodate groups
 7. Group Considerations: Factor in group dynamics, coordination time, and group-friendly venues
+8. DISTANCE FORMAT (MANDATORY - THIS IS CRITICAL):
+   - Every driving_distance_km field MUST use format: "X km from [Origin Location] to [Destination Location]"
+   - Examples: "10 km from Katunayake to CMB", "150 km from Negombo to Sigiriya", "80 km from Kandy to Nuwara Eliya"
+   - NEVER use incomplete formats like "10 km from CMB" or "150 km from Negombo" - ALWAYS include both origin and destination
+   - For airport transfers: "X km from Katunayake Airport to [Hotel Location]" or "X km from [Hotel Location] to Katunayake Airport"
+   - For city transfers: "X km from [Previous City] to [Next City]"
+9. Distance Accuracy (Strict):
+   - Provide accurate driving distances in kilometers (km) between locations
+   - Provide km for each travel leg (from the previous location to the next location)
+   - Provide total km for the full day (sum of all legs) in day_total_km field
+   - Use the most realistic drivable route (not straight-line distance)
+   - IMPORTANT: The mileage for each day itinerary should be displayed in km.
 
 Output your response as a valid JSON object with this structure:
 {
@@ -33,13 +46,15 @@ Output your response as a valid JSON object with this structure:
       "title": "Day title",
       "overnight_location": "City/Area name",
       "hotel_suggestion": "Hotel name or area (X star)",
+      "day_total_km": "X km",
       "activities": [
         {
           "time": "Morning/Afternoon/Evening",
           "activity": "Description",
           "location": "Place name",
           "duration": "X hours",
-          "driving_time": "X hours from previous" (optional)
+          "driving_time": "X hours from previous" (optional),
+          "driving_distance_km": "X km from [Origin Location] to [Destination Location]" (optional, e.g., "10 km from Katunayake to CMB", "150 km from Negombo to Sigiriya")
         }
       ],
       "meals": {
@@ -51,7 +66,8 @@ Output your response as a valid JSON object with this structure:
     }
   ],
   "practical_notes": ["Array of practical tips for group travel"],
-  "total_driving_hours": "Approximate total"
+  "total_driving_hours": "Approximate total",
+  "total_distance_km": "Approximate total km"
 }`;
 
 export async function POST(request: Request) {
@@ -113,19 +129,21 @@ export async function POST(request: Request) {
 - Total Rooms: ${(inquiry.rooms_dbl || 0) + (inquiry.rooms_sgl || 0) + (inquiry.rooms_tpl || 0) + (inquiry.rooms_qtpl || 0)}
 
 **Preferred Activities:**
-${inquiry.activities && (inquiry.activities as string[]).length > 0 
-  ? (inquiry.activities as string[]).map((a: string) => `- ${a}`).join("\n")
-  : "- General sightseeing and cultural experiences suitable for groups"}
+${inquiry.activities && (inquiry.activities as string[]).length > 0
+        ? (inquiry.activities as string[]).map((a: string) => `- ${a}`).join("\n")
+        : "- General sightseeing and cultural experiences suitable for groups"}
 
 Please create a realistic, well-paced GROUP TOUR itinerary that:
-1. Starts from Colombo airport on Day 1
-2. Ends back at Colombo airport on the final day
+1. Starts from Colombo airport (Katunayake) on Day 1
+2. Ends back at Colombo airport (Katunayake) on the final day
 3. Incorporates the selected activities logically
 4. Suggests appropriate hotels for the ${inquiry.hotel_type || "4-5 Star"} category that can accommodate groups
 5. ${childCount > 0 ? `Includes family-friendly options for the ${childCount} children in the group` : "Focuses on adult-oriented experiences"}
 6. Considers group dynamics - allow buffer time for group coordination
 7. Recommends group-friendly restaurants and venues
 8. Suggests a suitable transport arrangement for ${totalPax} travelers
+9. The mileage for each day itinerary should be displayed in km.
+10. MANDATORY FORMAT: Every driving_distance_km field MUST be "X km from [Origin] to [Destination]". Examples: "10 km from Katunayake Airport to Negombo", "150 km from Negombo to Sigiriya", "80 km from Kandy to Nuwara Eliya". Never use incomplete formats.
 
 Return ONLY the JSON object, no additional text.`;
 
@@ -161,7 +179,7 @@ Return ONLY the JSON object, no additional text.`;
     const openaiData = await openaiResponse.json();
     const generationTime = Date.now() - startTime;
     const rawContent = openaiData.choices[0]?.message?.content || "";
-    
+
     // Parse the JSON from the response
     let itineraryContent;
     try {

@@ -9,6 +9,8 @@ export async function proxy(request: NextRequest) {
     "/inquiry",
     "/api/inquiry",
     "/api/group-inquiry",
+    "/feedback",
+    "/api/feedback",
     "/login",
     "/signup",
   ];

@@ -347,15 +347,15 @@ export function RoomingListManager({
   const getRoomTypeBg = (type: string) => {
     switch (type) {
       case "DBL":
-        return "bg-blue-50 border-blue-200 hover:border-blue-400";
+        return "bg-primary-900/30 light:bg-blue-50 border-primary-700/50 light:border-blue-200 hover:border-primary-500 light:hover:border-blue-400";
       case "SGL":
-        return "bg-green-50 border-green-200 hover:border-green-400";
+        return "bg-green-900/30 light:bg-green-50 border-green-700/50 light:border-green-200 hover:border-green-500 light:hover:border-green-400";
       case "TPL":
-        return "bg-purple-50 border-purple-200 hover:border-purple-400";
+        return "bg-purple-900/30 light:bg-purple-50 border-purple-700/50 light:border-purple-200 hover:border-purple-500 light:hover:border-purple-400";
       case "QTPL":
-        return "bg-orange-50 border-orange-200 hover:border-orange-400";
+        return "bg-orange-900/30 light:bg-orange-50 border-orange-700/50 light:border-orange-200 hover:border-orange-500 light:hover:border-orange-400";
       default:
-        return "bg-gray-50 border-gray-200";
+        return "bg-surface-800 light:bg-gray-50 border-surface-700 light:border-gray-200";
     }
   };
 
@@ -364,7 +364,7 @@ export function RoomingListManager({
       {/* Header */}
       <div
         onClick={() => setIsExpanded(!isExpanded)}
-        className="bg-surface-50 px-6 py-4 border-b border-surface-200 cursor-pointer hover:bg-surface-100 transition-colors"
+        className="bg-surface-800 light:bg-surface-50 px-6 py-4 border-b border-surface-700 light:border-surface-200 cursor-pointer hover:bg-surface-700 light:hover:bg-surface-100 transition-colors"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -373,14 +373,14 @@ export function RoomingListManager({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-              <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-10 h-10 rounded-full bg-green-900/50 light:bg-green-100 flex items-center justify-center border border-green-700/50 light:border-transparent">
+              <svg className="w-5 h-5 text-green-300 light:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
             <div>
-              <h3 className="font-semibold text-surface-900">Rooming List</h3>
-              <p className="text-sm text-surface-500">
+              <h3 className="font-semibold text-surface-100 light:text-surface-900">Rooming List</h3>
+              <p className="text-sm text-surface-400 light:text-surface-500">
                 {assignedCount} of {members.length} guests assigned
                 {interconnections.length > 0 && (
                   <span className="text-pink-600 ml-2">• {interconnections.length} interconnection{interconnections.length !== 1 ? "s" : ""}</span>
@@ -427,7 +427,7 @@ export function RoomingListManager({
           {/* Instructions & Actions */}
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-surface-600">
+              <div className="flex items-center gap-2 text-sm text-surface-400 light:text-surface-600">
                 <svg className="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -695,16 +695,16 @@ export function RoomingListManager({
 
           {/* Summary */}
           {assignedCount > 0 && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="bg-green-900/30 light:bg-green-50 border border-green-700/50 light:border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-green-400 light:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <h4 className="text-sm font-medium text-green-800">
+                  <h4 className="text-sm font-medium text-green-300 light:text-green-800">
                     {assignedCount} of {members.length} guests assigned
                   </h4>
-                  <p className="text-xs text-green-600 mt-0.5">
+                  <p className="text-xs text-green-400 light:text-green-600 mt-0.5">
                     {rooms.filter((r) => getMembersInRoom(r.id).length > 0).length} of {rooms.length} rooms occupied
                   </p>
                 </div>

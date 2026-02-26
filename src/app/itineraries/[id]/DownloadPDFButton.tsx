@@ -45,7 +45,7 @@ export function DownloadPDFButton({ itineraryId, inquiryNumber }: DownloadPDFBut
   };
 
   return (
-    <Button onClick={handleDownload} disabled={isDownloading} variant="secondary">
+    <Button onClick={handleDownload} disabled={isDownloading} variant="secondary" className="hover:bg-accent-500 hover:text-black hover:border-accent-500">
       {isDownloading ? (
         <>
           <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none">

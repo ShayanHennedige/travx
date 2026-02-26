@@ -10,17 +10,17 @@ export default function PublicInquiryPage() {
   const [inquiryType, setInquiryType] = useState<InquiryType>("individual");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100">
+    <div className="min-h-screen bg-surface-900 light:bg-surface-100">
       {/* Header */}
-      <header className="bg-white border-b border-surface-200 sticky top-0 z-10">
+      <header className="bg-surface-800 light:bg-white border-b border-surface-600 light:border-surface-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
               <span className="text-white font-bold">TX</span>
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-surface-900">TravX</h1>
-              <p className="text-xs text-surface-500">Travel Inquiry Form</p>
+              <h1 className="text-lg font-semibold text-surface-100 light:text-surface-900">TravX</h1>
+              <p className="text-xs text-surface-400 light:text-surface-500">Travel Inquiry Form</p>
             </div>
           </div>
         </div>
@@ -29,22 +29,22 @@ export default function PublicInquiryPage() {
       {/* Form */}
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-surface-900 mb-2">
+          <h2 className="text-3xl font-bold text-surface-100 light:text-surface-900 mb-2">
             Plan Your Perfect Trip
           </h2>
-          <p className="text-surface-600 mb-6">
+          <p className="text-surface-300 light:text-surface-600 mb-6">
             Fill out the form below and our travel experts will create a customized itinerary for you.
           </p>
 
           {/* Toggle Switch */}
-          <div className="inline-flex items-center bg-surface-100 rounded-xl p-1.5">
+          <div className="inline-flex items-center bg-surface-700 light:bg-surface-200 rounded-xl p-1.5">
             <button
               type="button"
               onClick={() => setInquiryType("individual")}
               className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 inquiryType === "individual"
-                  ? "bg-white text-primary-700 shadow-sm"
-                  : "text-surface-600 hover:text-surface-900"
+                  ? "bg-surface-600 light:bg-surface-300 text-primary-300 light:text-primary-700 shadow-sm"
+                  : "text-surface-400 light:text-surface-600 hover:text-surface-200 light:hover:text-surface-900"
               }`}
             >
               <span className="flex items-center gap-2">
@@ -59,8 +59,8 @@ export default function PublicInquiryPage() {
               onClick={() => setInquiryType("group")}
               className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 inquiryType === "group"
-                  ? "bg-white text-primary-700 shadow-sm"
-                  : "text-surface-600 hover:text-surface-900"
+                  ? "bg-surface-600 light:bg-surface-300 text-primary-300 light:text-primary-700 shadow-sm"
+                  : "text-surface-400 light:text-surface-600 hover:text-surface-200 light:hover:text-surface-900"
               }`}
             >
               <span className="flex items-center gap-2">
@@ -72,7 +72,7 @@ export default function PublicInquiryPage() {
             </button>
           </div>
 
-          <p className="text-xs text-surface-500 mt-3">
+          <p className="text-xs text-surface-400 light:text-surface-500 mt-3">
             {inquiryType === "individual" 
               ? "For solo travelers, couples, or families"
               : "For groups of 5 or more travelers"
@@ -88,7 +88,7 @@ export default function PublicInquiryPage() {
         )}
 
         {/* Footer */}
-        <footer className="mt-12 text-center text-sm text-surface-500">
+        <footer className="mt-12 text-center text-sm text-surface-400 light:text-surface-500">
           <p>Need help? Contact us at support@travx.com</p>
         </footer>
       </main>

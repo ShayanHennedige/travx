@@ -16,14 +16,46 @@ Rules:
 - Don't overload days when adding activities
 - Adjust hotel recommendations if locations change significantly
 - Update meal locations if overnight stays change
+- Provide accurate driving distances in kilometers (km) between locations
+- Include day_total_km for each day (sum of all driving legs that day)
+- IMPORTANT: The mileage for each day itinerary should be displayed in km.
+
+Distance Accuracy (Strict):
+- Provide km for each travel leg (from the previous location to the next location) in activities with driving_distance_km
+- Provide total km for the full day (sum of all legs) in day_total_km
+- Use the most realistic drivable route (not straight-line distance)
+- If an external routing source is available (e.g., Google Maps/OSRM), base km on it; otherwise use best-available realistic estimates and keep them consistent with the stated driving times.
+- CRITICAL FORMAT: All driving_distance_km values MUST follow the format "X km from [Origin Location] to [Destination Location]" (e.g., "10 km from Katunayake to CMB", "150 km from Negombo to Sigiriya", "80 km from Kandy to Nuwara Eliya"). Never use abbreviated formats like "10 km from CMB" without the origin. Always specify both the origin and destination locations clearly.
 
 Return the COMPLETE updated itinerary as a valid JSON object with the same structure:
 {
   "title": "...",
   "summary": "...",
-  "days": [...],
+  "days": [
+    {
+      "day": 1,
+      "date": "YYYY-MM-DD",
+      "title": "Day title",
+      "overnight_location": "City/Area name",
+      "hotel_suggestion": "Hotel name or area (X star)",
+      "day_total_km": "X km",
+      "activities": [
+        {
+          "time": "Morning/Afternoon/Evening",
+          "activity": "Description",
+          "location": "Place name",
+          "duration": "X hours",
+          "driving_time": "X hours from previous" (optional),
+          "driving_distance_km": "X km from [Origin Location] to [Destination Location]" (optional, e.g., "10 km from Katunayake to CMB", "150 km from Negombo to Sigiriya")
+        }
+      ],
+      "meals": {...},
+      "notes": "..." (optional)
+    }
+  ],
   "practical_notes": [...],
-  "total_driving_hours": "..."
+  "total_driving_hours": "...",
+  "total_distance_km": "Approximate total km"
 }
 
 Return ONLY the JSON object, no additional text or explanations.`;

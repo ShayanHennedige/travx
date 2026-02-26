@@ -22,6 +22,7 @@ export default async function ItinerariesPage() {
       updated_at,
       inquiry_id,
       group_inquiry_id,
+      status,
       inquiries (
         id,
         inquiry_number,
@@ -52,6 +53,7 @@ export default async function ItinerariesPage() {
       updated_at,
       inquiry_id,
       group_inquiry_id,
+      status,
       group_inquiries (
         id,
         inquiry_number,
@@ -94,6 +96,7 @@ export default async function ItinerariesPage() {
       updated_at: itinerary.updated_at as string,
       inquiry_id: itinerary.inquiry_id as string | null,
       group_inquiry_id: itinerary.group_inquiry_id as string | null,
+      status: (itinerary.status as "new" | "in_progress" | "completed" | null) || null,
       type: "individual" as const,
       inquiry: inquiryData ? {
         id: inquiryData.id,
@@ -130,6 +133,7 @@ export default async function ItinerariesPage() {
       updated_at: itinerary.updated_at as string,
       inquiry_id: itinerary.inquiry_id as string | null,
       group_inquiry_id: itinerary.group_inquiry_id as string | null,
+      status: (itinerary.status as "new" | "in_progress" | "completed" | null) || null,
       type: "group" as const,
       inquiry: inquiryData ? {
         id: inquiryData.id,

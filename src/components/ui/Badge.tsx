@@ -10,14 +10,14 @@ interface BadgeProps {
 }
 
 const variantClasses: Record<string, string> = {
-  primary: "bg-primary-100 text-primary-700",
-  secondary: "bg-surface-100 text-surface-700",
-  blue: "bg-blue-100 text-blue-700",
-  purple: "bg-purple-100 text-purple-700",
-  green: "bg-green-100 text-green-700",
-  yellow: "bg-yellow-100 text-yellow-700",
-  red: "bg-red-100 text-red-700",
-  orange: "bg-orange-100 text-orange-700",
+  primary: "bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800 border border-primary-700/50 light:border-primary-200",
+  secondary: "bg-surface-800 light:bg-surface-200 text-surface-300 light:text-surface-700 border border-surface-600 light:border-surface-300",
+  blue: "bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800 border border-primary-700/50 light:border-primary-200",
+  purple: "bg-purple-900/50 light:bg-purple-100 text-purple-300 light:text-purple-800 border border-purple-700/50 light:border-purple-200",
+  green: "bg-green-900/50 light:bg-green-100 text-green-300 light:text-green-800 border border-green-700/50 light:border-green-200",
+  yellow: "bg-accent-900/50 light:bg-accent-100 text-accent-300 light:text-accent-800 border border-accent-700/50 light:border-accent-200",
+  red: "bg-red-900/50 light:bg-red-100 text-red-300 light:text-red-800 border border-red-700/50 light:border-red-200",
+  orange: "bg-orange-900/50 light:bg-orange-100 text-orange-300 light:text-orange-800 border border-orange-700/50 light:border-orange-200",
 };
 
 export function Badge({ children, variant = "secondary", className = "" }: BadgeProps) {

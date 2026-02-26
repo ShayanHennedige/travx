@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { format } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
 import { Header } from "@/components/layout";
 import { StatusBadge, Badge, Button } from "@/components/ui";
-import { InquiryStatus } from "@/types/database";
 import { TourTracker } from "./TourTracker";
-import { useRouter } from "next/navigation";
+import { LiveStatusTracker, StatusTrackerItem } from "./LiveStatusTracker";
+import { StaggerList, StaggerItem } from "@/components/ui/PageTransition";
 
 interface Inquiry {
   id: string;
@@ -72,13 +71,35 @@ interface DashboardContentProps {
   recentInquiries: Inquiry[];
   tours: Tour[];
   drivers: Driver[];
+  statusTrackerItems: StatusTrackerItem[];
 }
 
 type ViewMode = "dashboard" | "tracker";
 
-export function DashboardContent({ stats, recentInquiries, tours, drivers }: DashboardContentProps) {
-  const router = useRouter();
+const viewVariants = {
+  enter: (direction: number) => ({
+    opacity: 0,
+    x: direction > 0 ? 24 : -24,
+  }),
+  center: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] as const },
+  },
+  exit: (direction: number) => ({
+    opacity: 0,
+    x: direction > 0 ? -24 : 24,
+  }),
+};
+
+export function DashboardContent({ stats, recentInquiries, tours, drivers, statusTrackerItems }: DashboardContentProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
+  const [direction, setDirection] = useState(0);
+
+  const handleViewChange = (mode: ViewMode) => {
+    setDirection(mode === "tracker" ? 1 : -1);
+    setViewMode(mode);
+  };
 
   // Transform tours data for TourTracker
   const transformedTours = tours.map((tour) => ({
@@ -86,23 +107,6 @@ export function DashboardContent({ stats, recentInquiries, tours, drivers }: Das
     driver: tour.drivers || null,
     itinerary: tour.itineraries || null,
   }));
-
-  const handleAssignDriver = async (tourId: string, driverId: string) => {
-    try {
-      const response = await fetch(`/api/tours/${tourId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ driver_id: driverId }),
-      });
-
-      if (!response.ok) throw new Error("Failed to assign driver");
-
-      router.refresh();
-    } catch (error) {
-      console.error("Error assigning driver:", error);
-      alert("Failed to assign driver");
-    }
-  };
 
   return (
     <>
@@ -114,18 +118,18 @@ export function DashboardContent({ stats, recentInquiries, tours, drivers }: Das
         />
 
         {/* Animated Toggle Switch */}
-        <div className="relative bg-surface-100 rounded-full p-1 flex items-center">
+        <div className="relative bg-surface-800 light:bg-surface-200 rounded-full p-1 flex items-center border border-surface-700 light:border-surface-300">
           {/* Sliding Background */}
           <div
-            className={`absolute top-1 bottom-1 w-1/2 bg-white rounded-full shadow-md transition-all duration-300 ease-out ${
+            className={`absolute top-1 bottom-1 w-1/2 bg-accent-500 rounded-full shadow-md transition-all duration-300 ease-out ${
               viewMode === "tracker" ? "left-1/2 -translate-x-1" : "left-1"
             }`}
           />
           
           <button
-            onClick={() => setViewMode("dashboard")}
+            onClick={() => handleViewChange("dashboard")}
             className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${
-              viewMode === "dashboard" ? "text-surface-900" : "text-surface-500 hover:text-surface-700"
+              viewMode === "dashboard" ? "text-white light:text-black" : "text-surface-400 light:text-surface-600 hover:text-surface-200 light:hover:text-surface-900"
             }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -135,9 +139,9 @@ export function DashboardContent({ stats, recentInquiries, tours, drivers }: Das
           </button>
           
           <button
-            onClick={() => setViewMode("tracker")}
+            onClick={() => handleViewChange("tracker")}
             className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${
-              viewMode === "tracker" ? "text-surface-900" : "text-surface-500 hover:text-surface-700"
+              viewMode === "tracker" ? "text-white light:text-black" : "text-surface-400 light:text-surface-600 hover:text-surface-200 light:hover:text-surface-900"
             }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,161 +153,49 @@ export function DashboardContent({ stats, recentInquiries, tours, drivers }: Das
       </div>
 
       {/* Content with Animation */}
-      <div className="relative">
-        {/* Dashboard View */}
-        <div
-          className={`transition-all duration-500 ease-out ${
-            viewMode === "dashboard"
-              ? "opacity-100 translate-x-0"
-              : "opacity-0 -translate-x-8 absolute inset-0 pointer-events-none"
-          }`}
-        >
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
-            <StatCard label="Total Inquiries" value={stats.total} color="surface" />
-            <StatCard label="Individual" value={stats.individual} color="blue" icon="individual" />
-            <StatCard label="Group" value={stats.group} color="purple" icon="group" />
-            <StatCard label="New" value={stats.new} color="yellow" />
-            <StatCard label="In Progress" value={stats.in_progress} color="orange" />
-            <StatCard label="Confirmed" value={stats.confirmed} color="green" />
-            <StatCard label="Active Tours" value={stats.activeTours} color="teal" icon="tour" />
-          </div>
+      <div className="relative min-h-[400px]">
+        <AnimatePresence mode="wait" custom={direction}>
+          {viewMode === "dashboard" ? (
+            <motion.div
+              key="dashboard"
+              custom={direction}
+              variants={viewVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              className="absolute inset-0"
+            >
+              {/* Stats Grid */}
+              <StaggerList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+                <StaggerItem><StatCard label="Total Inquiries" value={stats.total} color="surface" /></StaggerItem>
+                <StaggerItem><StatCard label="Individual" value={stats.individual} color="blue" icon="individual" /></StaggerItem>
+                <StaggerItem><StatCard label="Group" value={stats.group} color="purple" icon="group" /></StaggerItem>
+                <StaggerItem><StatCard label="New" value={stats.new} color="yellow" /></StaggerItem>
+                <StaggerItem><StatCard label="In Progress" value={stats.in_progress} color="orange" /></StaggerItem>
+                <StaggerItem><StatCard label="Confirmed" value={stats.confirmed} color="green" /></StaggerItem>
+                <StaggerItem><StatCard label="Active Tours" value={stats.activeTours} color="teal" icon="tour" /></StaggerItem>
+              </StaggerList>
 
-          {/* Recent Inquiries */}
-          <div className="card">
-            <div className="px-6 py-4 border-b border-surface-200 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-surface-900">
-                Recent Inquiries
-              </h2>
-              <Link
-                href="/inquiries"
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-              >
-                View All
-              </Link>
-            </div>
-
-            {recentInquiries.length === 0 ? (
-              <div className="p-12 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-100 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-surface-900 mb-1">
-                  No inquiries yet
-                </h3>
-                <p className="text-surface-500 mb-6">
-                  Share the inquiry form link with your clients to start receiving inquiries
-                </p>
-                <div className="flex items-center justify-center gap-2">
-                  <code className="px-3 py-2 bg-surface-100 rounded-lg text-sm text-surface-700">
-                    /inquiry
-                  </code>
-                </div>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-surface-200 bg-surface-50">
-                      <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
-                        Inquiry
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
-                        Client
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
-                        Pax
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
-                        Travel Dates
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-surface-100 bg-white">
-                    {recentInquiries.map((inquiry) => {
-                      const isGroup = inquiry.type === "group";
-                      const detailUrl = isGroup 
-                        ? `/group-inquiries/${inquiry.id}` 
-                        : `/inquiries/${inquiry.id}`;
-                      const totalPax = isGroup
-                        ? (inquiry.no_of_adults || 0) + (inquiry.no_of_children || 0)
-                        : (inquiry.no_of_pax || 0) + (inquiry.no_of_children || 0);
-
-                      return (
-                        <tr
-                          key={inquiry.id}
-                          className="hover:bg-surface-50 transition-colors"
-                        >
-                          <td className="px-6 py-4">
-                            <Badge variant={isGroup ? "purple" : "blue"}>
-                              {isGroup ? "Group" : "Individual"}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4">
-                            <Link
-                              href={detailUrl}
-                              className="text-sm font-medium text-primary-600 hover:text-primary-700"
-                            >
-                              {inquiry.inquiry_number}
-                            </Link>
-                            <p className="text-xs text-surface-500 mt-0.5">
-                              {format(new Date(inquiry.created_at), "MMM d, yyyy")}
-                            </p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-medium text-surface-900">
-                              {inquiry.first_name} {inquiry.last_name}
-                            </p>
-                            <p className="text-xs text-surface-500">
-                              {inquiry.client_email}
-                            </p>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-surface-700">
-                            <span className="font-medium">{totalPax}</span>
-                            <span className="text-surface-500"> pax</span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-surface-700">
-                            {inquiry.arriving_date
-                              ? format(new Date(inquiry.arriving_date), "MMM d")
-                              : "TBD"}
-                            {inquiry.departure_date &&
-                              ` - ${format(new Date(inquiry.departure_date), "MMM d")}`}
-                          </td>
-                          <td className="px-6 py-4">
-                            <StatusBadge status={inquiry.status as InquiryStatus} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Tour Tracker View */}
-        <div
-          className={`transition-all duration-500 ease-out ${
-            viewMode === "tracker"
-              ? "opacity-100 translate-x-0"
-              : "opacity-0 translate-x-8 absolute inset-0 pointer-events-none"
-          }`}
-        >
-          <TourTracker 
-            tours={transformedTours}
-            drivers={drivers}
-            onAssignDriver={handleAssignDriver}
-          />
-        </div>
+              {/* Progress Tracker */}
+              <LiveStatusTracker items={statusTrackerItems} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="tracker"
+              custom={direction}
+              variants={viewVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              className="absolute inset-0"
+            >
+              <TourTracker 
+                tours={transformedTours}
+                drivers={drivers}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </>
   );
@@ -318,13 +210,13 @@ interface StatCardProps {
 
 function StatCard({ label, value, color, icon }: StatCardProps) {
   const colorClasses = {
-    surface: "bg-surface-100 text-surface-600",
-    blue: "bg-blue-100 text-blue-700",
-    yellow: "bg-yellow-100 text-yellow-700",
-    purple: "bg-purple-100 text-purple-700",
-    green: "bg-green-100 text-green-700",
-    orange: "bg-orange-100 text-orange-700",
-    teal: "bg-teal-100 text-teal-700",
+    surface: "bg-surface-800 light:bg-surface-200 text-surface-300 light:text-surface-700",
+    blue: "bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800 border border-primary-700/50 light:border-primary-200",
+    yellow: "bg-accent-900/50 light:bg-accent-100 text-accent-300 light:text-accent-800 border border-accent-700/50 light:border-accent-200",
+    purple: "bg-purple-900/50 light:bg-purple-100 text-purple-300 light:text-purple-800 border border-purple-700/50 light:border-purple-200",
+    green: "bg-green-900/50 light:bg-green-100 text-green-300 light:text-green-800 border border-green-700/50 light:border-green-200",
+    orange: "bg-orange-900/50 light:bg-orange-100 text-orange-300 light:text-orange-800 border border-orange-700/50 light:border-orange-200",
+    teal: "bg-teal-900/50 light:bg-teal-100 text-teal-300 light:text-teal-800 border border-teal-700/50 light:border-teal-200",
   };
 
   return (
@@ -346,8 +238,8 @@ function StatCard({ label, value, color, icon }: StatCardProps) {
           <span className="text-lg font-bold">{value}</span>
         )}
       </div>
-      <p className="text-2xl font-bold text-surface-900">{value}</p>
-      <p className="text-sm font-medium text-surface-600">{label}</p>
+      <p className="text-2xl font-bold text-surface-100 light:text-surface-900">{value}</p>
+      <p className="text-sm font-medium text-surface-400 light:text-surface-500">{label}</p>
     </div>
   );
 }

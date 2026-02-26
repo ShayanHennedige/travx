@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { format } from "date-fns";
 import { Button, Badge } from "@/components/ui";
@@ -35,10 +36,10 @@ interface VouchersListProps {
 type StatusFilter = "all" | "draft" | "confirmed" | "amended" | "cancelled";
 
 const statusColors: Record<string, string> = {
-  draft: "bg-yellow-100 text-yellow-700",
-  confirmed: "bg-green-100 text-green-700",
-  amended: "bg-blue-100 text-blue-700",
-  cancelled: "bg-red-100 text-red-700",
+  draft: "bg-amber-900/50 text-amber-300",
+  confirmed: "bg-green-900/50 text-green-300",
+  amended: "bg-primary-900/50 text-primary-300",
+  cancelled: "bg-red-900/50 text-red-300",
 };
 
 export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
@@ -83,7 +84,8 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
       type: "individual" | "group";
       inquiryId?: string;
       groupInquiryId?: string;
-      vouchers: Voucher[] 
+      vouchers: Voucher[];
+      overallStatus: string; // Overall status for the voucher group
     }> = {};
 
     filteredVouchers.forEach((voucher) => {
@@ -96,9 +98,29 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
           inquiryId: voucher.inquiry_id,
           groupInquiryId: voucher.group_inquiry_id,
           vouchers: [],
+          overallStatus: "new", // Default status
         };
       }
       groups[key].vouchers.push(voucher);
+    });
+
+    // Calculate overall status for each group
+    Object.keys(groups).forEach((key) => {
+      const group = groups[key];
+      const statuses = group.vouchers.map(v => v.status).filter(Boolean);
+      
+      // If all vouchers are completed, group is completed
+      if (statuses.length > 0 && statuses.every(s => s === "completed")) {
+        group.overallStatus = "completed";
+      } 
+      // If any voucher is in progress, group is in progress
+      else if (statuses.some(s => s === "in_progress")) {
+        group.overallStatus = "in_progress";
+      }
+      // Otherwise, new
+      else {
+        group.overallStatus = "new";
+      }
     });
 
     // Sort groups by most recent voucher
@@ -198,15 +220,15 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
   if (vouchers.length === 0) {
     return (
       <div className="card p-12 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-100 flex items-center justify-center">
-          <svg className="w-8 h-8 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-700 light:bg-surface-200 flex items-center justify-center">
+          <svg className="w-8 h-8 text-surface-500 light:text-surface-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-surface-900 mb-1">
+        <h3 className="text-lg font-medium text-surface-100 light:text-surface-900 mb-1">
           No vouchers yet
         </h3>
-        <p className="text-surface-500 mb-6">
+        <p className="text-surface-400 light:text-surface-500 mb-6">
           Generate vouchers from confirmed itineraries to see them here
         </p>
         <Link href="/itineraries">
@@ -237,7 +259,7 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                 placeholder="Search by voucher #, hotel, guest, or inquiry..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-surface-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm text-surface-100 light:text-surface-900 placeholder:text-surface-500 light:placeholder:text-surface-400"
               />
             </div>
           </div>
@@ -246,13 +268,13 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={expandAll}
-              className="px-3 py-1.5 text-sm text-surface-600 hover:text-surface-900 hover:bg-surface-100 rounded-md transition-colors"
+              className="px-3 py-1.5 text-sm text-surface-400 light:text-surface-600 hover:text-surface-100 light:hover:text-surface-900 hover:bg-surface-700 light:hover:bg-surface-200 rounded-md transition-colors"
             >
               Expand All
             </button>
             <button
               onClick={collapseAll}
-              className="px-3 py-1.5 text-sm text-surface-600 hover:text-surface-900 hover:bg-surface-100 rounded-md transition-colors"
+              className="px-3 py-1.5 text-sm text-surface-400 light:text-surface-600 hover:text-surface-100 light:hover:text-surface-900 hover:bg-surface-700 light:hover:bg-surface-200 rounded-md transition-colors"
             >
               Collapse All
             </button>
@@ -262,7 +284,7 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="px-3 py-2 rounded-lg border border-surface-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm bg-white"
+            className="px-3 py-2 rounded-lg border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-sm text-surface-100 light:text-surface-900"
           >
             <option value="all">All Status</option>
             <option value="draft">Draft</option>
@@ -272,7 +294,7 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
           </select>
         </div>
 
-        <div className="mt-3 text-sm text-surface-500">
+        <div className="mt-3 text-sm text-surface-400 light:text-surface-500">
           Showing {filteredVouchers.length} of {vouchers.length} vouchers in {groupedVouchers.length} group{groupedVouchers.length !== 1 ? "s" : ""}
           {searchQuery && ` matching "${searchQuery}"`}
         </div>
@@ -280,13 +302,19 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
 
       {/* Grouped Vouchers with Collapsible Sections */}
       <div className="space-y-4">
-        {groupedVouchers.map(([key, group]) => {
+        {groupedVouchers.map(([key, group], index) => {
           const isExpanded = expandedGroups.has(key);
           
           return (
-            <div key={key} className="card overflow-hidden">
+            <motion.div
+              key={key}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05, duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="card overflow-hidden"
+            >
               {/* Collapsible Group Header */}
-              <div className="bg-surface-50 px-6 py-4 border-b border-surface-200">
+              <div className="bg-surface-700 light:bg-surface-100 px-6 py-4 border-b border-surface-600 light:border-surface-200">
                 <div className="flex items-center justify-between">
                   {/* Clickable area for expand/collapse */}
                   <div 
@@ -295,14 +323,14 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                   >
                     {/* Expand/Collapse Arrow */}
                     <div className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}>
-                      <svg className="w-5 h-5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
                     
                     {/* Avatar */}
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold ${
-                      group.type === "group" ? "bg-purple-100 text-purple-700" : "bg-primary-100 text-primary-700"
+                      group.type === "group" ? "bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800" : "bg-primary-800/80 light:bg-primary-100 text-primary-300 light:text-primary-700"
                     }`}>
                       {group.clientName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                     </div>
@@ -310,62 +338,75 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                     {/* Client Info */}
                     <div className="text-left">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-surface-900">{group.clientName}</h3>
+                        <h3 className="font-semibold text-surface-100 light:text-surface-900">{group.clientName}</h3>
                         <Badge variant={group.type === "group" ? "purple" : "blue"}>
                           {group.type === "group" ? "Group" : "Individual"}
                         </Badge>
                       </div>
-                      <p className="text-sm text-surface-500">
-                        Ref: <span className="font-medium text-primary-600">{group.inquiryNumber}</span>
+                      <p className="text-sm text-surface-400 light:text-surface-500">
+                        Ref: <span className="font-medium text-primary-400">{group.inquiryNumber}</span>
                         <span className="mx-2">•</span>
                         <span className="font-medium">{group.vouchers.length}</span> voucher{group.vouchers.length !== 1 ? "s" : ""}
                       </p>
                     </div>
                   </div>
                   
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2">
-                    {/* Rooming List Button - Only for Group */}
-                    {group.type === "group" && group.groupInquiryId && (
-                      <button
-                        onClick={() => handleDownloadRoomingList(group.groupInquiryId!, group.inquiryNumber)}
-                        disabled={downloadingRoomingList === group.groupInquiryId}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors disabled:opacity-50"
-                        title="Download Rooming List"
-                      >
-                        {downloadingRoomingList === group.groupInquiryId ? (
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                          </svg>
-                        )}
-                        Rooming List
-                      </button>
-                    )}
+                  {/* Status and Action Buttons */}
+                  <div className="flex items-center gap-3">
+                    {/* Status Selector for Complete Voucher Group */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-surface-300 light:text-surface-600">Status:</span>
+                      <VoucherGroupStatusSelector
+                        inquiryId={group.inquiryId}
+                        groupInquiryId={group.groupInquiryId}
+                        currentStatus={group.overallStatus}
+                      />
+                    </div>
                     
-                    {/* View Inquiry Button */}
-                    <Link href={group.type === "group" ? `/group-inquiries/${group.groupInquiryId}` : `/inquiries/${group.inquiryId}`}>
-                      <Button variant="secondary" size="sm">
-                        View Inquiry
-                      </Button>
-                    </Link>
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2">
+                      {/* Rooming List Button - Only for Group */}
+                      {group.type === "group" && group.groupInquiryId && (
+                        <button
+                          onClick={() => handleDownloadRoomingList(group.groupInquiryId!, group.inquiryNumber)}
+                          disabled={downloadingRoomingList === group.groupInquiryId}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-300 light:text-green-800 bg-green-900/40 light:bg-green-100 hover:bg-green-800/50 light:hover:bg-green-200 rounded-lg border border-green-700/50 light:border-green-200 transition-colors disabled:opacity-50"
+                          title="Download Rooming List"
+                        >
+                          {downloadingRoomingList === group.groupInquiryId ? (
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                          )}
+                          Rooming List
+                        </button>
+                      )}
+                      
+                      {/* View Inquiry Button */}
+                      <Link href={group.type === "group" ? `/group-inquiries/${group.groupInquiryId}` : `/inquiries/${group.inquiryId}`}>
+                        <Button variant="secondary" size="sm">
+                          View Inquiry
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Collapsible Vouchers Content */}
+              {/* Collapsible Vouchers Content - nested rows with distinct background */}
               <div 
                 className={`transition-all duration-300 ease-in-out overflow-hidden ${
                   isExpanded ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
                 }`}
               >
-                <div className="divide-y divide-surface-100">
+                <div className="divide-y divide-surface-600 light:divide-surface-200 bg-surface-800/50 light:bg-surface-50">
                   {group.vouchers.map((voucher) => (
-                    <div key={voucher.id} className="p-4 hover:bg-surface-50 transition-colors">
+                    <div key={voucher.id} className="p-4 hover:bg-surface-700/70 light:hover:bg-surface-100 transition-colors">
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3">
@@ -373,16 +414,13 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                               <Badge variant="orange">Amendment #{voucher.amendment_number}</Badge>
                             )}
                             <Link href={`/vouchers/${voucher.id}`} className="group">
-                              <h4 className="font-medium text-surface-900 group-hover:text-primary-600 transition-colors">
+                              <h4 className="font-medium text-surface-100 light:text-surface-900 group-hover:text-primary-400 light:group-hover:text-primary-600 transition-colors">
                                 {voucher.hotel_name}
                               </h4>
                             </Link>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[voucher.status] || "bg-surface-100 text-surface-700"}`}>
-                              {voucher.status}
-                            </span>
                           </div>
-                          <div className="flex items-center gap-4 mt-1.5 text-sm text-surface-500">
-                            <span className="font-medium text-surface-700">{voucher.voucher_number}</span>
+                          <div className="flex items-center gap-4 mt-1.5 text-sm text-surface-400 light:text-surface-500">
+                            <span className="font-medium text-surface-300 light:text-surface-700">{voucher.voucher_number}</span>
                             <span className="flex items-center gap-1">
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -398,7 +436,7 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                           <button
                             onClick={() => handleDownloadPDF(voucher.id, voucher.voucher_number)}
                             disabled={downloadingPDF === voucher.id}
-                            className="p-2 text-surface-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50"
+                            className="p-2 text-surface-400 hover:text-primary-400 hover:bg-primary-900/30 rounded-lg transition-colors disabled:opacity-50"
                             title="Download PDF"
                           >
                             {downloadingPDF === voucher.id ? (
@@ -419,7 +457,7 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                           </Link>
                           <button
                             onClick={() => setDeleteConfirm(voucher.id)}
-                            className="p-2 text-surface-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 text-surface-400 hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
                             title="Delete"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -432,7 +470,7 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                   ))}
                 </div>
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
@@ -443,11 +481,11 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
           <svg className="w-12 h-12 mx-auto text-surface-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <h3 className="text-lg font-medium text-surface-900 mb-1">No results found</h3>
-          <p className="text-surface-500">Try adjusting your search query</p>
+          <h3 className="text-lg font-medium text-surface-100 light:text-surface-900 mb-1">No results found</h3>
+          <p className="text-surface-400 light:text-surface-500">Try adjusting your search query</p>
           <button
             onClick={() => setSearchQuery("")}
-            className="mt-4 text-primary-600 hover:text-primary-700 font-medium text-sm"
+            className="mt-4 text-primary-400 hover:text-primary-300 font-medium text-sm"
           >
             Clear search
           </button>
@@ -457,19 +495,19 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+          <div className="rounded-xl shadow-xl max-w-md w-full p-6" style={{ backgroundColor: "var(--bg-surface)" }}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 rounded-full bg-red-900/50 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-surface-900">Delete Voucher</h3>
-                <p className="text-sm text-surface-500">This action cannot be undone</p>
+                <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">Delete Voucher</h3>
+                <p className="text-sm text-surface-400 light:text-surface-500">This action cannot be undone</p>
               </div>
             </div>
-            <p className="text-surface-600 mb-6">
+            <p className="text-surface-400 light:text-surface-500 mb-6">
               Are you sure you want to delete this voucher?
             </p>
             <div className="flex items-center justify-end gap-3">
@@ -487,6 +525,96 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface VoucherGroupStatusSelectorProps {
+  inquiryId?: string;
+  groupInquiryId?: string;
+  currentStatus: string;
+}
+
+function VoucherGroupStatusSelector({ inquiryId, groupInquiryId, currentStatus }: VoucherGroupStatusSelectorProps) {
+  const router = useRouter();
+  
+  // Map existing statuses to component statuses
+  const getComponentStatus = (status: string): string => {
+    if (["new", "in_progress", "completed"].includes(status)) {
+      return status;
+    }
+    if (status === "draft") return "new";
+    if (status === "confirmed") return "in_progress";
+    if (status === "amended") return "in_progress";
+    if (status === "cancelled") return "completed";
+    return "new";
+  };
+
+  const [status, setStatus] = useState<string>(getComponentStatus(currentStatus));
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleStatusChange = async (newStatus: string) => {
+    const currentComponentStatus = getComponentStatus(currentStatus);
+    if (newStatus === currentComponentStatus) return;
+    
+    setStatus(newStatus);
+    setIsUpdating(true);
+    
+    try {
+      // Update all vouchers for this inquiry/group
+      const response = await fetch(`/api/vouchers/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          status: newStatus,
+          inquiry_id: inquiryId,
+          group_inquiry_id: groupInquiryId,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update status");
+      
+      router.refresh();
+    } catch (error) {
+      console.error("Error updating status:", error);
+      setStatus(getComponentStatus(currentStatus)); // Revert on error
+      alert("Failed to update status");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const statusOptions = [
+    { value: "new", label: "New" },
+    { value: "in_progress", label: "In Progress" },
+    { value: "completed", label: "Completed" },
+  ];
+
+  const getStatusColor = (s: string) => {
+    if (s === "completed") return "bg-green-900/50 light:bg-green-100 text-green-300 light:text-green-800 border border-green-700/50 light:border-green-200";
+    if (s === "in_progress") return "bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800 border border-primary-700/50 light:border-primary-200";
+    return "bg-amber-900/50 light:bg-amber-100 text-amber-300 light:text-amber-800 border border-amber-700/50 light:border-amber-200";
+  };
+
+  const statusColor = getStatusColor(status);
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
+        {status === "completed" ? "✓ Completed" : status === "in_progress" ? "⟳ In Progress" : "○ New"}
+      </span>
+      <select
+        value={status}
+        onChange={(e) => handleStatusChange(e.target.value)}
+        disabled={isUpdating}
+        className="px-2 py-1 text-xs border border-surface-600 light:border-surface-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none bg-surface-800 light:bg-white text-surface-100 light:text-surface-900 disabled:opacity-50"
+      >
+        {statusOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
