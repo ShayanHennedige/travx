@@ -21,7 +21,7 @@ function extractKeywords(remarks: (string | null)[]): Record<string, number> {
 
   remarks.forEach((remark) => {
     if (!remark) return;
-    
+
     const words = remark
       .toLowerCase()
       .replace(/[^\w\s]/g, " ")
@@ -45,53 +45,59 @@ function extractKeywords(remarks: (string | null)[]): Record<string, number> {
 
 // GET - Get feedback analytics
 export async function GET(request: Request) {
-  const supabase = await createClient();
   const { searchParams } = new URL(request.url);
+  const supabase = await createClient();
 
-  // Build base query
+  // Build base query (flat — no FK constraints defined in schema)
   let query = supabase.from("feedback").select("*");
 
   // Apply filters
   const dateFrom = searchParams.get("date_from");
   const dateTo = searchParams.get("date_to");
   const country = searchParams.get("country");
-  const ageGroup = searchParams.get("age_group");
   const tourId = searchParams.get("tour_id");
 
   if (dateFrom) {
-    // Include the entire start day
     query = query.gte("submitted_at", `${dateFrom}T00:00:00.000Z`);
   }
   if (dateTo) {
-    // Include the entire end day (up to end of day)
     query = query.lte("submitted_at", `${dateTo}T23:59:59.999Z`);
   }
   if (country) {
     query = query.eq("country", country);
   }
-  if (ageGroup) {
-    query = query.eq("age_group", ageGroup);
-  }
   if (tourId) {
     query = query.eq("tour_id", tourId);
   }
 
-  const { data: feedback, error } = await query;
+  const { data: feedbackData, error } = await query;
 
   if (error) {
     console.error("Error fetching feedback:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  if (!feedback || feedback.length === 0) {
+  const feedback = (feedbackData || []) as any[];
+
+  // Fetch driver info separately
+  const driverIds = feedback.map(f => f.driver_id).filter(Boolean) as string[];
+  const { data: drivers } = driverIds.length > 0
+    ? await supabase.from("drivers").select("id, name, vehicle_type, vehicle_number").in("id", driverIds)
+    : { data: [] as any[] };
+
+  const driverMap = new Map((drivers || []).map((d: any) => [d.id, d]));
+
+  if (feedback.length === 0) {
     return NextResponse.json({
       countryDistribution: {},
-      ageGroupDistribution: {},
       categoryHappiness: {},
       overallHappiness: 0,
       lowScores: [],
       keywords: {},
       totalFeedback: 0,
+      driverPerformance: [],
+      hotelPerformance: [],
+      vehiclePerformance: [],
     });
   }
 
@@ -102,92 +108,168 @@ export async function GET(request: Request) {
     countryDistribution[country] = (countryDistribution[country] || 0) + 1;
   });
 
-  // Age group distribution
-  const ageGroupDistribution: Record<string, number> = {};
-  feedback.forEach((f) => {
-    const ageGroup = f.age_group || "Unknown";
-    ageGroupDistribution[ageGroup] = (ageGroupDistribution[ageGroup] || 0) + 1;
-  });
-
   // Category happiness percentages
   const airportScores = feedback.map((f) => f.airport_welcome_score);
   const airportHappiness = calculateHappiness(airportScores);
 
   // Hotel quality average
-  const hotelScores: number[] = [];
+  const hotelScoresList: number[] = [];
   feedback.forEach((f) => {
     if (f.hotel_quality_scores) {
       const scores = Object.values(f.hotel_quality_scores) as number[];
-      hotelScores.push(...scores);
+      hotelScoresList.push(...scores);
     }
   });
-  const hotelHappiness = hotelScores.length > 0 
-    ? Math.round(hotelScores.reduce((sum, score) => sum + score, 0) / hotelScores.length)
+  const hotelHappiness = hotelScoresList.length > 0
+    ? Math.round(hotelScoresList.reduce((sum, score) => sum + score, 0) / hotelScoresList.length)
     : 0;
 
-  // Driver average (all driver scores)
-  const driverScores: number[] = [];
+  // Driver average
+  const driverScoresList: number[] = [];
   feedback.forEach((f) => {
-    if (f.driver_language_score !== null) driverScores.push(f.driver_language_score);
-    if (f.driver_appearance_score !== null) driverScores.push(f.driver_appearance_score);
-    if (f.driver_hospitality_score !== null) driverScores.push(f.driver_hospitality_score);
-    if (f.driver_helpfulness_score !== null) driverScores.push(f.driver_helpfulness_score);
+    const s = [
+      f.driver_language_score,
+      f.driver_appearance_score,
+      f.driver_hospitality_score,
+      f.driver_helpfulness_score
+    ].filter(v => v !== null && v !== undefined) as number[];
+    driverScoresList.push(...s);
   });
-  const driverHappiness = driverScores.length > 0
-    ? Math.round(driverScores.reduce((sum, score) => sum + score, 0) / driverScores.length)
+  const driverHappiness = driverScoresList.length > 0
+    ? Math.round(driverScoresList.reduce((sum, score) => sum + score, 0) / driverScoresList.length)
     : 0;
 
   // Vehicle average
-  const vehicleScores: number[] = [];
+  const vehicleScoresList: number[] = [];
   feedback.forEach((f) => {
-    if (f.vehicle_quality_score !== null) vehicleScores.push(f.vehicle_quality_score);
-    if (f.vehicle_cleanliness_score !== null) vehicleScores.push(f.vehicle_cleanliness_score);
-    if (f.vehicle_comfort_score !== null) vehicleScores.push(f.vehicle_comfort_score);
+    const s = [
+      f.vehicle_quality_score,
+      f.vehicle_cleanliness_score,
+      f.vehicle_comfort_score
+    ].filter(v => v !== null && v !== undefined) as number[];
+    vehicleScoresList.push(...s);
   });
-  const vehicleHappiness = vehicleScores.length > 0
-    ? Math.round(vehicleScores.reduce((sum, score) => sum + score, 0) / vehicleScores.length)
+  const vehicleHappiness = vehicleScoresList.length > 0
+    ? Math.round(vehicleScoresList.reduce((sum, score) => sum + score, 0) / vehicleScoresList.length)
     : 0;
 
   // Overall experience
   const overallScores = feedback.map((f) => f.overall_experience_score);
   const overallHappiness = calculateHappiness(overallScores);
 
-  // Overall happiness (average of all category averages)
+  // Total happiness calculation (weighted equally)
   const categoryAverages = [airportHappiness, hotelHappiness, driverHappiness, vehicleHappiness, overallHappiness]
     .filter((score) => score > 0);
   const totalOverallHappiness = categoryAverages.length > 0
     ? Math.round(categoryAverages.reduce((sum, score) => sum + score, 0) / categoryAverages.length)
     : 0;
 
-  // Low scores (< 60%)
-  const lowScores: Array<{ category: string; score: number; feedbackId: string }> = [];
+  // --- Detailed Performance Aggregation ---
+
+  // 1. Driver Performance
+  const driverStats = new Map<string, { name: string; totalScore: number; count: number; vehicleType: string }>();
   feedback.forEach((f) => {
-    if (f.airport_welcome_score !== null && f.airport_welcome_score < 60) {
-      lowScores.push({ category: "Airport Welcome", score: f.airport_welcome_score, feedbackId: f.id });
-    }
-    if (f.overall_experience_score !== null && f.overall_experience_score < 60) {
-      lowScores.push({ category: "Overall Experience", score: f.overall_experience_score, feedbackId: f.id });
-    }
-    
-    // Check driver scores
-    const driverAvg = calculateHappiness([
+    const driver = f.driver_id ? driverMap.get(f.driver_id) : null;
+    const key = f.driver_id || (driver?.name ? `name-${driver.name}` : null);
+    if (!key) return;
+
+    const scores = [
       f.driver_language_score,
       f.driver_appearance_score,
       f.driver_hospitality_score,
-      f.driver_helpfulness_score,
-    ]);
-    if (driverAvg > 0 && driverAvg < 60) {
-      lowScores.push({ category: "Driver", score: driverAvg, feedbackId: f.id });
+      f.driver_helpfulness_score
+    ].filter(s => s !== null && s !== undefined) as number[];
+
+    if (scores.length === 0) return;
+    const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+    if (!driverStats.has(key)) {
+      driverStats.set(key, {
+        name: driver?.name || "Unknown Driver",
+        totalScore: 0,
+        count: 0,
+        vehicleType: driver?.vehicle_type || "N/A"
+      });
     }
-    
-    // Check vehicle scores
-    const vehicleAvg = calculateHappiness([
+
+    const stat = driverStats.get(key)!;
+    stat.totalScore += avgScore;
+    stat.count += 1;
+  });
+
+  const driverPerformance = Array.from(driverStats.values()).map(stat => ({
+    name: stat.name,
+    vehicleType: stat.vehicleType,
+    averageScore: Math.round(stat.totalScore / stat.count),
+    reviewCount: stat.count
+  })).sort((a, b) => b.averageScore - a.averageScore);
+
+  // 2. Hotel Performance
+  const hotelStats = new Map<string, { totalScore: number; count: number }>();
+  feedback.forEach((f) => {
+    if (f.hotel_quality_scores) {
+      Object.entries(f.hotel_quality_scores).forEach(([hotelName, score]) => {
+        const val = score as number;
+        if (val > 0) {
+          if (!hotelStats.has(hotelName)) {
+            hotelStats.set(hotelName, { totalScore: 0, count: 0 });
+          }
+          const stat = hotelStats.get(hotelName)!;
+          stat.totalScore += val;
+          stat.count += 1;
+        }
+      });
+    }
+  });
+
+  const hotelPerformance = Array.from(hotelStats.entries()).map(([name, stat]) => ({
+    name,
+    averageScore: Math.round(stat.totalScore / stat.count),
+    reviewCount: stat.count
+  })).sort((a, b) => b.averageScore - a.averageScore);
+
+  // 3. Vehicle Performance
+  const vehicleStats = new Map<string, { type: string; number: string; totalScore: number; count: number }>();
+  feedback.forEach((f) => {
+    const driver = f.driver_id ? driverMap.get(f.driver_id) : null;
+    const vehicleName = driver?.vehicle_type || "Standard Vehicle";
+    const vehicleNo = driver?.vehicle_number || "N/A";
+    const key = `${vehicleName}-${vehicleNo}`;
+
+    const scores = [
       f.vehicle_quality_score,
       f.vehicle_cleanliness_score,
-      f.vehicle_comfort_score,
-    ]);
-    if (vehicleAvg > 0 && vehicleAvg < 60) {
-      lowScores.push({ category: "Vehicle", score: vehicleAvg, feedbackId: f.id });
+      f.vehicle_comfort_score
+    ].filter(s => s !== null && s !== undefined) as number[];
+
+    if (scores.length === 0) return;
+    const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+    if (!vehicleStats.has(key)) {
+      vehicleStats.set(key, { type: vehicleName, number: vehicleNo, totalScore: 0, count: 0 });
+    }
+
+    const stat = vehicleStats.get(key)!;
+    stat.totalScore += avgScore;
+    stat.count += 1;
+  });
+
+  const vehiclePerformance = Array.from(vehicleStats.values()).map(stat => ({
+    type: stat.type,
+    number: stat.number,
+    averageScore: Math.round(stat.totalScore / stat.count),
+    reviewCount: stat.count
+  })).sort((a, b) => b.averageScore - a.averageScore);
+
+  // Low scores (< 60%)
+  const lowScores: Array<{ category: string; score: number; feedbackId: string; guest: string }> = [];
+  feedback.forEach((f) => {
+    const guest = f.guest_name || "Guest";
+    if (f.airport_welcome_score !== null && f.airport_welcome_score < 60) {
+      lowScores.push({ category: "Airport Welcome", score: f.airport_welcome_score, feedbackId: f.id, guest });
+    }
+    if (f.overall_experience_score !== null && f.overall_experience_score < 60) {
+      lowScores.push({ category: "Overall", score: f.overall_experience_score, feedbackId: f.id, guest });
     }
   });
 
@@ -195,9 +277,8 @@ export async function GET(request: Request) {
   const remarks = feedback.map((f) => f.remarks);
   const keywords = extractKeywords(remarks);
 
-  return NextResponse.json({
+  const result = {
     countryDistribution,
-    ageGroupDistribution,
     categoryHappiness: {
       airportWelcome: airportHappiness,
       hotelQuality: hotelHappiness,
@@ -206,8 +287,13 @@ export async function GET(request: Request) {
       overallExperience: overallHappiness,
     },
     overallHappiness: totalOverallHappiness,
-    lowScores: lowScores.slice(0, 10), // Top 10 low scores
+    lowScores: lowScores.slice(0, 10),
     keywords,
     totalFeedback: feedback.length,
-  });
+    driverPerformance,
+    hotelPerformance,
+    vehiclePerformance
+  };
+
+  return NextResponse.json(result);
 }

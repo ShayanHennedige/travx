@@ -7,34 +7,32 @@ export const feedbackSchema = z.object({
   tour_id: z.string().uuid().optional().nullable(),
   token_id: z.string().uuid().optional().nullable(),
   driver_id: z.string().uuid().optional().nullable(),
-  vehicle_id: z.string().optional().nullable(),
-  
+
   // Guest Info
   guest_name: z.string().min(1, "Name is required"),
   guest_email: z.string().email("Valid email is required"),
   country: z.string().optional().nullable(),
-  age_group: z.enum(["Under 18", "18-25", "26-35", "36-45", "46-60", "60+"]).optional().nullable(),
-  
+
   // Ratings (0-100)
   airport_welcome_score: z.number().min(0).max(100).optional().nullable(),
-  
+
   // Hotel Quality (dynamic hotels)
-  hotel_quality_scores: z.record(z.number().min(0).max(100)).optional().default({}),
-  
+  hotel_quality_scores: z.record(z.string(), z.number().min(0).max(100)).optional().default({}),
+
   // Driver scores
   driver_language_score: z.number().min(0).max(100).optional().nullable(),
   driver_appearance_score: z.number().min(0).max(100).optional().nullable(),
   driver_hospitality_score: z.number().min(0).max(100).optional().nullable(),
   driver_helpfulness_score: z.number().min(0).max(100).optional().nullable(),
-  
+
   // Vehicle scores
   vehicle_quality_score: z.number().min(0).max(100).optional().nullable(),
   vehicle_cleanliness_score: z.number().min(0).max(100).optional().nullable(),
   vehicle_comfort_score: z.number().min(0).max(100).optional().nullable(),
-  
+
   // Overall
   overall_experience_score: z.number().min(0).max(100).optional().nullable(),
-  
+
   // Remarks
   remarks: z.string().max(800, "Remarks cannot exceed 800 characters").optional().nullable(),
 });
