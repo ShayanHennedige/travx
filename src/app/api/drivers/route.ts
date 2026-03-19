@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
+const vehicleTypes = ["Car", "Van", "Mini Coach", "30 Seater Coach", "Large Coach"] as const;
+
 const driverSchema = z.object({
   name: z.string().min(1, "Name is required"),
   contact_number: z.string().min(1, "Contact number is required"),
-  vehicle_type: z.string().optional().nullable(),
+  vehicle_type: z.enum(vehicleTypes).nullable().optional(),
   vehicle_number: z.string().optional().nullable(),
   languages: z.array(z.string()).optional().default([]),
 });

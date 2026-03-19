@@ -24,8 +24,6 @@ export async function POST(request: Request) {
       .from("feedback")
       .insert({
         ...feedbackData,
-        driver_id: (result.data as any).driver_id || null,
-        vehicle_id: (result.data as any).vehicle_id || null,
         token_id: token_id || null,
         submitted_at: new Date().toISOString(),
       })

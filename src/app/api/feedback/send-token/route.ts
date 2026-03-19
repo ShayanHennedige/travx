@@ -113,7 +113,7 @@ export async function POST(request: Request) {
 
     // Generate secure token
     const token = randomBytes(32).toString("hex");
-    
+
     // Token expires in 14 days
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 14);
@@ -139,8 +139,8 @@ export async function POST(request: Request) {
     }
 
     // Generate feedback URL
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3000";
     const feedbackUrl = `${baseUrl}/feedback?token=${token}`;
 
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     console.log("Feedback email should be sent:", {
       to: customerEmail,
       subject: `Feedback Request - ${reference}`,
-      body: `Dear ${customerName},\n\nWe hope you enjoyed your trip! Please share your feedback by clicking the link below:\n\n${feedbackUrl}\n\nThis link will expire in 14 days.\n\nBest regards,\nTravX Team`,
+      body: `Dear ${customerName},\n\nWe hope you enjoyed your trip! Please share your feedback by clicking the link below:\n\n${feedbackUrl}\n\nThis link will expire in 14 days.\n\nBest regards,\nTraveX Team`,
     });
 
     // For now, return success with URL (admin can copy if email fails)
