@@ -22,6 +22,7 @@ ALTER TABLE feedback_tokens ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 -- Allow authenticated users to create tokens
+DROP POLICY IF EXISTS "Users can create feedback tokens" ON public.feedback_tokens;
 CREATE POLICY "Users can create feedback tokens"
   ON feedback_tokens
   FOR INSERT
@@ -29,6 +30,7 @@ CREATE POLICY "Users can create feedback tokens"
   WITH CHECK (true);
 
 -- Allow public access to read tokens (for validation)
+DROP POLICY IF EXISTS "Public can read tokens for validation" ON public.feedback_tokens;
 CREATE POLICY "Public can read tokens for validation"
   ON feedback_tokens
   FOR SELECT
@@ -36,6 +38,7 @@ CREATE POLICY "Public can read tokens for validation"
   USING (true);
 
 -- Allow updating token usage status
+DROP POLICY IF EXISTS "Public can mark tokens as used" ON public.feedback_tokens;
 CREATE POLICY "Public can mark tokens as used"
   ON feedback_tokens
   FOR UPDATE
