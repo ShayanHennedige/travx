@@ -12,6 +12,7 @@ interface GroupMember {
   age_label: string | null;
   remarks: string | null;
   date_of_birth: string | null;
+  passport_no: string | null;
 }
 
 interface RoomingListManagerProps {
@@ -47,7 +48,7 @@ export function RoomingListManager({
   const [hasChanges, setHasChanges] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [draggedMember, setDraggedMember] = useState<GroupMember | null>(null);
-  
+
   // Interconnections: Array of room ID pairs that are interconnected
   const [interconnections, setInterconnections] = useState<number[][]>(initialInterconnections);
   const [connectingRoom, setConnectingRoom] = useState<number | null>(null);
@@ -179,7 +180,7 @@ export function RoomingListManager({
     if (!draggedMember) return;
 
     const currentRoomMembers = getMembersInRoom(room.id);
-    
+
     // Check if room is full (unless dropping on the same room)
     if (draggedMember.room_number !== room.id && currentRoomMembers.length >= room.maxOccupancy) {
       alert(`${room.category} can only hold ${room.maxOccupancy} guest${room.maxOccupancy > 1 ? "s" : ""}`);
@@ -187,24 +188,24 @@ export function RoomingListManager({
       return;
     }
 
-    // Determine room category (check if interconnected)
+    // Determine room category
     const interconnectedRoom = getInterconnectedRoom(room.id);
     let roomCategory = room.category;
-    if (interconnectedRoom !== null) {
-      roomCategory = "Interconnected";
-    }
+
+    const isInterconnected = interconnectedRoom !== null;
+    const interconnectedRemark = isInterconnected ? "Interconnected" : null;
 
     // Update member's room assignment
     setMembers((prev) =>
       prev.map((m) =>
         m.id === draggedMember.id
           ? {
-              ...m,
-              room_number: room.id,
-              room_category: roomCategory,
-              age_label: m.age_label || (m.member_type === "adult" ? "Adult" : calculateAgeLabel(m.date_of_birth)),
-              remarks: m.remarks || (m.member_type === "child" ? "Child" : null),
-            }
+            ...m,
+            room_number: room.id,
+            room_category: room.category, // Use physical room category directly
+            age_label: m.age_label || (m.member_type === "adult" ? "Adult" : calculateAgeLabel(m.date_of_birth)),
+            remarks: m.remarks && m.remarks !== "Interconnected" ? m.remarks : (interconnectedRemark || (m.member_type === "child" ? "Child" : null)),
+          }
           : m
       )
     );
@@ -261,10 +262,17 @@ export function RoomingListManager({
       // Update room categories for interconnected rooms
       const updatedMembers = members.map((m) => {
         if (m.room_number) {
+          const physicalRoom = rooms.find((r) => r.id === m.room_number);
           const interconnectedRoom = getInterconnectedRoom(m.room_number);
+          const isInterconnected = interconnectedRoom !== null;
+
+          // CRITICAL: Ensure room_category is ALWAYS the physical type from our rooms array
+          const finalCategory = physicalRoom?.category || "Double Room";
+
           return {
             ...m,
-            room_category: interconnectedRoom !== null ? "Interconnected" : rooms.find((r) => r.id === m.room_number)?.category || m.room_category,
+            room_category: finalCategory,
+            remarks: isInterconnected && (!m.remarks || m.remarks === "Child") ? "Interconnected" : m.remarks
           };
         }
         return m;
@@ -281,7 +289,7 @@ export function RoomingListManager({
       const response = await fetch("/api/rooming-list", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           assignments,
           interconnections,
           group_inquiry_id: groupInquiryId,
@@ -293,6 +301,7 @@ export function RoomingListManager({
       setMembers(updatedMembers);
       setHasChanges(false);
       alert("Rooming list saved successfully!");
+      // No redirect needed - inline editor stays on same page
     } catch (error) {
       console.error("Save error:", error);
       alert("Failed to save rooming list");
@@ -347,15 +356,15 @@ export function RoomingListManager({
   const getRoomTypeBg = (type: string) => {
     switch (type) {
       case "DBL":
-        return "bg-primary-900/30 light:bg-blue-50 border-primary-700/50 light:border-blue-200 hover:border-primary-500 light:hover:border-blue-400";
+        return "bg-blue-50 border-blue-200 hover:border-blue-400";
       case "SGL":
-        return "bg-green-900/30 light:bg-green-50 border-green-700/50 light:border-green-200 hover:border-green-500 light:hover:border-green-400";
+        return "bg-green-50 border-green-200 hover:border-green-400";
       case "TPL":
-        return "bg-purple-900/30 light:bg-purple-50 border-purple-700/50 light:border-purple-200 hover:border-purple-500 light:hover:border-purple-400";
+        return "bg-purple-50 border-purple-200 hover:border-purple-400";
       case "QTPL":
-        return "bg-orange-900/30 light:bg-orange-50 border-orange-700/50 light:border-orange-200 hover:border-orange-500 light:hover:border-orange-400";
+        return "bg-orange-50 border-orange-200 hover:border-orange-400";
       default:
-        return "bg-surface-800 light:bg-gray-50 border-surface-700 light:border-gray-200";
+        return "bg-gray-50 border-gray-200";
     }
   };
 
@@ -364,7 +373,7 @@ export function RoomingListManager({
       {/* Header */}
       <div
         onClick={() => setIsExpanded(!isExpanded)}
-        className="bg-surface-800 light:bg-surface-50 px-6 py-4 border-b border-surface-700 light:border-surface-200 cursor-pointer hover:bg-surface-700 light:hover:bg-surface-100 transition-colors"
+        className="bg-surface-50 px-6 py-4 border-b border-surface-200 cursor-pointer hover:bg-surface-100 transition-colors"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -373,14 +382,14 @@ export function RoomingListManager({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
-            <div className="w-10 h-10 rounded-full bg-green-900/50 light:bg-green-100 flex items-center justify-center border border-green-700/50 light:border-transparent">
-              <svg className="w-5 h-5 text-green-300 light:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+              <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
             <div>
-              <h3 className="font-semibold text-surface-100 light:text-surface-900">Rooming List</h3>
-              <p className="text-sm text-surface-400 light:text-surface-500">
+              <h3 className="font-semibold text-surface-900">Rooming List</h3>
+              <p className="text-sm text-surface-500">
                 {assignedCount} of {members.length} guests assigned
                 {interconnections.length > 0 && (
                   <span className="text-pink-600 ml-2">• {interconnections.length} interconnection{interconnections.length !== 1 ? "s" : ""}</span>
@@ -419,15 +428,14 @@ export function RoomingListManager({
 
       {/* Expanded Content */}
       <div
-        className={`transition-all duration-300 ease-in-out overflow-hidden ${
-          isExpanded ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0"
-        }`}
+        className={`transition-all duration-300 ease-in-out overflow-hidden ${isExpanded ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0"
+          }`}
       >
         <div className="p-6 space-y-6">
           {/* Instructions & Actions */}
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-surface-400 light:text-surface-600">
+              <div className="flex items-center gap-2 text-sm text-surface-600">
                 <svg className="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -464,11 +472,10 @@ export function RoomingListManager({
           <div
             onDragOver={handleDragOver}
             onDrop={handleDropOnUnassigned}
-            className={`p-4 rounded-xl border-2 border-dashed transition-all ${
-              draggedMember && draggedMember.room_number
-                ? "border-amber-400 bg-amber-50"
-                : "border-surface-300 bg-surface-50"
-            }`}
+            className={`p-4 rounded-xl border-2 border-dashed transition-all ${draggedMember && draggedMember.room_number
+              ? "border-amber-400 bg-amber-50"
+              : "border-surface-300 bg-surface-50"
+              }`}
           >
             <div className="flex items-center gap-2 mb-3">
               <svg className="w-5 h-5 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -478,7 +485,7 @@ export function RoomingListManager({
                 Unassigned Guests ({unassignedMembers.length})
               </h4>
             </div>
-            
+
             {unassignedMembers.length === 0 ? (
               <p className="text-sm text-surface-400 text-center py-4">
                 All guests have been assigned to rooms! 🎉
@@ -491,19 +498,27 @@ export function RoomingListManager({
                     draggable
                     onDragStart={(e) => handleDragStart(e, member)}
                     onDragEnd={handleDragEnd}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing transition-all hover:shadow-md ${
-                      member.member_type === "adult"
-                        ? "bg-blue-100 text-blue-800 hover:bg-blue-200"
-                        : "bg-amber-100 text-amber-800 hover:bg-amber-200"
-                    } ${draggedMember?.id === member.id ? "opacity-50 scale-95" : ""}`}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing transition-all hover:shadow-md ${member.member_type === "adult"
+                      ? "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                      : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                      } ${draggedMember?.id === member.id ? "opacity-50 scale-95" : ""}`}
                   >
                     <svg className="w-4 h-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
                     </svg>
-                    <span className="font-medium text-sm">{member.full_name}</span>
-                    <Badge variant={member.member_type === "adult" ? "blue" : "yellow"} className="text-xs">
-                      {member.member_type === "adult" ? "A" : "C"}
-                    </Badge>
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{member.full_name}</span>
+                        <Badge variant={member.member_type === "adult" ? "blue" : "yellow"} className="text-[10px] px-1 py-0 h-4">
+                          {member.member_type === "adult" ? "A" : "C"}
+                        </Badge>
+                      </div>
+                      {member.passport_no && (
+                        <span className="text-[10px] opacity-70 font-mono tracking-tighter">
+                          {member.passport_no}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -525,13 +540,10 @@ export function RoomingListManager({
                   key={room.id}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDropOnRoom(e, room)}
-                  className={`rounded-xl border-2 overflow-hidden transition-all ${getRoomTypeBg(room.type)} ${
-                    isDropTarget ? "ring-2 ring-primary-400 ring-offset-2 scale-[1.02]" : ""
-                  } ${isFull && draggedMember ? "opacity-50" : ""} ${
-                    interconnectedWith !== null ? "ring-2 ring-pink-400" : ""
-                  } ${isConnecting ? "ring-4 ring-pink-500 animate-pulse" : ""} ${
-                    isConnectTarget ? "hover:ring-2 hover:ring-pink-300" : ""
-                  }`}
+                  className={`rounded-xl border-2 overflow-hidden transition-all ${getRoomTypeBg(room.type)} ${isDropTarget ? "ring-2 ring-primary-400 ring-offset-2 scale-[1.02]" : ""
+                    } ${isFull && draggedMember ? "opacity-50" : ""} ${interconnectedWith !== null ? "ring-2 ring-pink-400" : ""
+                    } ${isConnecting ? "ring-4 ring-pink-500 animate-pulse" : ""} ${isConnectTarget ? "hover:ring-2 hover:ring-pink-300" : ""
+                    }`}
                 >
                   {/* Room Header */}
                   <div className={`bg-gradient-to-r ${getRoomTypeColor(room.type)} px-4 py-2 text-white`}>
@@ -550,13 +562,12 @@ export function RoomingListManager({
                             e.stopPropagation();
                             handleInterconnectClick(room.id);
                           }}
-                          className={`p-1 rounded transition-colors ${
-                            interconnectedWith !== null
-                              ? "bg-pink-500 text-white"
-                              : isConnecting
+                          className={`p-1 rounded transition-colors ${interconnectedWith !== null
+                            ? "bg-pink-500 text-white"
+                            : isConnecting
                               ? "bg-white text-pink-600"
                               : "bg-white/20 hover:bg-white/30 text-white"
-                          }`}
+                            }`}
                           title={
                             interconnectedWith !== null
                               ? `Interconnected with Room ${interconnectedWith}`
@@ -610,21 +621,27 @@ export function RoomingListManager({
                             draggable
                             onDragStart={(e) => handleDragStart(e, member)}
                             onDragEnd={handleDragEnd}
-                            className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing transition-all ${
-                              member.member_type === "adult"
-                                ? "bg-white border border-blue-200"
-                                : "bg-white border border-amber-200"
-                            } ${draggedMember?.id === member.id ? "opacity-50 scale-95" : "hover:shadow-sm"}`}
+                            className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing transition-all ${member.member_type === "adult"
+                              ? "bg-white border border-blue-200"
+                              : "bg-white border border-amber-200"
+                              } ${draggedMember?.id === member.id ? "opacity-50 scale-95" : "hover:shadow-sm"}`}
                           >
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <svg className="w-3 h-3 text-surface-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
                               </svg>
-                              <span className="text-sm font-medium text-surface-800 truncate">
-                                {member.full_name}
-                              </span>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-medium text-surface-800 truncate">
+                                  {member.full_name}
+                                </span>
+                                {member.passport_no && (
+                                  <span className="text-[10px] text-surface-400 font-mono tracking-tighter leading-none">
+                                    {member.passport_no}
+                                  </span>
+                                )}
+                              </div>
                               {member.member_type === "child" && (
-                                <span className="text-xs text-amber-600 flex-shrink-0">
+                                <span className="text-[10px] text-amber-600 flex-shrink-0">
                                   {member.age_label || "Child"}
                                 </span>
                               )}
@@ -634,7 +651,7 @@ export function RoomingListManager({
                                 e.stopPropagation();
                                 removeMemberFromRoom(member.id);
                               }}
-                              className="p-1 text-surface-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                              className="p-1 text-surface-400 hover:text-accent-500 hover:bg-accent-500/10 rounded transition-colors flex-shrink-0"
                             >
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -695,16 +712,16 @@ export function RoomingListManager({
 
           {/* Summary */}
           {assignedCount > 0 && (
-            <div className="bg-green-900/30 light:bg-green-50 border border-green-700/50 light:border-green-200 rounded-lg p-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-green-400 light:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <h4 className="text-sm font-medium text-green-300 light:text-green-800">
+                  <h4 className="text-sm font-medium text-green-800">
                     {assignedCount} of {members.length} guests assigned
                   </h4>
-                  <p className="text-xs text-green-400 light:text-green-600 mt-0.5">
+                  <p className="text-xs text-green-600 mt-0.5">
                     {rooms.filter((r) => getMembersInRoom(r.id).length > 0).length} of {rooms.length} rooms occupied
                   </p>
                 </div>

@@ -10,8 +10,6 @@ interface VoucherEditorProps {
     id: string;
     voucher_number: string;
     hotel_name: string;
-    hotel_address?: string;
-    hotel_contact?: string;
     guest_name: string;
     nationality?: string;
     pax_adults: number;
@@ -70,8 +68,6 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
 
   const [formData, setFormData] = useState({
     hotel_name: voucher.hotel_name,
-    hotel_address: voucher.hotel_address || "",
-    hotel_contact: voucher.hotel_contact || "",
     guest_name: voucher.guest_name,
     nationality: voucher.nationality || "",
     pax_adults: voucher.pax_adults,
@@ -87,9 +83,9 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
     arrival_time: voucher.arrival_time || "",
     departure_time: voucher.departure_time || "",
     room_rate_currency: voucher.room_rate_currency || "USD",
-    room_rate_sgl: voucher.room_rate_sgl || 0,
-    room_rate_dbl: voucher.room_rate_dbl || 0,
-    room_rate_tpl: voucher.room_rate_tpl || 0,
+    room_rate_sgl: voucher.room_rate_sgl || "",
+    room_rate_dbl: voucher.room_rate_dbl || "",
+    room_rate_tpl: voucher.room_rate_tpl || "",
     confirmed_by: voucher.confirmed_by || "",
     confirmed_date: voucher.confirmed_date || "",
     booked_by: voucher.booked_by || "",
@@ -116,6 +112,8 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
 
       router.refresh();
       alert("Voucher saved successfully!");
+      // Redirect back to vouchers list
+      router.push("/vouchers");
     } catch (error) {
       console.error("Save error:", error);
       alert("Failed to save voucher");
@@ -164,7 +162,13 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${voucher.voucher_number}.pdf`;
+
+      // Fallback for filename if voucher_number is missing or "null"
+      const safeVoucherNumber = (voucher.voucher_number && voucher.voucher_number !== "null")
+        ? voucher.voucher_number
+        : `V-${voucher.id.slice(0, 8).toUpperCase()}`;
+
+      a.download = `${safeVoucherNumber}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -209,9 +213,8 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
         </Button>
       </div>
 
-      {/* Hotel Information */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Hotel Information</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">Hotel Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="Hotel Name"
@@ -220,26 +223,12 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
             onChange={handleChange}
             required
           />
-          <Input
-            label="Hotel Contact"
-            name="hotel_contact"
-            value={formData.hotel_contact}
-            onChange={handleChange}
-          />
-          <div className="md:col-span-2">
-            <Input
-              label="Hotel Address"
-              name="hotel_address"
-              value={formData.hotel_address}
-              onChange={handleChange}
-            />
-          </div>
         </div>
       </div>
 
       {/* Guest Information */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Guest Information</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">Guest Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="Guest Name"
@@ -283,7 +272,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
 
       {/* Room Details */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Room Details</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">Room Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select
             label="Room Type"
@@ -319,7 +308,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
 
       {/* Booking Details */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Booking Details</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">Booking Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Input
             label="Check-in Date"
@@ -364,7 +353,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
 
       {/* Rates */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Room Rates</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">Room Rates</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Input
             label="Currency"
@@ -404,7 +393,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
 
       {/* Confirmation Details */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Confirmation Details</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">Confirmation Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="Confirmed By"
@@ -444,7 +433,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
 
       {/* Remarks */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Booking Remarks</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">Booking Remarks</h3>
         <Textarea
           label="Remarks"
           name="remarks"
@@ -453,7 +442,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
           rows={4}
           placeholder="Enter any special remarks or notes for this booking..."
         />
-        <p className="text-xs text-surface-400 light:text-surface-500 mt-2">
+        <p className="text-xs text-surface-500 mt-2">
           These remarks will appear highlighted in yellow on the voucher PDF.
         </p>
       </div>
@@ -461,20 +450,20 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
       {/* Amendment Modal */}
       {showAmendModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="rounded-xl shadow-xl max-w-md w-full p-6" style={{ backgroundColor: "var(--bg-surface)" }}>
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-orange-900/50 light:bg-orange-100 flex items-center justify-center border border-orange-700/50 light:border-transparent">
-                <svg className="w-5 h-5 text-orange-300 light:text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">Create Amendment</h3>
-                <p className="text-sm text-surface-400 light:text-surface-500">This will create a new amended voucher</p>
+                <h3 className="text-lg font-semibold text-surface-900">Create Amendment</h3>
+                <p className="text-sm text-surface-500">This will create a new amended voucher</p>
               </div>
             </div>
-            
-            <p className="text-surface-400 light:text-surface-600 mb-4">
+
+            <p className="text-surface-600 mb-4">
               Creating an amendment will mark the current voucher as &quot;Amended&quot; and create a new voucher with your changes.
             </p>
 
