@@ -6,8 +6,6 @@ import Link from "next/link";
 import { format, addDays } from "date-fns";
 import { ItineraryEditor } from "./ItineraryEditor";
 import { DownloadPDFButton } from "./DownloadPDFButton";
-import { GenerateVouchersButton } from "./GenerateVouchersButton";
-import { FinalizeTourButton } from "./FinalizeTourButton";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -38,14 +36,15 @@ interface ItineraryContent {
   }[];
   practical_notes: string[];
   total_driving_hours: string;
+  total_distance_km?: string;
 }
 
 export default async function ItineraryDetailPage({ params }: PageProps) {
   const { id } = await params;
   const supabase = await createClient();
 
-  // Fetch itinerary with individual inquiry
-  const { data: itinerary, error } = await supabase
+  // Fetch itinerary first
+  const { data: itinerary, error: itineraryError } = await supabase
     .from("itineraries")
     .select(`
       id,
@@ -54,47 +53,90 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
       updated_at,
       inquiry_id,
       group_inquiry_id,
-      inquiries (
-        id,
-        inquiry_number,
-        first_name,
-        last_name,
-        client_email,
-        country,
-        arriving_date,
-        departure_date,
-        no_of_nights,
-        no_of_pax,
-        no_of_children,
-        hotel_type,
-        activities
-      ),
-      group_inquiries (
-        id,
-        inquiry_number,
-        head_first_name,
-        head_last_name,
-        client_email,
-        country,
-        arriving_date,
-        departure_date,
-        no_of_nights,
-        no_of_adults,
-        no_of_children,
-        hotel_type,
-        activities
-      )
+      status
     `)
     .eq("id", id)
     .single();
 
-  if (error || !itinerary) {
+  if (itineraryError || !itinerary) {
+    console.error("Itinerary not found:", itineraryError);
     notFound();
   }
+
+  // Fetch individual inquiry if exists
+  const { data: individualInquiry } = itinerary.inquiry_id
+    ? await supabase
+      .from("inquiries")
+      .select(`
+          id,
+          inquiry_number,
+          first_name,
+          last_name,
+          passport_no,
+          client_email,
+          country,
+          arriving_date,
+          departure_date,
+          no_of_nights,
+          no_of_pax,
+          no_of_children,
+          hotel_type,
+          agent_name,
+          agent_company,
+          meal_plan,
+          room_category,
+          rooms_dbl,
+          rooms_sgl,
+          rooms_tpl,
+          rooms_qtpl,
+          activities
+        `)
+      .eq("id", itinerary.inquiry_id)
+      .single()
+    : { data: null };
+
+  // Fetch group inquiry if exists
+  const { data: groupInquiry } = itinerary.group_inquiry_id
+    ? await supabase
+      .from("group_inquiries")
+      .select(`
+          id,
+          inquiry_number,
+          head_first_name,
+          head_last_name,
+          head_passport_no,
+          client_email,
+          country,
+          agent_name,
+          agent_email,
+          agent_company,
+          arriving_date,
+          departure_date,
+          no_of_nights,
+          no_of_adults,
+          no_of_children,
+          hotel_type,
+          room_category,
+          meal_plan,
+          rooms_dbl,
+          rooms_sgl,
+          rooms_tpl,
+          rooms_qtpl,
+          activities
+        `)
+      .eq("id", itinerary.group_inquiry_id)
+      .single()
+    : { data: null };
 
   // Count existing vouchers
   const { count: vouchersCount } = await supabase
     .from("hotel_vouchers")
+    .select("id", { count: "exact" })
+    .eq("itinerary_id", id);
+
+  // Fetch invoices count for this itinerary
+  const { count: invoicesCount } = await supabase
+    .from("customer_invoices")
     .select("id", { count: "exact" })
     .eq("itinerary_id", id);
 
@@ -105,62 +147,68 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
     .eq("itinerary_id", id)
     .single();
 
-  const content = itinerary.content as ItineraryContent;
-  
-  // Handle both individual and group inquiries
-  const individualInquiry = itinerary.inquiries as unknown as {
-    id: string;
-    inquiry_number: string;
-    first_name: string;
-    last_name: string;
-    client_email: string;
-    country: string;
-    arriving_date: string;
-    departure_date: string;
-    no_of_nights: number;
-    no_of_pax: number;
-    no_of_children: number;
-    hotel_type: string;
-    activities: string[];
-  } | null;
+  // Fetch costing sheet
+  const { data: costingSheet } = await supabase
+    .from("tour_costing_sheets")
+    .select("*")
+    .eq("itinerary_id", id)
+    .single();
 
-  const groupInquiry = itinerary.group_inquiries as unknown as {
-    id: string;
-    inquiry_number: string;
-    head_first_name: string;
-    head_last_name: string;
-    client_email: string;
-    country: string;
-    arriving_date: string;
-    departure_date: string;
-    no_of_nights: number;
-    no_of_adults: number;
-    no_of_children: number;
-    hotel_type: string;
-    activities: string[];
-  } | null;
+  const content = itinerary.content as ItineraryContent;
 
   const isGroup = !!groupInquiry;
-  const inquiry = individualInquiry || groupInquiry;
-  const guestName = individualInquiry 
-    ? `${individualInquiry.first_name} ${individualInquiry.last_name}`
-    : groupInquiry 
-      ? `${groupInquiry.head_first_name} ${groupInquiry.head_last_name}`
-      : "Guest";
-  const paxAdults = individualInquiry?.no_of_pax || groupInquiry?.no_of_adults || 1;
-  const paxChildren = inquiry?.no_of_children || 0;
-  const inquiryLink = isGroup 
+  const inquiry = groupInquiry || individualInquiry;
+
+  // Prioritize Agent details for Main Contact display
+  const guestName = groupInquiry?.agent_name
+    ? groupInquiry.agent_name
+    : groupInquiry?.agent_company
+      ? groupInquiry.agent_company
+      : individualInquiry
+        ? `${individualInquiry.first_name} ${individualInquiry.last_name}`
+        : groupInquiry?.head_first_name
+          ? `${groupInquiry.head_first_name} ${groupInquiry.head_last_name}`
+          : "Guest";
+
+  const contactEmail = groupInquiry?.agent_email || inquiry?.client_email;
+  const paxAdults = (isGroup ? groupInquiry?.no_of_adults : individualInquiry?.no_of_pax) || 1;
+  const paxChildren = (isGroup ? groupInquiry?.no_of_children : individualInquiry?.no_of_children) || 0;
+
+  // Safe date formatting helper
+  const safeFormat = (dateStr: string | undefined | null, formatStr: string, fallback: string = "N/A") => {
+    if (!dateStr) return fallback;
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return fallback;
+      return format(d, formatStr);
+    } catch (e) {
+      return fallback;
+    }
+  };
+
+  const inquiryLink = isGroup
     ? `/group-inquiries/${groupInquiry?.id}`
-    : `/inquiries/${individualInquiry?.id}`;
+    : individualInquiry
+      ? `/inquiries/${individualInquiry?.id}`
+      : "#";
+
+  // Type-safe property access helpers
+  const getHotelType = () => groupInquiry?.hotel_type || individualInquiry?.hotel_type || "Standard";
+  const getRoomCategory = () => groupInquiry?.room_category || individualInquiry?.room_category || "Standard";
+  const getMealPlan = () => groupInquiry?.meal_plan || individualInquiry?.meal_plan || "Not Specified";
+  const getCountry = () => groupInquiry?.country || individualInquiry?.country || "Not specified";
+  const getActivities = () => groupInquiry?.activities || individualInquiry?.activities || [];
 
   // Extract hotels from itinerary with dates
   // Exclude last day (departure day) as there's no overnight stay
   const extractHotelsFromItinerary = () => {
+    if (!content?.days) return [];
+
     const hotelsMap: { [key: string]: { hotel_name: string; location: string; nights: number; firstDay: number } } = {};
-    
+
     // Exclude the last day (departure day) - no overnight stay
     const daysWithOvernight = content.days.slice(0, -1);
-    
+
     daysWithOvernight.forEach((day) => {
       if (day.hotel_suggestion && day.overnight_location) {
         const key = day.hotel_suggestion;
@@ -178,17 +226,17 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
     });
 
     const arrivalDate = inquiry?.arriving_date ? new Date(inquiry.arriving_date) : new Date();
-    
+
     // Convert to array with check-in/check-out dates
     return Object.values(hotelsMap).map((hotel) => {
       const checkInDate = addDays(arrivalDate, hotel.firstDay - 1);
       const checkOutDate = addDays(checkInDate, hotel.nights);
-      
+
       return {
         hotel_name: hotel.hotel_name,
         location: hotel.location,
-        check_in_date: format(checkInDate, "yyyy-MM-dd"),
-        check_out_date: format(checkOutDate, "yyyy-MM-dd"),
+        check_in_date: isNaN(checkInDate.getTime()) ? "" : format(checkInDate, "yyyy-MM-dd"),
+        check_out_date: isNaN(checkOutDate.getTime()) ? "" : format(checkOutDate, "yyyy-MM-dd"),
         no_of_nights: hotel.nights,
       };
     });
@@ -199,110 +247,143 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
   return (
     <AppLayout>
       <Header
-        title={content.title}
-        subtitle={`Generated on ${format(new Date(itinerary.created_at), "MMMM d, yyyy 'at' h:mm a")}`}
+        title={content?.title || "Itinerary Details"}
+        subtitle={`Generated on ${safeFormat(itinerary.created_at, "MMMM d, yyyy 'at' h:mm a")}`}
         action={
           <div className="flex items-center gap-3">
-            {inquiry && (
-              <FinalizeTourButton
-                itineraryId={itinerary.id}
-                inquiryId={itinerary.inquiry_id}
-                groupInquiryId={itinerary.group_inquiry_id}
-                clientName={guestName}
-                startDate={inquiry.arriving_date}
-                endDate={inquiry.departure_date}
-                paxAdults={paxAdults}
-                paxChildren={paxChildren}
-                existingTourId={existingTour?.id}
-              />
-            )}
-            {hotels.length > 0 && (
-              <GenerateVouchersButton
-                itineraryId={itinerary.id}
-                inquiryId={itinerary.inquiry_id}
-                groupInquiryId={itinerary.group_inquiry_id}
-                guestName={guestName}
-                nationality={inquiry?.country}
-                paxAdults={paxAdults}
-                paxChildren={paxChildren}
-                hotels={hotels}
-                existingVouchersCount={vouchersCount || 0}
-              />
-            )}
-            <DownloadPDFButton 
+            {/* Primary Actions - Itinerary */}
+            <DownloadPDFButton
               itineraryId={itinerary.id}
               inquiryNumber={inquiry?.inquiry_number}
+              size="sm"
+              costingSheetStatus={costingSheet?.status || null}
             />
+
+            {/* Link to Back */}
             <Link href="/itineraries">
-              <Button variant="secondary" className="hover:bg-accent-500 hover:text-black hover:border-accent-500">Back to List</Button>
+              <Button variant="secondary" size="sm">Back to List</Button>
             </Link>
           </div>
         }
       />
 
+
+      {/* Main Content Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
-        <div className="lg:col-span-2">
-          <ItineraryEditor
-            itineraryId={itinerary.id}
-            initialContent={content}
-          />
+        <div className="lg:col-span-2 space-y-6">
+          {content ? (
+            <ItineraryEditor
+              itineraryId={itinerary.id}
+              initialContent={content}
+            />
+          ) : (
+            <div className="card p-12 text-center">
+              <p className="text-surface-500">No itinerary content found.</p>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Linked Inquiry Info */}
+          {/* Workflow Actions */}
+
+
+          {/* Inquiry Summary */}
           {inquiry && (
-            <div className="card p-6">
-              <h3 className="text-sm font-semibold text-surface-100 light:text-surface-900 mb-4 flex items-center gap-2">
-                Linked Inquiry
+            <div className="card p-6 border border-surface-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-bold text-surface-900 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Inquiry Summary
+                </h3>
                 {isGroup && (
-                  <span className="px-2 py-0.5 bg-purple-900/50 light:bg-purple-100 text-purple-300 light:text-purple-700 rounded text-xs border border-purple-700/50 light:border-transparent">Group</span>
+                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] font-bold uppercase tracking-wider">Group</span>
                 )}
-              </h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-surface-400 light:text-surface-500 uppercase tracking-wider">Client</p>
-                  <p className="text-sm font-medium text-surface-100 light:text-surface-900">{guestName}</p>
-                  <p className="text-xs text-surface-400 light:text-surface-500">{inquiry.client_email}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-3 bg-surface-50 rounded-lg border border-surface-100">
+                  <p className="text-[10px] text-surface-400 uppercase font-bold tracking-widest mb-1">Main Contact</p>
+                  <p className="text-sm font-bold text-surface-900 mb-0.5">{guestName}</p>
+
+                  {(individualInquiry?.passport_no || groupInquiry?.head_passport_no) && (
+                    <p className="text-[10px] text-surface-400 font-mono tracking-tighter mt-1">
+                      Passport: {individualInquiry?.passport_no || groupInquiry?.head_passport_no}
+                    </p>
+                  )}
+                  {groupInquiry?.agent_company && groupInquiry.agent_name && (
+                    <p className="text-[10px] text-primary-600 font-medium mt-1">{groupInquiry.agent_company}</p>
+                  )}
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-surface-400 light:text-surface-500">Inquiry #</span>
-                  <Link href={inquiryLink} className="text-primary-400 light:text-primary-600 hover:text-primary-300 light:hover:text-primary-700 font-medium">
+
+                <div className="grid grid-cols-2 gap-y-3 px-1 border-t border-surface-100 pt-4">
+                  <span className="text-xs text-surface-500">Inquiry #</span>
+                  <Link href={inquiryLink} className="text-xs text-primary-600 hover:text-primary-700 font-bold text-right">
                     {inquiry.inquiry_number}
                   </Link>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-surface-400 light:text-surface-500">Travel Dates</span>
-                  <span className="text-surface-100 light:text-surface-900">
-                    {format(new Date(inquiry.arriving_date), "MMM d")} - {format(new Date(inquiry.departure_date), "MMM d")}
+
+                  <span className="text-xs text-surface-500">Travel Dates</span>
+                  <span className="text-xs text-surface-900 font-medium text-right">
+                    {safeFormat(inquiry.arriving_date, "MMM d")} - {safeFormat(inquiry.departure_date, "MMM d")}
                   </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-surface-400 light:text-surface-500">Duration</span>
-                  <span className="text-surface-100 light:text-surface-900">{inquiry.no_of_nights} nights</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-surface-400 light:text-surface-500">Travelers</span>
-                  <span className="text-surface-100 light:text-surface-900">
+
+                  <span className="text-xs text-surface-500">Duration</span>
+                  <span className="text-xs text-surface-900 font-medium text-right">{inquiry.no_of_nights} nights</span>
+
+                  <span className="text-xs text-surface-500">Travelers</span>
+                  <span className="text-xs text-surface-900 font-medium text-right">
                     {paxAdults} adults{paxChildren > 0 && `, ${paxChildren} children`}
                   </span>
+
+                  <span className="text-xs text-surface-500">Hotel Type</span>
+                  <span className="text-xs text-surface-900 font-medium text-right">{getHotelType()}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-surface-400 light:text-surface-500">Hotel Type</span>
-                  <span className="text-surface-100 light:text-surface-900">{inquiry.hotel_type || "Not specified"}</span>
-                </div>
+
+                {/* Accommodation Summary - New Section */}
+                {(inquiry?.meal_plan || inquiry?.room_category || (paxAdults + paxChildren) > 0) && (
+                  <div className="border-t border-surface-100 pt-3 mt-1">
+                    <p className="text-[10px] text-surface-400 uppercase font-bold tracking-widest mb-2">Accommodation Details</p>
+                    <div className="grid grid-cols-2 gap-y-2">
+                      <span className="text-xs text-surface-500">Meal Plan</span>
+                      <span className="text-xs text-surface-900 font-medium text-right">{getMealPlan()}</span>
+
+                      <span className="text-xs text-surface-500">Room Class</span>
+                      <span className="text-xs text-surface-900 font-medium text-right">{getRoomCategory()}</span>
+
+                      {((inquiry as any)?.rooms_dbl || (inquiry as any)?.rooms_sgl || (inquiry as any)?.rooms_tpl || (inquiry as any)?.rooms_qtpl) > 0 ? (
+                        <>
+                          <span className="text-xs text-surface-500">Rooms</span>
+                          <span className="text-xs text-surface-900 font-medium text-right">
+                            {[(inquiry as any)?.rooms_dbl && `${(inquiry as any).rooms_dbl} DBL`,
+                            (inquiry as any)?.rooms_sgl && `${(inquiry as any).rooms_sgl} SGL`,
+                            (inquiry as any)?.rooms_tpl && `${(inquiry as any).rooms_tpl} TPL`,
+                            (inquiry as any)?.rooms_qtpl && `${(inquiry as any).rooms_qtpl} QUAD`
+                            ].filter(Boolean).join(", ")}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xs text-surface-500">Rooms</span>
+                          <span className="text-xs text-surface-900 font-medium text-right">Not Specified</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Activities */}
-              {inquiry.activities && inquiry.activities.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-surface-600 light:border-surface-200">
-                  <p className="text-xs text-surface-400 light:text-surface-500 uppercase tracking-wider mb-2">Requested Activities</p>
+              {getActivities().length > 0 && (
+                <div className="mt-4 pt-4 border-t border-surface-100">
+                  <p className="text-[10px] text-surface-400 uppercase font-bold tracking-widest mb-2">Interests</p>
                   <div className="flex flex-wrap gap-1">
-                    {inquiry.activities.map((activity: string) => (
+                    {getActivities().map((activity: string) => (
                       <span
                         key={activity}
-                        className="px-2 py-0.5 bg-primary-900/50 light:bg-primary-50 text-primary-300 light:text-primary-700 rounded text-xs border border-primary-700/50 light:border-transparent"
+                        className="px-2 py-0.5 bg-white border border-primary-100 text-primary-700 rounded text-[10px] font-medium"
                       >
                         {activity}
                       </span>
@@ -313,84 +394,93 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
             </div>
           )}
 
+          {/* Tour Logistics */}
+          <div className="card p-6 border border-surface-200">
+            <h3 className="text-sm font-bold text-surface-900 mb-4 flex items-center gap-2">
+              <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Tour Logistics
+            </h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center py-2 border-b border-surface-50 last:border-0">
+                <span className="text-xs text-surface-500">Total Duration</span>
+                <span className="text-xs text-surface-900 font-bold">{(content?.days?.length || 0)} Days</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-surface-50 last:border-0">
+                <span className="text-xs text-surface-500">Est. Driving</span>
+                <span className="text-xs text-surface-900 font-bold">{content.total_driving_hours}</span>
+              </div>
+              {content.total_distance_km && (
+                <div className="flex justify-between items-center py-2 border-b border-surface-50 last:border-0">
+                  <span className="text-xs text-surface-500">Est. Distance</span>
+                  <span className="text-xs text-surface-900 font-bold">{content.total_distance_km}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center py-2 border-b border-surface-50 last:border-0">
+                <span className="text-xs text-surface-500">Last Revised</span>
+                <span className="text-xs text-surface-600">
+                  {safeFormat(itinerary.updated_at, "MMM d, yyyy")}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Hotels in Itinerary */}
           {hotels.length > 0 && (
-            <div className="card p-6">
-              <h3 className="text-sm font-semibold text-surface-100 light:text-surface-900 mb-4 flex items-center gap-2">
-                <svg className="w-4 h-4 text-primary-400 light:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="card p-6 border border-surface-200">
+              <h3 className="text-sm font-bold text-surface-900 mb-4 flex items-center gap-2">
+                <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                Hotels ({hotels.length})
+                Accommodation List
               </h3>
               <div className="space-y-3">
                 {hotels.map((hotel, index) => (
-                  <div key={index} className="flex items-center gap-3 p-2 bg-surface-800 light:bg-surface-50 rounded-lg border border-surface-700 light:border-transparent">
-                    <span className="w-6 h-6 rounded-full bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-700 flex items-center justify-center text-xs font-medium border border-primary-700/50 light:border-transparent">
+                  <div key={index} className="flex items-center gap-3 p-2 hover:bg-surface-50 rounded-lg transition-colors border border-transparent hover:border-surface-100">
+                    <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-[10px] font-bold">
                       {index + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-surface-100 light:text-surface-900 truncate">{hotel.hotel_name}</p>
-                      <p className="text-xs text-surface-400 light:text-surface-500">{hotel.no_of_nights} nights • {hotel.location}</p>
+                      <p className="text-xs font-bold text-surface-900 truncate">{hotel.hotel_name}</p>
+                      <p className="text-[10px] text-surface-500 font-medium">{hotel.no_of_nights} {hotel.no_of_nights === 1 ? "Night" : "Nights"} • {hotel.location}</p>
                     </div>
                   </div>
                 ))}
               </div>
               {(vouchersCount || 0) > 0 && (
-                <div className="mt-4 pt-4 border-t border-surface-600 light:border-surface-200">
-                  <Link href={`/vouchers?itinerary_id=${itinerary.id}`} className="text-sm text-primary-400 light:text-primary-600 hover:text-primary-300 light:hover:text-primary-700 font-medium">
-                    View {vouchersCount} existing voucher{vouchersCount !== 1 ? "s" : ""} →
+                <div className="mt-4 pt-4 border-t border-surface-100">
+                  <Link href={`/vouchers?itinerary_id=${itinerary.id}`} className="text-xs text-primary-600 hover:text-primary-700 font-bold flex items-center gap-1">
+                    Managed Vouchers ({vouchersCount})
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
                   </Link>
                 </div>
               )}
             </div>
           )}
 
-          {/* Quick Stats */}
-          <div className="card p-6">
-            <h3 className="text-sm font-semibold text-surface-100 light:text-surface-900 mb-4">
-              Itinerary Summary
-            </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-surface-400 light:text-surface-500">Total Days</span>
-                <span className="text-surface-100 light:text-surface-900 font-medium">{content.days.length}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-surface-400 light:text-surface-500">Total Driving</span>
-                <span className="text-surface-100 light:text-surface-900 font-medium">{content.total_driving_hours}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-surface-400 light:text-surface-500">Last Updated</span>
-                <span className="text-surface-100 light:text-surface-900">
-                  {format(new Date(itinerary.updated_at), "MMM d, yyyy")}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Practical Tips */}
-          {content.practical_notes && content.practical_notes.length > 0 && (
-            <div className="card p-6">
-              <h3 className="text-sm font-semibold text-surface-100 light:text-surface-900 mb-4 flex items-center gap-2">
-                <svg className="w-4 h-4 text-primary-400 light:text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          {/* Operations Link */}
+          <div className="card p-4 border border-surface-200 bg-gradient-to-br from-primary-50 to-surface-50">
+            <Link href="/operations" className="flex items-center gap-3 group">
+              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center group-hover:bg-primary-200 transition-colors">
+                <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
-                Practical Tips
-              </h3>
-              <ul className="space-y-2">
-                {content.practical_notes.map((note, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm text-surface-300 light:text-surface-700">
-                    <svg className="w-4 h-4 text-primary-500 light:text-primary-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>{note}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-surface-900 group-hover:text-primary-600 transition-colors">Tour Operations</p>
+                <p className="text-xs text-surface-500">Costing, Invoice, Finalize & Vouchers</p>
+              </div>
+              <svg className="w-5 h-5 text-surface-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
         </div>
       </div>
     </AppLayout>
   );
 }
+

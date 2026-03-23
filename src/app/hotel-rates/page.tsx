@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Button, Input } from "@/components/ui";
-import { FormSection, AnimatedSuccessCard } from "@/components/ui/FormSection";
 import { useSearchParams } from "next/navigation";
 import { mealPlanOptions, currencyOptions, roomCategoryPresets, RatePlan, RoomCategory } from "@/lib/validations/hotel-rates";
 
@@ -44,6 +43,21 @@ const createEmptyRoomCategory = (): RoomCategory => ({
 });
 
 export default function HotelRatesPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
+                <div className="max-w-md w-full bg-white rounded-xl shadow-xl p-8 text-center">
+                    <div className="w-12 h-12 mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+                    <p className="text-surface-600">Loading form...</p>
+                </div>
+            </div>
+        }>
+            <HotelRatesContent />
+        </Suspense>
+    );
+}
+
+function HotelRatesContent() {
     const searchParams = useSearchParams();
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -225,16 +239,16 @@ export default function HotelRatesPage() {
     // Success screen
     if (submitSuccess) {
         return (
-            <div className="min-h-screen bg-surface-900 light:bg-surface-100 flex items-center justify-center">
-                <AnimatedSuccessCard className="max-w-md w-full card p-8 text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-900/50 border border-green-700 flex items-center justify-center">
-                        <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
+                <div className="max-w-md w-full bg-white rounded-xl shadow-xl p-8 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-bold text-surface-100 light:text-surface-900 mb-2">Thank You!</h2>
-                    <p className="text-surface-400 light:text-surface-600">Your rates have been submitted successfully. We will review them shortly.</p>
-                </AnimatedSuccessCard>
+                    <h2 className="text-2xl font-bold text-surface-900 mb-2">Thank You!</h2>
+                    <p className="text-surface-600">Your rates have been submitted successfully. We will review them shortly.</p>
+                </div>
             </div>
         );
     }
@@ -242,15 +256,15 @@ export default function HotelRatesPage() {
     // Error screen
     if (error && !hotelInfo) {
         return (
-            <div className="min-h-screen bg-surface-900 light:bg-surface-100 flex items-center justify-center">
-                <div className="max-w-md w-full card p-8 text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-900/50 border border-red-700 flex items-center justify-center">
-                        <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
+                <div className="max-w-md w-full bg-white rounded-xl shadow-xl p-8 text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent-500/10 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-bold text-surface-100 light:text-surface-900 mb-2">Error</h2>
-                    <p className="text-surface-400 light:text-surface-600">{error}</p>
+                    <h2 className="text-2xl font-bold text-surface-900 mb-2">Error</h2>
+                    <p className="text-surface-600">{error}</p>
                 </div>
             </div>
         );
@@ -259,32 +273,32 @@ export default function HotelRatesPage() {
     // Loading screen
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-surface-900 light:bg-surface-100 flex items-center justify-center">
-                <div className="max-w-md w-full card p-8 text-center">
-                    <div className="w-12 h-12 mx-auto mb-4 border-4 border-surface-600 border-t-primary-500 rounded-full animate-spin" />
-                    <p className="text-surface-400 light:text-surface-600">Loading form...</p>
+            <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
+                <div className="max-w-md w-full bg-white rounded-xl shadow-xl p-8 text-center">
+                    <div className="w-12 h-12 mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+                    <p className="text-surface-600">Loading form...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-surface-900 light:bg-surface-100">
+        <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100">
             {/* Header */}
-            <header className="bg-surface-800 light:bg-white border-b border-surface-600 light:border-surface-200 sticky top-0 z-10">
+            <header className="bg-white border-b border-surface-200 sticky top-0 z-10">
                 <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
-                            <span className="text-white font-bold">TX</span>
+                            <span className="text-white font-bold">SH</span>
                         </div>
                         <div>
-                            <h1 className="text-lg font-semibold text-surface-100 light:text-surface-900">TravX</h1>
-                            <p className="text-xs text-surface-400 light:text-surface-500">Hotel Rate Submission Form</p>
+                            <h1 className="text-lg font-semibold text-surface-900">TraveX</h1>
+                            <p className="text-xs text-surface-500">Hotel Rate Submission Form</p>
                         </div>
                     </div>
                     {requestInfo && (
                         <div className="text-right text-sm">
-                            <p className="text-surface-400 light:text-surface-500">Request: <span className="font-medium text-surface-100 light:text-surface-900">{requestInfo.request_number}</span></p>
+                            <p className="text-surface-500">Request: <span className="font-medium text-surface-900">{requestInfo.request_number}</span></p>
                         </div>
                     )}
                 </div>
@@ -293,10 +307,10 @@ export default function HotelRatesPage() {
             {/* Form */}
             <main className="max-w-5xl mx-auto px-4 py-8">
                 <div className="mb-8 text-center">
-                    <h2 className="text-3xl font-bold text-surface-100 light:text-surface-900 mb-2">
+                    <h2 className="text-3xl font-bold text-surface-900 mb-2">
                         Submit Your Hotel Rates
                     </h2>
-                    <p className="text-surface-400 light:text-surface-600">
+                    <p className="text-surface-600">
                         Please enter your room rates for the requested period.
                     </p>
                 </div>
@@ -304,16 +318,16 @@ export default function HotelRatesPage() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Request Info Box (if available) */}
                     {requestInfo?.notes && (
-                        <div className="p-4 bg-primary-900/30 light:bg-primary-50 border border-primary-700 light:border-primary-200 rounded-lg">
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                             <div className="flex items-start gap-3">
-                                <svg className="w-5 h-5 text-primary-400 light:text-primary-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <div className="flex-1">
-                                    <p className="text-sm font-medium text-primary-300 light:text-primary-800 mb-1">Request Notes:</p>
-                                    <p className="text-sm text-primary-200/90 light:text-primary-700">{requestInfo.notes}</p>
+                                    <p className="text-sm font-medium text-blue-900 mb-1">Request Notes:</p>
+                                    <p className="text-sm text-blue-700">{requestInfo.notes}</p>
                                     {requestInfo.check_in_date && requestInfo.check_out_date && (
-                                        <p className="text-sm text-primary-200/90 light:text-primary-700 mt-2">
+                                        <p className="text-sm text-blue-700 mt-2">
                                             <strong>Period:</strong> {new Date(requestInfo.check_in_date).toLocaleDateString()} - {new Date(requestInfo.check_out_date).toLocaleDateString()}
                                         </p>
                                     )}
@@ -323,17 +337,17 @@ export default function HotelRatesPage() {
                     )}
 
                     {/* Hotel Information - Editable */}
-                    <FormSection index={0} className="card p-6">
-                        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4 flex items-center gap-2">
-                            <svg className="w-5 h-5 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="card p-6">
+                        <h3 className="text-lg font-semibold text-surface-900 mb-4 flex items-center gap-2">
+                            <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                             </svg>
                             Hotel Information
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-surface-300 light:text-surface-700 mb-1">
-                                    Hotel Name <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-surface-700 mb-1">
+                                    Hotel Name <span className="text-accent-500">*</span>
                                 </label>
                                 <Input
                                     type="text"
@@ -344,8 +358,8 @@ export default function HotelRatesPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-surface-300 light:text-surface-700 mb-1">
-                                    Hotel Email <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-surface-700 mb-1">
+                                    Hotel Email <span className="text-accent-500">*</span>
                                 </label>
                                 <Input
                                     type="email"
@@ -356,7 +370,7 @@ export default function HotelRatesPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-surface-300 light:text-surface-700 mb-1">
+                                <label className="block text-sm font-medium text-surface-700 mb-1">
                                     Hotel Contact Number
                                 </label>
                                 <Input
@@ -367,7 +381,7 @@ export default function HotelRatesPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-surface-300 light:text-surface-700 mb-1">
+                                <label className="block text-sm font-medium text-surface-700 mb-1">
                                     Hotel Address
                                 </label>
                                 <Input
@@ -378,13 +392,13 @@ export default function HotelRatesPage() {
                                 />
                             </div>
                         </div>
-                    </FormSection>
+                    </div>
 
                     {/* Room Categories */}
                     {roomCategories.map((category, catIndex) => (
-                        <FormSection key={catIndex} index={catIndex + 1} className="card p-6 border-l-4 border-l-primary-500">
+                        <div key={catIndex} className="card p-6 border-l-4 border-l-primary-500">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">
+                                <h3 className="text-lg font-semibold text-surface-900">
                                     Room Category {catIndex + 1}
                                 </h3>
                                 {roomCategories.length > 1 && (
@@ -393,7 +407,7 @@ export default function HotelRatesPage() {
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => removeRoomCategory(catIndex)}
-                                        className="text-red-500 hover:text-red-700"
+                                        className="text-accent-500 hover:text-accent-700"
                                     >
                                         Remove Category
                                     </Button>
@@ -402,8 +416,8 @@ export default function HotelRatesPage() {
 
                             {/* Room Category Name */}
                             <div className="mb-6">
-                                <label className="block text-sm font-medium text-surface-300 light:text-surface-700 mb-1">
-                                    Room Category Name <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-surface-700 mb-1">
+                                    Room Category Name <span className="text-accent-500">*</span>
                                 </label>
                                 <div className="flex gap-2">
                                     <Input
@@ -414,7 +428,7 @@ export default function HotelRatesPage() {
                                         className="flex-1"
                                     />
                                     <select
-                                        className="px-3 py-2 border border-surface-600 light:border-surface-300 rounded-lg text-sm bg-surface-800 light:bg-white text-surface-100 light:text-surface-900"
+                                        className="px-3 py-2 border border-surface-300 rounded-lg text-sm bg-white"
                                         onChange={(e) => {
                                             if (e.target.value) {
                                                 updateRoomCategory(catIndex, "room_category", e.target.value);
@@ -432,17 +446,17 @@ export default function HotelRatesPage() {
 
                             {/* Rate Plans */}
                             <div className="space-y-4">
-                                <h4 className="text-sm font-semibold text-surface-300 light:text-surface-700 uppercase tracking-wide">Rate Plans</h4>
+                                <h4 className="text-sm font-semibold text-surface-700 uppercase tracking-wide">Rate Plans</h4>
 
                                 {category.rate_plans.map((plan, planIndex) => (
-                                    <div key={planIndex} className="p-4 bg-surface-800 light:bg-surface-50 rounded-lg border border-surface-600 light:border-surface-200">
+                                    <div key={planIndex} className="p-4 bg-surface-50 rounded-lg border border-surface-200">
                                         <div className="flex items-center justify-between mb-4">
-                                            <span className="text-sm font-medium text-surface-300 light:text-surface-700">Rate Plan {planIndex + 1}</span>
+                                            <span className="text-sm font-medium text-surface-600">Rate Plan {planIndex + 1}</span>
                                             {category.rate_plans.length > 1 && (
                                                 <button
                                                     type="button"
                                                     onClick={() => removeRatePlan(catIndex, planIndex)}
-                                                    className="text-red-500 hover:text-red-700 text-sm"
+                                                    className="text-accent-500 hover:text-accent-700 text-sm"
                                                 >
                                                     Remove
                                                 </button>
@@ -452,11 +466,11 @@ export default function HotelRatesPage() {
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                                             {/* Meal Plan */}
                                             <div>
-                                                <label className="block text-xs text-surface-400 light:text-surface-600 mb-1">Meal Plan</label>
+                                                <label className="block text-xs text-surface-500 mb-1">Meal Plan</label>
                                                 <select
                                                     value={plan.meal_plan}
                                                     onChange={(e) => updateRatePlan(catIndex, planIndex, "meal_plan", e.target.value)}
-                                                    className="w-full px-3 py-2 border border-surface-600 light:border-surface-300 rounded-lg text-sm bg-surface-800 light:bg-white text-surface-100 light:text-surface-900"
+                                                    className="w-full px-3 py-2 border border-surface-300 rounded-lg text-sm bg-white"
                                                 >
                                                     {mealPlanOptions.map((opt) => (
                                                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -466,7 +480,7 @@ export default function HotelRatesPage() {
 
                                             {/* Valid From */}
                                             <div>
-                                                <label className="block text-xs text-surface-400 light:text-surface-600 mb-1">Valid From</label>
+                                                <label className="block text-xs text-surface-500 mb-1">Valid From</label>
                                                 <Input
                                                     type="date"
                                                     value={plan.valid_from}
@@ -476,7 +490,7 @@ export default function HotelRatesPage() {
 
                                             {/* Valid To */}
                                             <div>
-                                                <label className="block text-xs text-surface-400 light:text-surface-600 mb-1">Valid To</label>
+                                                <label className="block text-xs text-surface-500 mb-1">Valid To</label>
                                                 <Input
                                                     type="date"
                                                     value={plan.valid_to}
@@ -486,11 +500,11 @@ export default function HotelRatesPage() {
 
                                             {/* Currency */}
                                             <div>
-                                                <label className="block text-xs text-surface-400 light:text-surface-600 mb-1">Currency</label>
+                                                <label className="block text-xs text-surface-500 mb-1">Currency</label>
                                                 <select
                                                     value={plan.currency}
                                                     onChange={(e) => updateRatePlan(catIndex, planIndex, "currency", e.target.value)}
-                                                    className="w-full px-3 py-2 border border-surface-600 light:border-surface-300 rounded-lg text-sm bg-surface-800 light:bg-white text-surface-100 light:text-surface-900"
+                                                    className="w-full px-3 py-2 border border-surface-300 rounded-lg text-sm bg-white"
                                                 >
                                                     {currencyOptions.map((opt) => (
                                                         <option key={opt.value} value={opt.value}>{opt.value}</option>
@@ -502,7 +516,7 @@ export default function HotelRatesPage() {
                                         {/* Rates */}
                                         <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
                                             <div>
-                                                <label className="block text-xs text-surface-400 light:text-surface-600 mb-1">Single (SGL)</label>
+                                                <label className="block text-xs text-surface-500 mb-1">Single (SGL)</label>
                                                 <Input
                                                     type="number"
                                                     min="0"
@@ -513,7 +527,7 @@ export default function HotelRatesPage() {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-surface-400 light:text-surface-600 mb-1">Double (DBL)</label>
+                                                <label className="block text-xs text-surface-500 mb-1">Double (DBL)</label>
                                                 <Input
                                                     type="number"
                                                     min="0"
@@ -524,7 +538,7 @@ export default function HotelRatesPage() {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-surface-400 light:text-surface-600 mb-1">Triple (TPL)</label>
+                                                <label className="block text-xs text-surface-500 mb-1">Triple (TPL)</label>
                                                 <Input
                                                     type="number"
                                                     min="0"
@@ -535,7 +549,7 @@ export default function HotelRatesPage() {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-surface-400 light:text-surface-600 mb-1">Child Rate</label>
+                                                <label className="block text-xs text-surface-500 mb-1">Child Rate</label>
                                                 <Input
                                                     type="number"
                                                     min="0"
@@ -546,7 +560,7 @@ export default function HotelRatesPage() {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-surface-400 light:text-surface-600 mb-1">Extra Adult</label>
+                                                <label className="block text-xs text-surface-500 mb-1">Extra Adult</label>
                                                 <Input
                                                     type="number"
                                                     min="0"
@@ -569,7 +583,7 @@ export default function HotelRatesPage() {
                                     + Add Rate Plan
                                 </Button>
                             </div>
-                        </FormSection>
+                        </div>
                     ))}
 
                     {/* Add Room Category Button */}
@@ -585,7 +599,7 @@ export default function HotelRatesPage() {
 
                     {/* Error Message */}
                     {error && (
-                        <div className="p-4 bg-red-900/30 light:bg-red-50 border border-red-700 light:border-red-200 rounded-lg text-red-300 light:text-red-700 text-sm">
+                        <div className="p-4 bg-accent-500/10 border border-accent-500/30 rounded-lg text-accent-600 text-sm">
                             {error}
                         </div>
                     )}
@@ -606,9 +620,9 @@ export default function HotelRatesPage() {
             </main>
 
             {/* Footer */}
-                <footer className="border-t border-surface-600 light:border-surface-200 mt-12 py-6">
-                <div className="max-w-5xl mx-auto px-4 text-center text-sm text-surface-400 light:text-surface-500">
-                    <p>Thank you for partnering with TravX</p>
+            <footer className="border-t border-surface-200 mt-12 py-6">
+                <div className="max-w-5xl mx-auto px-4 text-center text-sm text-surface-500">
+                    <p>Thank you for partnering with TraveX</p>
                 </div>
             </footer>
         </div>
