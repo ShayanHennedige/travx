@@ -52,7 +52,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
     // Get current tour to check previous driver_id
     const { data: currentTour } = await supabase
       .from("tours")
-      .select("driver_id")
+      .select("driver_id, driver_status")
       .eq("id", id)
       .single();
 
@@ -60,6 +60,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
       .from("tours")
       .update({
         ...updateData,
+        driver_status: updateData.driver_id ? "completed" : currentTour?.driver_status,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)

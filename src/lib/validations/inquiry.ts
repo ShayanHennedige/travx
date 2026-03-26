@@ -73,6 +73,9 @@ export const inquiryPriorities = ["low", "medium", "high", "urgent"] as const;
 
 // Public inquiry form schema (for client submission)
 export const publicInquirySchema = z.object({
+  // Agent Arrangement
+  arranged_by_agent: z.boolean().default(false),
+  
   // Travel Agent Details (Optional)
   agent_name: z.string().optional(),
   agent_email: z.string().email("Please enter a valid agent email address").optional().or(z.literal("")),
@@ -94,6 +97,13 @@ export const publicInquirySchema = z.object({
   country: z.string().optional().or(z.literal("")),
   arriving_date: z.string().min(1, "Arriving date is required"),
   departure_date: z.string().min(1, "Departure date is required"),
+  // Flight Details (Optional)
+  inbound_flight_no: z.string().optional().or(z.literal("")),
+  inbound_arrival_date: z.string().optional().or(z.literal("")),
+  inbound_arrival_time: z.string().optional().or(z.literal("")),
+  outbound_flight_no: z.string().optional().or(z.literal("")),
+  outbound_departure_date: z.string().optional().or(z.literal("")),
+  outbound_departure_time: z.string().optional().or(z.literal("")),
   no_of_pax: z.coerce.number().min(1, "At least 1 person is required").max(50).default(1),
   no_of_children: z.coerce.number().min(0).max(20).default(0),
   hotel_type: z.string().min(1, "Please select a hotel type"),

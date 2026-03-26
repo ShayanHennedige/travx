@@ -42,8 +42,22 @@ interface InquiryData {
   no_of_nights: number;
   no_of_pax: number;
   no_of_children: number;
+  passport_no?: string | null;
+  head_passport_no?: string | null;
+  country?: string | null;
   hotel_type: string;
   room_category?: string;
+  meal_plan?: string;
+  is_group?: boolean;
+  rooms_dbl?: number;
+  rooms_sgl?: number;
+  rooms_tpl?: number;
+  rooms_qtpl?: number;
+}
+
+interface PDFOptions {
+  includeRates?: boolean;
+  costingData?: any;
 }
 
 function formatDateWithSuffix(dateStr: string): string {
@@ -63,53 +77,65 @@ function getDaySuffix(day: number): string {
   }
 }
 
-function generateDayHTML(day: ItineraryDay, isLastDay: boolean = false): string {
+function generateDayHTML(day: ItineraryDay, isLastDay: boolean = false, mealPlan: string = 'BB'): string {
   const dayDate = day.date ? new Date(day.date) : null;
   const dateFormatted = dayDate ? formatDateWithSuffix(day.date) : "";
   const dayOfWeek = dayDate ? format(dayDate, "EEEE") : "";
 
-  // Extract travel times and distances from activities
   const travelActivities = day.activities.filter(a => a.driving_time || a.driving_distance_km);
-  
-  const activitiesList = day.activities
-    .map(a => `<li>${a.activity}</li>`)
-    .join("");
 
-  const travelTimesList = travelActivities.length > 0 
+  const travelTimesList = travelActivities.length > 0
     ? `
-      <p class="label">Travel Time & Distance:</p>
-      <ul>
+      <div class="travel-info">
         ${travelActivities.map(a => {
-          const timePart = a.driving_time ? `approx. <strong>${a.driving_time}</strong>` : "";
-          const distancePart = a.driving_distance_km ? `<strong>${a.driving_distance_km}</strong>` : "";
-          const parts = [timePart, distancePart].filter(Boolean);
-          return `<li>${a.location}: ${parts.join(" • ")}</li>`;
-        }).join("")}
-      </ul>
-    ` 
+      const timePart = a.driving_time ? `${a.driving_time}` : "";
+      const distancePart = a.driving_distance_km ? `${a.driving_distance_km}` : "";
+      const parts = [timePart, distancePart].filter(Boolean);
+      return `${a.location}: ${parts.join(" · ")}`;
+    }).join(" &nbsp;|&nbsp; ")}
+      </div>
+    `
     : "";
 
-  // Don't show overnight/hotel info for departure day (last day)
-  const overnightSection = isLastDay 
-    ? "" 
+  const getMealDisplayText = (abbr: string): string => {
+    switch (abbr.toUpperCase()) {
+      case 'AI': return 'All Inclusive';
+      case 'FB': return 'Full Board';
+      case 'HB': return 'Half Board';
+      case 'BB': return 'Bed & Breakfast';
+      default: return 'Bed & Breakfast';
+    }
+  };
+
+  const overnightSection = isLastDay
+    ? ""
     : `
-      <p><strong>Overnight:</strong> ${day.overnight_location}</p>
-      <p><strong>Hotel:</strong> ${day.hotel_suggestion}</p>
-      <p><strong>Meals:</strong> Bed & Breakfast</p>
+      <div class="overnight-info">
+        <span class="ov-detail"><em>Overnight:</em> ${day.overnight_location}</span>
+        <span class="ov-sep">·</span>
+        <span class="ov-detail"><em>Hotel:</em> ${day.hotel_suggestion}</span>
+        <span class="ov-sep">·</span>
+        <span class="ov-detail"><em>Meals:</em> ${getMealDisplayText(mealPlan)}</span>
+      </div>
     `;
 
   return `
     <div class="day-card">
-      <p class="day-header">Day ${String(day.day).padStart(2, "0")} / ${dateFormatted} – ${dayOfWeek} | ${day.title}</p>
+      <div class="day-header">
+        <span class="day-num">DAY ${String(day.day).padStart(2, "0")}</span>
+        <span class="day-divider"></span>
+        <div class="day-title-block">
+          <span class="day-title">${day.title}</span>
+          <span class="day-date">${dayOfWeek}, ${dateFormatted}</span>
+        </div>
+      </div>
       
-      <ul>
-        ${activitiesList}
+      <ul class="activities">
+        ${day.activities.map(a => `<li>${a.activity}</li>`).join("")}
       </ul>
 
       ${travelTimesList}
-
-      ${day.day_total_km ? `<p class="label">Total Distance for Day: <strong>${day.day_total_km}</strong></p>` : ""}
-
+      ${day.day_total_km ? `<div class="km-tag">${day.day_total_km} total</div>` : ""}
       ${overnightSection}
     </div>
   `;
@@ -117,19 +143,22 @@ function generateDayHTML(day: ItineraryDay, isLastDay: boolean = false): string 
 
 export function generateItineraryHTML(
   itinerary: ItineraryContent,
-  inquiry: InquiryData | null
+  inquiry: InquiryData | null,
+  options: PDFOptions = {}
 ): string {
-  const totalPax = inquiry 
+  const { includeRates = false, costingData = null } = options;
+  const logoUrl = process.env.NEXT_PUBLIC_LOGO_URL || 'https://tvxwjknpdzvuovjgqvvi.supabase.co/storage/v1/object/public/logo/Serendia.png';
+  const totalPax = inquiry
     ? (inquiry.no_of_pax || 0) + (inquiry.no_of_children || 0)
     : 2;
 
-  const clientName = inquiry 
+  const clientName = inquiry
     ? `${inquiry.first_name} ${inquiry.last_name}`
     : "Valued Guest";
 
-  const arrivalDate = inquiry?.arriving_date 
+  const arrivalDate = inquiry?.arriving_date
     ? new Date(inquiry.arriving_date)
-    : itinerary.days[0]?.date 
+    : itinerary.days[0]?.date
       ? new Date(itinerary.days[0].date)
       : new Date();
 
@@ -141,41 +170,50 @@ export function generateItineraryHTML(
 
   const nights = inquiry?.no_of_nights || itinerary.days.length - 1;
 
-  // Build accommodation summary
-  // Exclude last day (departure day) as there's no overnight stay
   const accommodationMap = new Map<string, { hotel: string; nights: number }>();
-  const daysWithOvernight = itinerary.days.slice(0, -1); // Exclude departure day
-  
+  const daysWithOvernight = itinerary.days.slice(0, -1);
+
   daysWithOvernight.forEach((day) => {
     if (day.overnight_location && day.hotel_suggestion) {
       const key = day.overnight_location;
       if (accommodationMap.has(key)) {
-        const existing = accommodationMap.get(key)!;
-        existing.nights += 1;
+        accommodationMap.get(key)!.nights += 1;
       } else {
         accommodationMap.set(key, { hotel: day.hotel_suggestion, nights: 1 });
       }
     }
   });
 
+  const getMealPlanAbbreviation = (mealPlan?: string): string => {
+    if (!mealPlan) return 'BB';
+    const lowerPlan = mealPlan.toLowerCase();
+    if (lowerPlan.includes('all inclusive') || lowerPlan === 'ai') return 'AI';
+    if (lowerPlan.includes('full board') || lowerPlan === 'fb') return 'FB';
+    if (lowerPlan.includes('half board') || lowerPlan === 'hb') return 'HB';
+    if (lowerPlan.includes('bed & breakfast') || lowerPlan.includes('bed and breakfast') || lowerPlan === 'bb') return 'BB';
+    return mealPlan;
+  };
+
+  const mealPlanDisplay = getMealPlanAbbreviation(inquiry?.meal_plan);
+
   const accommodationRows = Array.from(accommodationMap.entries())
     .map(([location, data]) => `
       <tr>
         <td>${location}</td>
         <td>${data.hotel}</td>
-        <td>${inquiry?.room_category || "Deluxe"}</td>
-        <td class="basis-cell">BB</td>
+        <td class="center">${data.nights} Night${data.nights > 1 ? 's' : ''}</td>
+        <td class="center">${inquiry?.room_category || "Deluxe"}</td>
+        <td class="center accent">${mealPlanDisplay}</td>
       </tr>
     `)
     .join("");
 
-  // Split days into odd (left column) and even (right column)
   const totalDays = itinerary.days.length;
   const oddDays = itinerary.days.filter((_, i) => i % 2 === 0);
   const evenDays = itinerary.days.filter((_, i) => i % 2 === 1);
 
-  const leftColumnHTML = oddDays.map(day => generateDayHTML(day, day.day === totalDays)).join("");
-  const rightColumnHTML = evenDays.map(day => generateDayHTML(day, day.day === totalDays)).join("");
+  const leftColumnHTML = oddDays.map(day => generateDayHTML(day, day.day === totalDays, mealPlanDisplay)).join("");
+  const rightColumnHTML = evenDays.map(day => generateDayHTML(day, day.day === totalDays, mealPlanDisplay)).join("");
 
   return `
 <!DOCTYPE html>
@@ -183,268 +221,537 @@ export function generateItineraryHTML(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sri Lanka Itinerary - ${inquiry?.inquiry_number || "Travel Plan"}</title>
+  <title>${itinerary.title || "Sri Lanka Itinerary"} - ${inquiry?.inquiry_number || ""}</title>
   <style>
-    @page {
-      size: A4;
-      margin: 15mm 10mm 20mm 10mm;
-    }
+    @page { size: A4; margin: 14mm 16mm 16mm 16mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
     body {
-      font-family: "Times New Roman", Times, serif;
-      font-size: 12px;
-      line-height: 1.5;
-      color: #000;
+      font-family: "Times New Roman", "Times", Georgia, serif;
+      font-size: 10.5px;
+      line-height: 1.55;
+      color: #2c2c2c;
     }
 
-    /* Header */
+    /* ── Header ── */
     .header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
-      padding-bottom: 15px;
-      border-bottom: 2px solid #000;
-      margin-bottom: 20px;
+      align-items: center;
+      padding: 14px 0 16px;
+      border-bottom: 2px solid #2c2c2c;
+      margin-bottom: 26px;
     }
 
-    .logo-section {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+    .logo { height: 110px; width: auto; }
 
-    .logo {
-      width: 50px;
-      height: 50px;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 20px;
-      font-weight: bold;
+    .company-info {
+      text-align: right;
+      font-size: 12px;
+      color: #444;
+      line-height: 1.65;
     }
 
     .company-name {
-      font-size: 24px;
+      font-size: 17px;
       font-weight: bold;
-      color: #1d4ed8;
+      color: #2c2c2c;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
     }
 
-    .company-tagline {
-      font-size: 10px;
-      color: #666;
-    }
-
-    .company-details {
-      text-align: right;
-      font-size: 10px;
-      color: #333;
-      line-height: 1.6;
-    }
-
-    /* Trip Info Section */
-    .trip-info {
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
       margin-bottom: 20px;
     }
 
-    .ref-line {
-      font-size: 14px;
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-
-    .pax-line {
-      font-size: 12px;
-      font-weight: bold;
+    .hero-title {
+      font-size: 20px;
+      font-weight: normal;
+      font-style: italic;
+      color: #2c2c2c;
+      letter-spacing: 0.4px;
       margin-bottom: 3px;
     }
 
-    .client-line {
-      font-size: 12px;
+    .hero-line {
+      width: 60px;
+      height: 1.5px;
+      background: #c09853;
+      margin: 8px auto;
+    }
+
+    .hero-sub {
+      font-size: 10px;
+      color: #888;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Trip Details ── */
+    .details-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      padding: 12px 0;
+      border-top: 1px solid #e5e0d8;
+      border-bottom: 1px solid #e5e0d8;
+    }
+
+    .detail-group {
+      text-align: center;
+      flex: 1;
+    }
+
+    .detail-group + .detail-group {
+      border-left: 1px solid #e5e0d8;
+    }
+
+    .detail-label {
+      font-size: 7.5px;
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      color: #999;
+      margin-bottom: 3px;
+    }
+
+    .detail-value {
+      font-size: 11px;
+      color: #2c2c2c;
       font-weight: bold;
-      margin-bottom: 15px;
     }
 
-    .trip-title {
-      font-size: 14px;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
-
-    .trip-details p {
+    /* ── Section Titles ── */
+    .section-title {
       font-size: 12px;
-      margin-bottom: 2px;
+      font-style: italic;
+      color: #2c2c2c;
+      margin-bottom: 12px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #c09853;
+      display: inline-block;
     }
 
-    /* Two Column Layout for Days */
+    /* ── Day Layout ── */
     .days-container {
       display: flex;
       gap: 20px;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
     }
 
     .days-column {
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
     }
 
+    /* ── Day Card ── */
     .day-card {
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid #ddd;
-    }
-
-    .day-card:last-child {
-      border-bottom: none;
+      break-inside: avoid;
+      padding-bottom: 12px;
+      border-bottom: 1px dotted #d5d0c8;
     }
 
     .day-header {
-      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .day-num {
+      font-size: 8px;
       font-weight: bold;
-      margin-bottom: 10px;
+      letter-spacing: 2px;
+      color: #fff;
+      background: #2c2c2c;
+      padding: 3px 8px;
+      border-radius: 2px;
     }
 
-    .day-card ul {
-      margin-left: 20px;
-      margin-bottom: 10px;
+    .day-divider {
+      width: 1px;
+      height: 22px;
+      background: #c09853;
     }
 
-    .day-card li {
-      font-size: 12px;
-      margin-bottom: 5px;
+    .day-title-block {
+      display: flex;
+      flex-direction: column;
     }
 
-    .day-card .label {
-      font-size: 12px;
+    .day-title {
+      font-size: 11px;
       font-weight: bold;
-      margin-top: 10px;
-      margin-bottom: 5px;
+      color: #2c2c2c;
+      line-height: 1.3;
     }
 
-    .day-card p {
-      font-size: 12px;
-      margin-bottom: 3px;
+    .day-date {
+      font-size: 9px;
+      color: #999;
+      font-style: italic;
     }
 
-    /* Accommodation Section */
+    ul.activities {
+      list-style: none;
+      margin: 4px 0 4px 28px;
+      padding: 0;
+    }
+
+    ul.activities li {
+      font-size: 10.5px;
+      margin-bottom: 2px;
+      color: #444;
+      padding-left: 12px;
+      position: relative;
+    }
+
+    ul.activities li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #c09853;
+    }
+
+    .travel-info {
+      font-size: 9px;
+      color: #888;
+      font-style: italic;
+      margin: 4px 0 4px 28px;
+    }
+
+    .km-tag {
+      font-size: 9px;
+      color: #c09853;
+      font-weight: bold;
+      margin-left: 28px;
+      margin-bottom: 4px;
+    }
+
+    .overnight-info {
+      font-size: 9.5px;
+      color: #555;
+      margin-top: 6px;
+      margin-left: 28px;
+      line-height: 1.6;
+    }
+
+    .ov-sep {
+      color: #ccc;
+      margin: 0 4px;
+    }
+
+    /* ── Accommodation Table ── */
     .accommodation-section {
       margin-top: 20px;
-      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
-    .accommodation-title {
-      font-size: 14px;
-      font-weight: bold;
-      font-style: italic;
-      text-decoration: underline;
-      margin-bottom: 15px;
-    }
-
-    table.accommodation {
+    table.accom {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12px;
+      font-size: 10px;
     }
 
-    table.accommodation th {
-      background-color: #f5f5f5;
-      border: 1px solid #000;
-      padding: 8px 10px;
+    table.accom th {
+      font-size: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #888;
+      font-weight: normal;
+      padding: 6px 10px;
       text-align: left;
-      font-style: italic;
-      font-weight: bold;
-      color: #4a5a2a;
+      border-bottom: 1.5px solid #2c2c2c;
     }
 
-    table.accommodation td {
-      border: 1px solid #000;
+    table.accom td {
       padding: 8px 10px;
-      vertical-align: top;
+      border-bottom: 1px solid #eee;
+      color: #333;
     }
 
-    table.accommodation .basis-cell {
-      color: #b91c1c;
+    table.accom .center { text-align: center; }
+    table.accom .accent { color: #c09853; font-weight: bold; }
+
+    table.accom tr:last-child td {
+      border-bottom: 1.5px solid #2c2c2c;
+    }
+
+    /* ── T&C Section ── */
+    .tc-section {
+      margin-top: 28px;
+      break-inside: avoid;
+      border-top: 1.5px solid #2c2c2c;
+      padding-top: 16px;
+    }
+
+    .tc-rate-box {
+      background: #faf8f5;
+      border: 1px solid #e5e0d8;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+    }
+
+    .tc-rate-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .tc-rate-value {
+      font-size: 13px;
       font-weight: bold;
+      color: #2c2c2c;
+    }
+
+    .tc-rate-detail {
+      font-size: 10.5px;
+      color: #555;
+      margin-top: 4px;
+    }
+
+    .tc-columns {
+      display: flex;
+      gap: 24px;
+      margin-top: 14px;
+    }
+
+    .tc-col {
+      flex: 1;
+    }
+
+    .tc-col-title {
+      font-size: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #2c2c2c;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #c09853;
+      display: inline-block;
+    }
+
+    .tc-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .tc-list li {
+      font-size: 10.5px;
+      color: #444;
+      padding: 3px 0 3px 14px;
+      position: relative;
+    }
+
+    .tc-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 9px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #c09853;
+    }
+
+    .tc-list.excludes li::before {
+      background: #ccc;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 9px;
+      color: #aaa;
+      font-style: italic;
+    }
+
+    .footer-line {
+      width: 40px;
+      height: 1px;
+      background: #c09853;
+      margin: 8px auto;
     }
 
     @media print {
-      .day-card {
-        page-break-inside: avoid;
-      }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
 <body>
-  <!-- Header with TravX Details -->
+
+  <!-- Header -->
   <div class="header">
-    <div class="logo-section">
-      <div class="logo">TX</div>
-      <div>
-        <div class="company-name">TravX</div>
-        <div class="company-tagline">Sri Lanka Travel Specialists</div>
-      </div>
-    </div>
-    <div class="company-details">
-      <strong>TravX Holidays (Pvt) Ltd</strong><br>
-      63A, Old Road, Pannipitiya<br>
-      Colombo, Sri Lanka<br>
-      Tel: +94 11 2817781 | Mob: +94 77 3469998<br>
-      Email: info@travx.com | www.travx.com
+    <img src="${logoUrl}" alt="TraveX" class="logo" />
+    <div class="company-info">
+      <div class="company-name">TraveX</div>
+      63A, Old Road, Pannipitiya, Sri Lanka<br>
+      +94 77 346 9998 &nbsp;·&nbsp; info@Travex.com
     </div>
   </div>
 
-  <!-- Trip Reference Info -->
-  <div class="trip-info">
-    <p class="ref-line">SRI LANKA. <span style="font-weight: normal;">Dossier Ref. ${inquiry?.inquiry_number || "TRV/2026/001"}</span></p>
-    <p class="pax-line">Tailor Made Tour – ${String(totalPax).padStart(2, "0")} pax</p>
-    <p class="client-line">${clientName}</p>
-
-    <hr style="border: none; border-top: 1px solid #000; margin: 15px 0;">
-
-    <p class="trip-title">Luxury Sri Lanka Itinerary – ${String(nights).padStart(2, "0")} Nights / ${String(nights + 1).padStart(2, "0")} Days</p>
-    <div class="trip-details">
-      <p><strong>Basis:</strong> ${inquiry?.hotel_type || "Bed & Breakfast"} | <strong>Guests:</strong> ${String(totalPax).padStart(2, "0")} Pax</p>
-      <p><strong>Arrival:</strong> ${format(arrivalDate, "EEEE, dd MMMM")}</p>
-      <p><strong>Departure:</strong> ${format(departureDate, "EEEE, dd MMMM")}</p>
-      ${itinerary.total_distance_km ? `<p><strong>Total Distance:</strong> ${itinerary.total_distance_km}</p>` : ""}
-    </div>
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-title">${itinerary.title || `Sri Lanka ${nights + 1} Day Adventure`}</div>
+    <div class="hero-line"></div>
+    <div class="hero-sub">Tailor-Made for ${clientName} &nbsp;·&nbsp; ${String(totalPax).padStart(2, "0")} Traveller${totalPax > 1 ? 's' : ''} &nbsp;·&nbsp; Ref ${inquiry?.inquiry_number || "—"}</div>
   </div>
 
-  <hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;">
+  <!-- Trip Summary -->
+  <div class="details-row">
+    <div class="detail-group">
+      <div class="detail-label">Travel Dates</div>
+      <div class="detail-value">${format(arrivalDate, "dd MMM")} – ${format(departureDate, "dd MMM yyyy")}</div>
+    </div>
+    <div class="detail-group">
+      <div class="detail-label">Duration</div>
+      <div class="detail-value">${nights} Nights / ${nights + 1} Days</div>
+    </div>
+    <div class="detail-group">
+      <div class="detail-label">Category</div>
+      <div class="detail-value">${inquiry?.hotel_type || "Standard"}</div>
+    </div>
+    ${itinerary.total_distance_km ? `
+    <div class="detail-group">
+      <div class="detail-label">Total Distance</div>
+      <div class="detail-value">${itinerary.total_distance_km}</div>
+    </div>` : ""}
+  </div>
 
-  <!-- Two Column Day Layout (Odd / Even) -->
+  <!-- Itinerary -->
+  <div class="section-title">Day-by-Day Itinerary</div>
+
   <div class="days-container">
-    <div class="days-column">
-      ${leftColumnHTML}
-    </div>
-    <div class="days-column">
-      ${rightColumnHTML}
-    </div>
+    <div class="days-column">${leftColumnHTML}</div>
+    <div class="days-column">${rightColumnHTML}</div>
   </div>
 
-  <!-- Accommodation Summary -->
+  <!-- Accommodation -->
   <div class="accommodation-section">
-    <p class="accommodation-title">Accommodation</p>
-    <table class="accommodation">
+    <div class="section-title">Accommodation Plan</div>
+    <table class="accom">
       <thead>
         <tr>
-          <th style="width: 25%;">Location</th>
-          <th style="width: 40%;">${inquiry?.hotel_type || "5*"} Hotels</th>
-          <th style="width: 20%;">Room</th>
-          <th style="width: 15%;">Basis</th>
+          <th>Location</th>
+          <th>Hotel / Property</th>
+          <th class="center">Duration</th>
+          <th class="center">Room Type</th>
+          <th class="center">Basis</th>
         </tr>
       </thead>
-      <tbody>
-        ${accommodationRows}
-      </tbody>
+      <tbody>${accommodationRows}</tbody>
     </table>
+  </div>
+
+  ${includeRates && costingData ? (() => {
+      const currency = costingData.currency || 'USD';
+      const perPerson = costingData.per_person_usd?.toFixed(2) || '0.00';
+      const noOfPax = costingData.no_of_pax || totalPax;
+
+      // Determine room sharing description
+      const getSharingDesc = (pax: number): string => {
+        if (pax >= 4) return 'quad room';
+        if (pax === 3) return 'triple room';
+        if (pax === 2) return 'double room';
+        return 'single room';
+      };
+
+      // Build meal plan description from accommodation data
+      const buildMealPlanDesc = (): string => {
+        const accomData = costingData.accommodation_data || [];
+        if (accomData.length === 0) return `${costingData.meal_plan || 'BB'} basis`;
+
+        // Group by location and basis
+        const locationBasis = new Map<string, string>();
+        accomData.forEach((row: any) => {
+          if (row.location && row.basis) {
+            locationBasis.set(row.location, row.basis);
+          }
+        });
+
+        if (locationBasis.size === 0) return `${costingData.meal_plan || 'BB'} basis`;
+
+        // Check if all same basis
+        const basisValues = [...new Set(locationBasis.values())];
+        if (basisValues.length === 1) {
+          return `${basisValues[0]} basis`;
+        }
+
+        // Different basis per location
+        return Array.from(locationBasis.entries())
+          .map(([loc, basis]) => `${loc} – ${basis} basis`)
+          .join(' / ');
+      };
+
+      // Build includes list
+      const includes: string[] = [];
+      includes.push(`Accommodation on ${costingData.hotel_type || inquiry?.hotel_type || '4/5*'} hotels`);
+      includes.push(`Meal plan – ${buildMealPlanDesc()}`);
+
+      // Add transport if exists
+      if (costingData.transport_data && costingData.transport_data.length > 0) {
+        includes.push('Airport return transfer shuttles');
+      }
+
+      // Add extras
+      if (costingData.extras_data) {
+        costingData.extras_data.forEach((extra: any) => {
+          if (extra.name) includes.push(extra.name);
+        });
+      }
+
+      // Standard excludes
+      const excludes = [
+        'Entrance tickets or boat rides',
+        'Tips',
+        'Personal expenses',
+      ];
+
+      return `
+    <div class="tc-section">
+      <div class="section-title">Rates & Terms</div>
+
+      <div class="tc-rate-box">
+        <div class="tc-rate-label">Rate – ${currency} net per person</div>
+        <div class="tc-rate-value">Base ${String(noOfPax).padStart(2, '0')} pax sharing ${getSharingDesc(noOfPax)} – ${currency} ${perPerson} net per person</div>
+      </div>
+
+      <div class="tc-columns">
+        <div class="tc-col">
+          <div class="tc-col-title">Price Includes</div>
+          <ul class="tc-list">
+            ${includes.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="tc-col">
+          <div class="tc-col-title">Price Does Not Include</div>
+          <ul class="tc-list excludes">
+            ${excludes.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    </div>
+    `;
+    })() : ''}
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-line"></div>
+    This itinerary is subject to availability at the time of booking.<br>
+    Thank you for choosing <strong style="color:#2c2c2c;">TraveX</strong>.
   </div>
 
 </body>
