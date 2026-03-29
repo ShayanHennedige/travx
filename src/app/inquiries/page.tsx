@@ -28,8 +28,8 @@ export default async function InquiriesPage() {
   return (
     <AppLayout>
       <Header
-        title="Inquiries"
-        subtitle="Manage individual and group travel inquiries"
+        title="Inquiry Management"
+        subtitle="Organize and process client travel requests"
       />
       <InquiriesListWithToggle
         individualInquiries={individualInquiries || []}
