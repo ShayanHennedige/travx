@@ -29,27 +29,67 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refreshing the auth token
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const pathname = request.nextUrl.pathname;
 
-  // If there's no user and we're not on the login page, redirect to login
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
-  ) {
+  // List of public paths that don't require authentication
+  const publicPaths = [
+    "/inquiry",
+    "/api/inquiry",
+    "/feedback",
+    "/api/feedback",
+    "/login",
+    "/auth",
+    "/api/debug-emails",
+    "/api/debug/backfill-references",
+  ];
+
+  const isPublicPath = publicPaths.some(
+    (path) => pathname === path || pathname.startsWith(path + "/")
+  );
+
+  // Refreshing the auth token and get session
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const user = session?.user || null;
+
+  // If it's a public path, just proceed (but we still refreshed the session above if cookies were present)
+  if (isPublicPath) {
+    // If user is already logged in and tries to access login, redirect to dashboard
+    if (user && pathname === "/login") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+    return supabaseResponse;
+  }
+
+  // If there's no user and we're not on a public page, redirect to login
+  if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // If user is logged in and on login page, redirect to dashboard
-  if (user && request.nextUrl.pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  // Check session age - force logout if session is too old
+  if (session) {
+    const sessionExpiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+    const now = Date.now();
+
+    if (sessionExpiresAt > 0 && now >= sessionExpiresAt) {
+      // Session expired - sign out and redirect to login
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("reason", "session_expired");
+
+      const response = NextResponse.redirect(url);
+      // Clear all auth cookies
+      response.cookies.delete('sb-access-token');
+      response.cookies.delete('sb-refresh-token');
+      return response;
+    }
   }
 
   return supabaseResponse;

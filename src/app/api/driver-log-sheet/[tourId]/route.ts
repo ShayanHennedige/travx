@@ -13,7 +13,7 @@ interface ItineraryActivity {
     location: string;
     duration?: string;
     driving_time?: string;
-    driving_distance_km?: string; // New field: "X km from previous"
+    driving_distance_km?: string;
 }
 
 interface ItineraryDay {
@@ -22,7 +22,7 @@ interface ItineraryDay {
     title: string;
     overnight_location: string;
     hotel_suggestion?: string;
-    day_total_km?: string; // New field: "X km" for the full day
+    day_total_km?: string;
     activities?: ItineraryActivity[];
     notes?: string;
 }
@@ -33,35 +33,33 @@ interface ItineraryContent {
     days: ItineraryDay[];
     practical_notes?: string[];
     total_driving_hours?: string;
-    total_distance_km?: string; // New field: "Approximate total km"
+    total_distance_km?: string;
 }
 
-// TravX Company Details
+// TraveX Company Details
 const COMPANY = {
-    name: "TravX Tours (Pvt) Ltd",
-    address: "123 Galle Road, Colombo 03, Sri Lanka",
-    email: "info@travxtours.com",
-    phone: "+94 11 234 5678",
-    website: "www.travxtours.com",
+    name: "TraveX",
+    address: "63A, Old Road, Pannipitiya, Sri Lanka",
+    email: "info@Travex.com",
+    phone: "+94 77 346 9998",
+    website: "www.serendiaholidays.com",
 };
 
-// Theme colors (matching project's globals.css)
+// Theme colors - TraveX Red/Black Branding
 const COLORS = {
-    primary600: "005CD4",      // --color-primary-600
-    primary100: "E0EFFF",      // --color-primary-100
-    primary50: "F0F7FF",       // --color-primary-50
-    accent500: "FF7A15",       // --color-accent-500
-    surface100: "F1F5F9",      // --color-surface-100
-    surface200: "E2E8F0",      // --color-surface-200
-    surface700: "334155",      // --color-surface-700
+    primary600: "E04344", // TraveX Red
+    primary100: "FDE8E8", // Light red
+    primary50: "FEF2F2", // Very light red
+    accent500: "1A1A1A", // Black
+    surface100: "F1F5F9",
+    surface200: "E2E8F0",
+    surface700: "334155",
     white: "FFFFFF",
-    warning: "FEF3C7",         // Light yellow for balance row
+    warning: "FEF3C7",
 };
 
 // Helper to extract mileage from itinerary day
 function extractMileageFromDay(day: ItineraryDay): number {
-    // First, try to use day_total_km if available (new field)
-    // Format: "X km" or "X km from Y to Z"
     if (day.day_total_km) {
         const kmMatch = day.day_total_km.match(/(\d+\.?\d*)\s*km/i);
         if (kmMatch) {
@@ -71,13 +69,10 @@ function extractMileageFromDay(day: ItineraryDay): number {
         }
     }
 
-    // Otherwise, sum up driving_distance_km from activities
-    // Format: "X km from [Origin] to [Destination]"
     let totalKm = 0;
     if (day.activities) {
         for (const activity of day.activities) {
             if (activity.driving_distance_km) {
-                // Match "X km" or "X km from Y to Z"
                 const kmMatch = activity.driving_distance_km.match(/(\d+\.?\d*)\s*km/i);
                 if (kmMatch) {
                     const activityKm = parseFloat(kmMatch[1]);
@@ -93,7 +88,6 @@ function extractMileageFromDay(day: ItineraryDay): number {
         return Math.round(totalKm);
     }
 
-    // Fallback: estimate from driving time (~40 km/h average on Sri Lankan roads)
     let totalDrivingHours = 0;
     if (day.activities) {
         for (const activity of day.activities) {
@@ -123,29 +117,18 @@ export async function GET(request: Request, { params }: RouteParams) {
     const { tourId } = await params;
     const supabase = await createClient();
 
+    console.log("=== Driver Log Sheet API Called ===");
+    console.log("Tour ID:", tourId);
+
     try {
-        // Fetch tour with related data
+        // Fetch tour
         const { data: tour, error: tourError } = await supabase
             .from("tours")
-            .select(`
-        *,
-        itinerary_id,
-        drivers (
-          id,
-          name,
-          vehicle_type,
-          vehicle_number,
-          contact_number
-        ),
-        itineraries (
-          id,
-          content,
-          inquiry_id,
-          group_inquiry_id
-        )
-      `)
+            .select("*")
             .eq("id", tourId)
             .single();
+
+        console.log("Tour query result:", { tour: tour?.id, error: tourError });
 
         if (tourError || !tour) {
             console.error("Error fetching tour:", tourError);
@@ -153,6 +136,60 @@ export async function GET(request: Request, { params }: RouteParams) {
                 { error: "Tour not found" },
                 { status: 404 }
             );
+        }
+
+        console.log("Tour data:", {
+            id: tour.id,
+            client_name: tour.client_name,
+            start_date: tour.start_date,
+            end_date: tour.end_date,
+            itinerary_id: tour.itinerary_id,
+            driver_id: tour.driver_id,
+        });
+
+        // Fetch driver if assigned
+        let driver = null;
+        if (tour.driver_id) {
+            const { data: driverData } = await supabase
+                .from("drivers")
+                .select("id, name, vehicle_type, vehicle_number, contact_number")
+                .eq("id", tour.driver_id)
+                .single();
+            driver = driverData;
+        }
+
+        // Fetch costing sheet via itinerary_id (costing sheets link to itineraries, not tours)
+        let extraKm = 0;
+        if (tour.itinerary_id) {
+            const { data: costingSheet, error: costingError } = await supabase
+                .from("tour_costing_sheets")
+                .select("transport_data")
+                .eq("itinerary_id", tour.itinerary_id)
+                .single();
+
+            console.log("Costing sheet query:", { found: !!costingSheet, error: costingError });
+
+            // Extract extra km from transport_data JSONB
+            // Look for row with "extra" in description (e.g., "Extra KM", "Extra Kms")
+            if (costingSheet?.transport_data && Array.isArray(costingSheet.transport_data)) {
+                // Try exact match first
+                let extraKmItem = costingSheet.transport_data.find((item: any) =>
+                    item.description?.toLowerCase() === 'extra km' ||
+                    item.description?.toLowerCase() === 'extra kms'
+                );
+
+                // Fallback: search for any row containing "extra"
+                if (!extraKmItem) {
+                    extraKmItem = costingSheet.transport_data.find((item: any) =>
+                        item.description?.toLowerCase().includes('extra')
+                    );
+                }
+
+                if (extraKmItem && extraKmItem.mileage) {
+                    extraKm = extraKmItem.mileage;
+                    console.log("Extra KM found:", extraKm, "from row:", extraKmItem.description);
+                }
+            }
         }
 
         // Verify we have the correct itinerary linked to this tour
@@ -164,68 +201,57 @@ export async function GET(request: Request, { params }: RouteParams) {
             );
         }
 
-        // If nested query didn't return itinerary, fetch it directly using itinerary_id
+        // Fetch itinerary content
         let itineraryContent: ItineraryContent | null = null;
-        if (tour.itineraries?.content) {
-            try {
-                itineraryContent = typeof tour.itineraries.content === "string"
-                    ? JSON.parse(tour.itineraries.content)
-                    : tour.itineraries.content;
-            } catch (e) {
-                console.error("Error parsing nested itinerary content:", e);
-            }
-        }
-
-        // Fallback: fetch itinerary directly if nested query didn't work
-        if (!itineraryContent && tour.itinerary_id) {
-            const { data: directItinerary, error: itineraryError } = await supabase
+        let itinerary = null;
+        if (tour.itinerary_id) {
+            const { data: itineraryData, error: itineraryError } = await supabase
                 .from("itineraries")
                 .select("id, content, inquiry_id, group_inquiry_id")
                 .eq("id", tour.itinerary_id)
                 .single();
 
-            if (!itineraryError && directItinerary?.content) {
+            itinerary = itineraryData;
+
+            if (!itineraryError && itineraryData?.content) {
                 try {
-                    itineraryContent = typeof directItinerary.content === "string"
-                        ? JSON.parse(directItinerary.content)
-                        : directItinerary.content;
+                    itineraryContent = typeof itineraryData.content === "string"
+                        ? JSON.parse(itineraryData.content)
+                        : itineraryData.content;
                     console.log("Fetched itinerary directly using itinerary_id:", tour.itinerary_id);
+                    console.log("Itinerary days:", itineraryContent?.days?.map(d => ({ day: d.day, date: d.date, title: d.title })));
                 } catch (e) {
-                    console.error("Error parsing direct itinerary content:", e);
+                    console.error("Error parsing itinerary content:", e);
                 }
             } else {
-                console.error("Error fetching itinerary directly:", itineraryError);
+                console.error("Error fetching itinerary:", itineraryError);
             }
         }
 
-        // Fetch inquiry data if available
+        // Fetch inquiry data if available (from itinerary, not tour)
         let inquiry = null;
-        if (tour.inquiry_id) {
+        if (itinerary?.inquiry_id) {
             const { data: inquiryData } = await supabase
                 .from("inquiries")
                 .select("first_name, last_name, country, no_of_pax, no_of_children")
-                .eq("id", tour.inquiry_id)
+                .eq("id", itinerary.inquiry_id)
                 .single();
             inquiry = inquiryData;
         }
 
-        // Fetch group inquiry data if available
+        // Fetch group inquiry data if available (from itinerary, not tour)
         let groupInquiry = null;
-        if (tour.group_inquiry_id) {
+        if (itinerary?.group_inquiry_id) {
             const { data: groupInquiryData } = await supabase
                 .from("group_inquiries")
                 .select("group_name, travel_agent, country, no_of_pax, no_of_children")
-                .eq("id", tour.group_inquiry_id)
+                .eq("id", itinerary.group_inquiry_id)
                 .single();
             groupInquiry = groupInquiryData;
         }
 
-        // Log tour and itinerary info for debugging
         console.log("Tour ID:", tourId);
-        console.log("Tour itinerary_id:", tour.itinerary_id);
-        console.log("Tour inquiry_id:", tour.inquiry_id);
-        console.log("Tour group_inquiry_id:", tour.group_inquiry_id);
-        console.log("Tour driver_id:", tour.driver_id);
+        console.log("Extra KM from costing:", extraKm);
         if (itineraryContent) {
             console.log("Itinerary days count:", itineraryContent.days?.length);
             console.log("Itinerary title:", itineraryContent.title);
@@ -233,7 +259,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         // Create workbook
         const workbook = new ExcelJS.Workbook();
-        workbook.creator = "TravX";
+        workbook.creator = "TraveX";
         workbook.created = new Date();
 
         const worksheet = workbook.addWorksheet("Log Sheet", {
@@ -263,9 +289,8 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         // ===== DEFINE STYLES =====
 
-        // Table header style (blue theme)
-        const tableHeaderStyle: Partial<ExcelJS.Style> = {
-            font: { bold: true, size: 11, color: { argb: "FF" + COLORS.white } },
+        const tableHeaderStyle: any = {
+            font: { bold: true, size: 11, color: { argb: "FFFFFFFF" } },
             alignment: { horizontal: "center", vertical: "middle" },
             fill: {
                 type: "pattern",
@@ -280,7 +305,6 @@ export async function GET(request: Request, { params }: RouteParams) {
             },
         };
 
-        // Label cell style (light blue background)
         const labelStyle: Partial<ExcelJS.Style> = {
             font: { bold: true, size: 10, color: { argb: "FF" + COLORS.surface700 } },
             alignment: { horizontal: "left", vertical: "middle" },
@@ -297,7 +321,6 @@ export async function GET(request: Request, { params }: RouteParams) {
             },
         };
 
-        // Data cell style
         const cellStyle: Partial<ExcelJS.Style> = {
             font: { size: 10 },
             alignment: { horizontal: "left", vertical: "middle" },
@@ -309,7 +332,6 @@ export async function GET(request: Request, { params }: RouteParams) {
             },
         };
 
-        // Number cell style (centered)
         const numberCellStyle: Partial<ExcelJS.Style> = {
             font: { size: 10 },
             alignment: { horizontal: "center", vertical: "middle" },
@@ -321,7 +343,6 @@ export async function GET(request: Request, { params }: RouteParams) {
             },
         };
 
-        // Total row style
         const totalRowStyle: Partial<ExcelJS.Style> = {
             font: { bold: true, size: 10 },
             alignment: { horizontal: "right", vertical: "middle" },
@@ -335,23 +356,6 @@ export async function GET(request: Request, { params }: RouteParams) {
                 bottom: { style: "thin", color: { argb: "FF" + COLORS.surface200 } },
                 left: { style: "thin", color: { argb: "FF" + COLORS.surface200 } },
                 right: { style: "thin", color: { argb: "FF" + COLORS.surface200 } },
-            },
-        };
-
-        // Balance row style (highlighted)
-        const balanceRowStyle: Partial<ExcelJS.Style> = {
-            font: { bold: true, size: 11, color: { argb: "FF" + COLORS.surface700 } },
-            alignment: { horizontal: "right", vertical: "middle" },
-            fill: {
-                type: "pattern",
-                pattern: "solid",
-                fgColor: { argb: "FF" + COLORS.warning },
-            },
-            border: {
-                top: { style: "medium", color: { argb: "FF" + COLORS.accent500 } },
-                bottom: { style: "medium", color: { argb: "FF" + COLORS.accent500 } },
-                left: { style: "medium", color: { argb: "FF" + COLORS.accent500 } },
-                right: { style: "medium", color: { argb: "FF" + COLORS.accent500 } },
             },
         };
 
@@ -410,7 +414,6 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         // ===== TOUR INFO SECTION =====
 
-        // Determine guest name and travel agent
         let guestName = tour.client_name || "";
         let travelAgent = "";
         let paxInfo = `${tour.pax_adults || 0} Adults`;
@@ -426,9 +429,9 @@ export async function GET(request: Request, { params }: RouteParams) {
             travelAgent = groupInquiry.travel_agent || groupInquiry.country || "Direct";
         }
 
-        const driverName = tour.drivers?.name || "Not Assigned";
-        const driverVehicle = tour.drivers?.vehicle_type
-            ? `${tour.drivers.vehicle_type}${tour.drivers.vehicle_number ? ` (${tour.drivers.vehicle_number})` : ""}`
+        const driverName = driver?.name || "Not Assigned";
+        const driverVehicle = driver?.vehicle_type
+            ? `${driver.vehicle_type}${driver.vehicle_number ? ` (${driver.vehicle_number})` : ""}`
             : "";
 
         // Row: Guest Name
@@ -463,8 +466,22 @@ export async function GET(request: Request, { params }: RouteParams) {
         currentRow++;
 
         // Row: Arrival Date | Departure Date
-        const arrivalDate = tour.start_date ? format(parseISO(tour.start_date), "dd MMM yyyy") : "";
-        const departureDate = tour.end_date ? format(parseISO(tour.end_date), "dd MMM yyyy") : "";
+        let arrivalDate = "";
+        let departureDate = "";
+        
+        try {
+            arrivalDate = tour.start_date ? format(parseISO(tour.start_date), "dd MMM yyyy") : "";
+        } catch (e) {
+            console.error("Error parsing start_date:", tour.start_date, e);
+            arrivalDate = tour.start_date || "";
+        }
+        
+        try {
+            departureDate = tour.end_date ? format(parseISO(tour.end_date), "dd MMM yyyy") : "";
+        } catch (e) {
+            console.error("Error parsing end_date:", tour.end_date, e);
+            departureDate = tour.end_date || "";
+        }
 
         worksheet.getCell(`A${currentRow}`).value = "Arrival Date";
         Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
@@ -476,7 +493,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         Object.assign(worksheet.getCell(`D${currentRow}`), cellStyle);
         currentRow++;
 
-        // Row: Arrival Flight | Departure Flight (empty for manual entry)
+        // Row: Arrival Flight | Departure Flight
         worksheet.getCell(`A${currentRow}`).value = "Arrival Flight";
         Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
         worksheet.getCell(`B${currentRow}`).value = "";
@@ -504,65 +521,102 @@ export async function GET(request: Request, { params }: RouteParams) {
         worksheet.getRow(currentRow).height = 22;
         currentRow++;
 
-        // Generate daily entries with mileage from itinerary
+        // Generate daily entries
         const logStartRow = currentRow;
         let tourDays: Array<{ date: Date; location: string; mileage: number }> = [];
 
         if (itineraryContent?.days && itineraryContent.days.length > 0) {
-            // Use itinerary days and extract mileage
-            tourDays = itineraryContent.days.map((day) => {
-                // Build itinerary description: use title or combine overnight location with activities
+            tourDays = itineraryContent.days.map((day, index) => {
                 let itineraryDescription = day.title || "";
                 if (day.overnight_location && day.title !== day.overnight_location) {
                     itineraryDescription = `${day.title || day.overnight_location} - ${day.overnight_location}`;
                 } else if (!itineraryDescription && day.overnight_location) {
                     itineraryDescription = day.overnight_location;
                 }
-                
+
+                // Parse date safely
+                let dayDate: Date;
+                try {
+                    if (day.date) {
+                        dayDate = parseISO(day.date);
+                    } else if (tour.start_date) {
+                        // Fallback: use tour start date + index days
+                        const startDate = parseISO(tour.start_date);
+                        dayDate = new Date(startDate);
+                        dayDate.setDate(startDate.getDate() + index);
+                    } else {
+                        dayDate = new Date();
+                    }
+                } catch (e) {
+                    console.error(`Error parsing date for day ${day.day}:`, day.date, e);
+                    dayDate = new Date();
+                }
+
                 return {
-                    date: day.date ? parseISO(day.date) : parseISO(tour.start_date),
+                    date: dayDate,
                     location: itineraryDescription || day.overnight_location || "",
                     mileage: extractMileageFromDay(day),
                 };
             });
         } else if (tour.start_date && tour.end_date) {
-            // Generate days from tour dates (no mileage data available)
-            const dates = eachDayOfInterval({
-                start: parseISO(tour.start_date),
-                end: parseISO(tour.end_date),
-            });
-            tourDays = dates.map((date, index) => ({
-                date,
-                location: index === 0 ? "Airport / Hotel" : index === dates.length - 1 ? "Hotel / Airport" : "",
-                mileage: 0,
-            }));
+            try {
+                const dates = eachDayOfInterval({
+                    start: parseISO(tour.start_date),
+                    end: parseISO(tour.end_date),
+                });
+                tourDays = dates.map((date, index) => ({
+                    date,
+                    location: index === 0 ? "Airport / Hotel" : index === dates.length - 1 ? "Hotel / Airport" : "",
+                    mileage: 0,
+                }));
+            } catch (e) {
+                console.error("Error generating date interval:", e);
+                // Fallback: create at least one day
+                tourDays = [{
+                    date: new Date(),
+                    location: "Tour",
+                    mileage: 0,
+                }];
+            }
         }
 
         // Add daily entries
         tourDays.forEach((day, index) => {
             const isEvenRow = index % 2 === 0;
-            const rowFill: Partial<ExcelJS.Fill> = isEvenRow
-                ? { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + COLORS.white } }
+            const rowFill: any = isEvenRow
+                ? { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } }
                 : { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + COLORS.primary50 } };
 
-            worksheet.getCell(`A${currentRow}`).value = format(day.date, "dd-MMM");
+            // Format date safely
+            let dateStr = "";
+            try {
+                dateStr = format(day.date, "dd-MMM");
+            } catch (e) {
+                console.error("Error formatting date:", day.date, e);
+                dateStr = "N/A";
+            }
+
+            worksheet.getCell(`A${currentRow}`).value = dateStr;
             Object.assign(worksheet.getCell(`A${currentRow}`), cellStyle);
             worksheet.getCell(`A${currentRow}`).alignment = { horizontal: "center", vertical: "middle" };
             worksheet.getCell(`A${currentRow}`).fill = rowFill;
+            worksheet.getCell(`A${currentRow}`).protection = { locked: true };
 
             worksheet.getCell(`B${currentRow}`).value = day.location;
             Object.assign(worksheet.getCell(`B${currentRow}`), cellStyle);
             worksheet.getCell(`B${currentRow}`).fill = rowFill;
+            worksheet.getCell(`B${currentRow}`).protection = { locked: true };
 
-            // Mileage from itinerary (or 0 if not available)
             worksheet.getCell(`C${currentRow}`).value = day.mileage;
             Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
             worksheet.getCell(`C${currentRow}`).fill = rowFill;
+            worksheet.getCell(`C${currentRow}`).protection = { locked: true };
 
-            // Actual - editable, leave empty (not 0)
+            // Actual column - editable
             worksheet.getCell(`D${currentRow}`).value = "";
             Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
             worksheet.getCell(`D${currentRow}`).fill = rowFill;
+            worksheet.getCell(`D${currentRow}`).protection = { locked: false };
 
             currentRow++;
         });
@@ -572,23 +626,48 @@ export async function GET(request: Request, { params }: RouteParams) {
         // Total row
         worksheet.getCell(`A${currentRow}`).value = "";
         Object.assign(worksheet.getCell(`A${currentRow}`), totalRowStyle);
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
+
         worksheet.getCell(`B${currentRow}`).value = "Total";
         Object.assign(worksheet.getCell(`B${currentRow}`), totalRowStyle);
         worksheet.getCell(`B${currentRow}`).alignment = { horizontal: "right", vertical: "middle" };
+        worksheet.getCell(`B${currentRow}`).protection = { locked: true };
 
         worksheet.getCell(`C${currentRow}`).value = {
             formula: `SUM(C${logStartRow}:C${logEndRow})`,
         };
         Object.assign(worksheet.getCell(`C${currentRow}`), totalRowStyle);
         worksheet.getCell(`C${currentRow}`).alignment = { horizontal: "center", vertical: "middle" };
+        worksheet.getCell(`C${currentRow}`).protection = { locked: true };
 
         worksheet.getCell(`D${currentRow}`).value = {
             formula: `SUM(D${logStartRow}:D${logEndRow})`,
         };
         Object.assign(worksheet.getCell(`D${currentRow}`), totalRowStyle);
         worksheet.getCell(`D${currentRow}`).alignment = { horizontal: "center", vertical: "middle" };
+        worksheet.getCell(`D${currentRow}`).protection = { locked: true };
 
         const totalMileageRow = currentRow;
+        currentRow++;
+
+        // Extra KM row (from costing sheet)
+        worksheet.getCell(`A${currentRow}`).value = "";
+        Object.assign(worksheet.getCell(`A${currentRow}`), cellStyle);
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`B${currentRow}`).value = "Extra KM";
+        Object.assign(worksheet.getCell(`B${currentRow}`), labelStyle);
+        worksheet.getCell(`B${currentRow}`).alignment = { horizontal: "right", vertical: "middle" };
+        worksheet.getCell(`B${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`C${currentRow}`).value = extraKm;
+        Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
+        worksheet.getCell(`C${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`D${currentRow}`).value = "";
+        Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
+        worksheet.getCell(`D${currentRow}`).protection = { locked: true };
+
         currentRow++;
 
         // Empty row
@@ -597,58 +676,54 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         // ===== COST CALCULATION SECTION =====
 
-        const numberOfDays = tourDays.length || 1;
-
         // Row: Total Mileage Cost
         worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
         worksheet.getCell(`A${currentRow}`).value = "Total Mileage Cost";
         Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
-        worksheet.getCell(`C${currentRow}`).value = 0; // Rate per km (editable, default 0)
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`C${currentRow}`).value = 0;
         Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
-        worksheet.getCell(`D${currentRow}`).value = 0; // Driver will fill this manually
+        worksheet.getCell(`C${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`D${currentRow}`).value = 0;
         Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
         worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
+        worksheet.getCell(`D${currentRow}`).protection = { locked: false };
         const mileageCostRow = currentRow;
         currentRow++;
 
-        // Row: Batta (daily allowance) - 2000 per day when there's mileage
+        // Row: Parking Fee
         worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
-        const daysWithMileage = tourDays.filter(day => day.mileage > 0).length;
-        worksheet.getCell(`A${currentRow}`).value = `Batta (${numberOfDays} days)`;
+        worksheet.getCell(`A${currentRow}`).value = "Parking Fee";
         Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
-        // Set batta to 2000 per day when there's mileage, otherwise 0
-        const battaPerDay = daysWithMileage > 0 ? 2000 : 0;
-        worksheet.getCell(`C${currentRow}`).value = battaPerDay; // Constant 2000 per day when mileage exists
-        Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
-        worksheet.getCell(`D${currentRow}`).value = {
-            formula: `${numberOfDays}*C${currentRow}`,
-        };
-        Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
-        worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
-        const battaRow = currentRow;
-        currentRow++;
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
 
-        // Row: Parking
-        worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
-        worksheet.getCell(`A${currentRow}`).value = "Parking";
-        Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
         worksheet.getCell(`C${currentRow}`).value = "";
         Object.assign(worksheet.getCell(`C${currentRow}`), cellStyle);
-        worksheet.getCell(`D${currentRow}`).value = 0; // Driver will fill this manually, default 0
+        worksheet.getCell(`C${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`D${currentRow}`).value = 0;
         Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
         worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
+        worksheet.getCell(`D${currentRow}`).protection = { locked: false };
         const parkingRow = currentRow;
         currentRow++;
 
-        // Row: Highway
+        // Row: Highway Cost
         worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
-        worksheet.getCell(`A${currentRow}`).value = "Highway";
+        worksheet.getCell(`A${currentRow}`).value = "Highway Cost";
         Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
+
         worksheet.getCell(`C${currentRow}`).value = "";
         Object.assign(worksheet.getCell(`C${currentRow}`), cellStyle);
-        worksheet.getCell(`D${currentRow}`).value = 0; // Driver will fill this manually, default 0
+        worksheet.getCell(`C${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`D${currentRow}`).value = 0;
         Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
         worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
+        worksheet.getCell(`D${currentRow}`).protection = { locked: false };
         const highwayRow = currentRow;
         currentRow++;
 
@@ -656,37 +731,28 @@ export async function GET(request: Request, { params }: RouteParams) {
         worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
         worksheet.getCell(`A${currentRow}`).value = "Total";
         Object.assign(worksheet.getCell(`A${currentRow}`), totalRowStyle);
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
+
         worksheet.getCell(`D${currentRow}`).value = {
             formula: `SUM(D${mileageCostRow}:D${highwayRow})`,
         };
         Object.assign(worksheet.getCell(`D${currentRow}`), totalRowStyle);
         worksheet.getCell(`D${currentRow}`).alignment = { horizontal: "center", vertical: "middle" };
         worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
-        const totalRow = currentRow;
-        currentRow++;
+        worksheet.getCell(`D${currentRow}`).protection = { locked: true };
 
-        // Row: Tour Advance
-        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
-        worksheet.getCell(`A${currentRow}`).value = "Tour Advance";
-        Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
-        worksheet.getCell(`D${currentRow}`).value = 0; // Editable, default 0
-        Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
-        worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
-        const advanceRow = currentRow;
-        currentRow++;
-
-        // Row: Balance to Pay
-        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
-        worksheet.getCell(`A${currentRow}`).value = "Balance to Pay";
-        Object.assign(worksheet.getCell(`A${currentRow}`), balanceRowStyle);
-        worksheet.getCell(`A${currentRow}`).alignment = { horizontal: "left", vertical: "middle" };
-        worksheet.getCell(`D${currentRow}`).value = {
-            formula: `D${totalRow}-D${advanceRow}`,
-        };
-        Object.assign(worksheet.getCell(`D${currentRow}`), balanceRowStyle);
-        worksheet.getCell(`D${currentRow}`).alignment = { horizontal: "center", vertical: "middle" };
-        worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
-        worksheet.getRow(currentRow).height = 24;
+        // Enable worksheet protection - only Actual column cells are editable
+        await worksheet.protect("", {
+            selectLockedCells: true,
+            selectUnlockedCells: true,
+            formatCells: false,
+            formatColumns: false,
+            formatRows: false,
+            insertColumns: false,
+            insertRows: false,
+            deleteColumns: false,
+            deleteRows: false,
+        });
 
         // Generate Excel buffer
         const buffer = await workbook.xlsx.writeBuffer();
@@ -704,10 +770,13 @@ export async function GET(request: Request, { params }: RouteParams) {
                 "Content-Disposition": `attachment; filename="${filename}"`,
             },
         });
-    } catch (err) {
-        console.error("Error generating log sheet:", err);
+    } catch (err: any) {
+        console.error("=== Error generating log sheet ===");
+        console.error("Error message:", err?.message);
+        console.error("Error stack:", err?.stack);
+        console.error("Full error:", err);
         return NextResponse.json(
-            { error: "Failed to generate log sheet" },
+            { error: err?.message || "Failed to generate log sheet", details: err?.toString() },
             { status: 500 }
         );
     }
