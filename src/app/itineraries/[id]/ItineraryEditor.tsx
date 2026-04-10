@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { format } from "date-fns";
+import { useRouter } from "next/navigation";
 
 interface ItineraryDay {
   day: number;
@@ -42,6 +43,7 @@ interface ItineraryEditorProps {
 }
 
 export function ItineraryEditor({ itineraryId, initialContent }: ItineraryEditorProps) {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState<ItineraryContent>(initialContent);
@@ -76,6 +78,9 @@ export function ItineraryEditor({ itineraryId, initialContent }: ItineraryEditor
       setContent(data.itinerary.content);
       setEditRequest("");
       setShowEditPanel(false);
+
+      // Refresh the page to update parent derived sections (Accommodation List, Logistics)
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -86,45 +91,51 @@ export function ItineraryEditor({ itineraryId, initialContent }: ItineraryEditor
   return (
     <div className="space-y-6">
       {/* Edit Controls */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-surface-100 light:text-surface-900">
+      <div className="card p-5 border-l-4 border-primary-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-surface-900 flex items-center gap-2">
+              <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               Itinerary Details
             </h2>
-            <p className="text-sm text-surface-400 light:text-surface-500 mt-1">
-              {content.summary}
+            <p className="text-sm text-surface-600 mt-1 italic leading-relaxed">
+              &quot;{content.summary}&quot;
             </p>
           </div>
-          <Button
-            variant="secondary"
-            onClick={() => setShowEditPanel(!showEditPanel)}
-            disabled={isEditing}
-            className="hover:bg-accent-500 hover:text-black hover:border-accent-500"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Edit Itinerary
-          </Button>
+          <div className="flex-shrink-0">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowEditPanel(!showEditPanel)}
+              disabled={isEditing}
+              className="w-full sm:w-auto shadow-sm"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit Itinerary
+            </Button>
+          </div>
         </div>
 
         {/* Edit Panel */}
         {showEditPanel && (
-          <div className="border-t border-surface-600 light:border-surface-200 pt-4 mt-4">
-            <label className="block text-sm font-medium text-surface-300 light:text-surface-700 mb-2">
+          <div className="border-t border-surface-200 pt-4 mt-4">
+            <label className="block text-sm font-medium text-surface-700 mb-2">
               Describe your changes in plain English
             </label>
             <textarea
               value={editRequest}
               onChange={(e) => setEditRequest(e.target.value)}
               placeholder="e.g., Add a beach day in Mirissa on Day 3, remove the temple visit on Day 2, change the hotel in Kandy to a 5-star property..."
-              className="w-full px-4 py-3 rounded-lg border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none resize-none text-surface-100 light:text-surface-900 placeholder:text-surface-500 light:placeholder:text-surface-500"
+              className="w-full px-4 py-3 rounded-lg border border-surface-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none resize-none text-surface-900 placeholder-surface-400"
               rows={4}
               disabled={isEditing}
             />
             <div className="flex items-center justify-between mt-3">
-              <p className="text-xs text-surface-400 light:text-surface-500">
+              <p className="text-xs text-surface-500">
                 The AI will understand your request and update the itinerary accordingly.
               </p>
               <div className="flex items-center gap-2">
@@ -165,8 +176,8 @@ export function ItineraryEditor({ itineraryId, initialContent }: ItineraryEditor
             </div>
 
             {error && (
-              <div className="mt-4 p-4 bg-red-900/30 light:bg-red-50 border border-red-700 light:border-red-200 rounded-lg">
-                <p className="text-sm text-red-300 light:text-red-600">{error}</p>
+            <div className="mt-4 p-4 bg-accent-500/10 border border-accent-500/30 rounded-lg">
+                <p className="text-sm text-accent-500">{error}</p>
               </div>
             )}
           </div>
@@ -174,33 +185,39 @@ export function ItineraryEditor({ itineraryId, initialContent }: ItineraryEditor
       </div>
 
       {/* Day by Day Itinerary */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         {content.days.map((day) => (
-          <div key={day.day} className="card overflow-hidden">
-            {/* Day Header */}
-            <div className="bg-surface-700 light:bg-surface-100 px-6 py-4 border-b border-surface-600 light:border-surface-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <span className="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center font-bold text-sm">
-                      {day.day}
-                    </span>
-                    <div>
-                      <h3 className="font-semibold text-surface-100 light:text-surface-900">{day.title}</h3>
-                      <p className="text-sm text-surface-400 light:text-surface-500">
-                        {day.date && format(new Date(day.date), "EEEE, MMMM d, yyyy")}
-                      </p>
-                    </div>
+          <div key={day.day} className="card overflow-hidden group">
+            {/* Day Header - Dark Theme matches Active Tours Card */}
+            <div className="bg-surface-900 px-6 py-5 border-b border-surface-800 transition-colors duration-300">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4 flex-1">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-surface-800 border border-surface-700 text-teal-400 flex items-center justify-center font-bold text-lg shadow-sm group-hover:bg-teal-400 group-hover:text-surface-900 transition-colors duration-300">
+                    {day.day}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-white mb-1">{day.title}</h3>
+                    <p className="text-sm text-surface-400 font-medium">
+                      {(() => {
+                        if (!day.date) return "";
+                        try {
+                          const d = new Date(day.date);
+                          if (isNaN(d.getTime())) return "";
+                          return format(d, "EEEE, MMMM d, yyyy");
+                        } catch (e) {
+                          return "";
+                        }
+                      })()}
+                    </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-surface-300 light:text-surface-700">
-                    Overnight: {day.overnight_location}
-                  </p>
-                    <p className="text-xs text-surface-400 light:text-surface-500">{day.hotel_suggestion}</p>
+                <div className="text-right flex-shrink-0 pl-4 border-l border-surface-800">
+                  <p className="text-[10px] uppercase tracking-wider text-surface-500 font-bold mb-1">Overnight</p>
+                  <p className="text-sm font-bold text-white">{day.overnight_location}</p>
+                  <p className="text-xs text-surface-400 mt-0.5">{day.hotel_suggestion}</p>
                   {day.day_total_km && (
-                    <p className="text-xs font-medium text-primary-400 light:text-primary-600 mt-1">
-                      Total: {day.day_total_km}
+                    <p className="text-[10px] font-bold text-surface-300 mt-1 bg-surface-800 px-2 py-0.5 rounded-full inline-block">
+                      {day.day_total_km}
                     </p>
                   )}
                 </div>
@@ -208,53 +225,61 @@ export function ItineraryEditor({ itineraryId, initialContent }: ItineraryEditor
             </div>
 
             {/* Activities */}
-            <div className="p-6">
-              <div className="space-y-4">
+            <div className="p-6 bg-white">
+              <div className="relative border-l-2 border-surface-100 ml-4 space-y-8 my-2">
                 {day.activities.map((activity, idx) => (
-                  <div key={idx} className="flex gap-4">
-                    <div className="flex-shrink-0 w-20">
-                      <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                        activity.time.toLowerCase().includes('morning') 
-                          ? 'bg-amber-900/50 light:bg-amber-100 text-amber-300 light:text-amber-700'
-                          : activity.time.toLowerCase().includes('afternoon')
-                          ? 'bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-700'
-                          : 'bg-purple-900/50 light:bg-purple-100 text-purple-300 light:text-purple-700'
-                      }`}>
-                        {activity.time}
-                      </span>
-                    </div>
-                    <div className="flex-grow">
-                      <p className="text-surface-100 light:text-surface-900 font-medium">{activity.activity}</p>
-                        <div className="flex items-center gap-3 mt-1 text-sm text-surface-400 light:text-surface-500">
-                        <span className="flex items-center gap-1">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          {activity.location}
+                  <div key={idx} className="relative pl-8">
+                    {/* Timeline Dot */}
+                    <div className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full border-2 border-white bg-teal-400 shadow-sm ring-4 ring-teal-50"></div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                      {/* Time Badge - Simplified */}
+                      <div className="md:col-span-2 flex-shrink-0">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-surface-100 text-surface-600 border border-surface-200 min-w-[80px] justify-center uppercase tracking-wide">
+                          {activity.time}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          {activity.duration}
-                        </span>
-                        {activity.driving_time && (
-                          <span className="flex items-center gap-1 text-orange-400 light:text-orange-600">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                      </div>
+
+                      {/* Activity Content */}
+                      <div className="md:col-span-10 space-y-2">
+                        <h4 className="text-base font-bold text-surface-900 leading-tight">
+                          {activity.activity}
+                        </h4>
+
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                          <div className="flex items-center gap-1.5 text-surface-500">
+                            <svg className="w-4 h-4 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
-                            {activity.driving_time}
-                          </span>
-                        )}
-                        {activity.driving_distance_km && (
-                          <span className="flex items-center gap-1 text-green-400 light:text-green-600">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                            {activity.location}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-surface-500">
+                            <svg className="w-4 h-4 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            {activity.driving_distance_km}
-                          </span>
-                        )}
+                            {activity.duration}
+                          </div>
+
+                          {activity.driving_time && (
+                            <div className="flex items-center gap-1.5 text-teal-600 font-medium">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                              </svg>
+                              {activity.driving_time}
+                            </div>
+                          )}
+
+                          {activity.driving_distance_km && (
+                            <div className="flex items-center gap-1.5 text-teal-600 font-medium">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                              </svg>
+                              {activity.driving_distance_km}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -262,29 +287,33 @@ export function ItineraryEditor({ itineraryId, initialContent }: ItineraryEditor
               </div>
 
               {/* Meals */}
-              <div className="mt-6 pt-4 border-t border-surface-600 light:border-surface-200">
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-surface-400 light:text-surface-500 text-xs uppercase tracking-wider mb-1">Breakfast</p>
-                    <p className="text-surface-300 light:text-surface-600">{day.meals.breakfast}</p>
+              <div className="mt-8 pt-6 border-t border-surface-100">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-surface-50 p-3 rounded-lg border border-surface-100 flex flex-col">
+                    <span className="text-[10px] uppercase tracking-wider text-surface-400 font-bold mb-1">Breakfast</span>
+                    <span className="text-sm font-medium text-surface-900">{day.meals.breakfast}</span>
                   </div>
-                  <div>
-                    <p className="text-surface-400 light:text-surface-500 text-xs uppercase tracking-wider mb-1">Lunch</p>
-                    <p className="text-surface-300 light:text-surface-600">{day.meals.lunch}</p>
+                  <div className="bg-surface-50 p-3 rounded-lg border border-surface-100 flex flex-col">
+                    <span className="text-[10px] uppercase tracking-wider text-surface-400 font-bold mb-1">Lunch</span>
+                    <span className="text-sm font-medium text-surface-900">{day.meals.lunch}</span>
                   </div>
-                  <div>
-                    <p className="text-surface-400 light:text-surface-500 text-xs uppercase tracking-wider mb-1">Dinner</p>
-                    <p className="text-surface-300 light:text-surface-600">{day.meals.dinner}</p>
+                  <div className="bg-surface-50 p-3 rounded-lg border border-surface-100 flex flex-col">
+                    <span className="text-[10px] uppercase tracking-wider text-surface-400 font-bold mb-1">Dinner</span>
+                    <span className="text-sm font-medium text-surface-900">{day.meals.dinner}</span>
                   </div>
                 </div>
               </div>
 
               {/* Notes */}
               {day.notes && (
-                <div className="mt-4 p-3 bg-amber-900/30 light:bg-amber-50 rounded-lg border border-amber-700/50 light:border-transparent">
-                  <p className="text-sm text-amber-300 light:text-amber-800">
-                    <span className="font-medium">Note:</span> {day.notes}
-                  </p>
+                <div className="mt-4 p-4 bg-teal-50 rounded-lg border border-teal-100 flex gap-3 text-sm text-teal-800">
+                  <svg className="w-5 h-5 text-teal-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <span className="font-bold block mb-0.5 text-teal-900">Note</span>
+                    {day.notes}
+                  </div>
                 </div>
               )}
             </div>

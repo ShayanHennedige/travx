@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 // GET - Get inquiry/itinerary data for pre-filling feedback form
 export async function GET(request: Request) {
-  const supabase = await createClient();
+  // Use admin client if available to bypass RLS for this public lookup
+  const adminSupabase = createAdminClient();
+  const anonSupabase = await createClient();
+  const supabase = adminSupabase || anonSupabase;
+
   const { searchParams } = new URL(request.url);
 
   const token = searchParams.get("token");
@@ -12,128 +17,96 @@ export async function GET(request: Request) {
   const itineraryId = searchParams.get("itinerary_id");
   const tourId = searchParams.get("tour_id");
   const groupInquiryId = searchParams.get("group_inquiry_id");
+  const email = searchParams.get("email");
 
-  // If reference number is provided, look up the inquiry first
+  console.log("Feedback prefill request params:", { email, reference, token, tourId });
+
   let effectiveInquiryId = inquiryId;
   let effectiveGroupInquiryId = groupInquiryId;
   let referenceTourId: string | null = null;
   let referenceItineraryId: string | null = null;
 
+  // 1. Reference Number Lookup (Primary method)
   if (reference) {
-    // Try individual inquiry first
-    const { data: individualInquiry } = await supabase
-      .from("inquiries")
-      .select("id")
-      .eq("inquiry_number", reference.trim())
-      .single();
+    const refStr = reference.trim();
+    console.log("Searching for tour by reference:", refStr);
 
-    if (individualInquiry) {
-      effectiveInquiryId = individualInquiry.id;
-      // Find itinerary for this inquiry
-      const { data: itinerary } = await supabase
-        .from("itineraries")
-        .select("id")
-        .eq("inquiry_id", individualInquiry.id)
-        .single();
+    const { data: indv } = await supabase.from("inquiries").select("id").eq("inquiry_number", refStr).maybeSingle();
+    const { data: grp } = await supabase.from("group_inquiries").select("id").eq("inquiry_number", refStr).maybeSingle();
 
+    const inquiryIdFound = indv?.id || grp?.id;
+    const type = indv?.id ? "inquiry_id" : "group_inquiry_id";
+
+    if (inquiryIdFound) {
+      const { data: itinerary } = await supabase.from("itineraries").select("id").eq(type, inquiryIdFound).maybeSingle();
       if (itinerary) {
         referenceItineraryId = itinerary.id;
-        // Find tour for this itinerary
-        const { data: tour } = await supabase
-          .from("tours")
-          .select("id")
-          .eq("itinerary_id", itinerary.id)
-          .single();
-
-        if (tour) {
-          referenceTourId = tour.id;
-        }
-      }
-    } else {
-      // Try group inquiry
-      const { data: groupInquiry } = await supabase
-        .from("group_inquiries")
-        .select("id")
-        .eq("inquiry_number", reference.trim())
-        .single();
-
-      if (groupInquiry) {
-        effectiveGroupInquiryId = groupInquiry.id;
-        // Find itinerary for this group inquiry
-        const { data: itinerary } = await supabase
-          .from("itineraries")
-          .select("id")
-          .eq("group_inquiry_id", groupInquiry.id)
-          .single();
-
-        if (itinerary) {
-          referenceItineraryId = itinerary.id;
-          // Find tour for this itinerary
-          const { data: tour } = await supabase
-            .from("tours")
-            .select("id")
-            .eq("itinerary_id", itinerary.id)
-            .single();
-
-          if (tour) {
-            referenceTourId = tour.id;
-          }
-        }
-      } else {
-        return NextResponse.json(
-          { error: "Could not find inquiry with this reference number" },
-          { status: 404 }
-        );
+        const { data: tour } = await supabase.from("tours").select("id").eq("itinerary_id", itinerary.id).maybeSingle();
+        if (tour) referenceTourId = tour.id;
       }
     }
   }
 
-  // If token is provided, validate and extract IDs
-  let tokenRecord: any = null;
-  let tokenInquiryId: string | null = null;
-  let tokenGroupInquiryId: string | null = null;
-  let tokenItineraryId: string | null = null;
-  let tokenTourId: string | null = null;
+  // 2. Email Lookup (Fallback for legacy support)
+  else if (email) {
+    console.log("Searching for tour by email:", email.trim());
+    const emailStr = email.trim();
+
+    // Find inquiries matching this email
+    const { data: inquiries } = await supabase
+      .from("inquiries")
+      .select("id, status, created_at")
+      .eq("client_email", emailStr)
+      .order("created_at", { ascending: false });
+
+    const { data: groupInquiries } = await supabase
+      .from("group_inquiries")
+      .select("id, status, created_at, client_email, head_client_email")
+      .or(`client_email.eq.${emailStr},head_client_email.eq.${emailStr}`)
+      .order("created_at", { ascending: false });
+
+    const candidates: Array<{ id: string; type: "individual" | "group"; date: string }> = [];
+    if (inquiries) inquiries.forEach(i => candidates.push({ id: i.id, type: "individual", date: i.created_at }));
+    if (groupInquiries) groupInquiries.forEach(i => candidates.push({ id: i.id, type: "group", date: i.created_at }));
+
+    candidates.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    for (const candidate of candidates) {
+      const { data: itinerary } = await supabase
+        .from("itineraries")
+        .select("id")
+        .eq(candidate.type === "individual" ? "inquiry_id" : "group_inquiry_id", candidate.id)
+        .maybeSingle();
+
+      if (itinerary) {
+        const { data: tour } = await supabase
+          .from("tours")
+          .select("id")
+          .eq("itinerary_id", itinerary.id)
+          .maybeSingle();
+
+        if (tour) {
+          referenceTourId = tour.id;
+          console.log(`Found tour ${tour.id} for email ${emailStr}`);
+          break;
+        }
+      }
+    }
+
+    if (!referenceTourId && candidates.length === 0) {
+      return NextResponse.json({ error: "No bookings found for this email" }, { status: 404 });
+    }
+  }
+
+  // 3. Token Lookup
   let tokenId: string | null = null;
-
+  let tokenTourId: string | null = null;
   if (token) {
-    const { data: record, error: tokenError } = await supabase
-      .from("feedback_tokens")
-      .select("*")
-      .eq("token", token)
-      .single();
-
-    if (tokenError || !record) {
-      return NextResponse.json(
-        { error: "Invalid or expired feedback token" },
-        { status: 401 }
-      );
+    const { data: record } = await supabase.from("feedback_tokens").select("*").eq("token", token).maybeSingle();
+    if (record && !record.used_at && new Date(record.expires_at) > new Date()) {
+      tokenTourId = record.tour_id;
+      tokenId = record.id;
     }
-
-    tokenRecord = record;
-
-    // Check if token is expired
-    if (new Date(tokenRecord.expires_at) < new Date()) {
-      return NextResponse.json(
-        { error: "Feedback token has expired" },
-        { status: 401 }
-      );
-    }
-
-    // Check if token has already been used
-    if (tokenRecord.used_at) {
-      return NextResponse.json(
-        { error: "This feedback link has already been used" },
-        { status: 401 }
-      );
-    }
-
-    // Use IDs from token
-    tokenInquiryId = tokenRecord.inquiry_id;
-    tokenGroupInquiryId = tokenRecord.group_inquiry_id;
-    tokenItineraryId = tokenRecord.itinerary_id;
-    tokenTourId = tokenRecord.tour_id;
-    tokenId = tokenRecord.id;
   }
 
   try {
@@ -141,368 +114,155 @@ export async function GET(request: Request) {
     let hotels: string[] = [];
     let driverData: any = null;
     let vehicleData: any = null;
-    let effectiveTourId = tourId || tokenTourId || referenceTourId || null;
-    let effectiveItineraryId = itineraryId || tokenItineraryId || referenceItineraryId || null;
-    // Use reference-looked-up IDs if available
-    effectiveInquiryId = effectiveInquiryId || inquiryId || tokenInquiryId || null;
-    effectiveGroupInquiryId = effectiveGroupInquiryId || groupInquiryId || tokenGroupInquiryId || null;
+    let finalTourId: string | null = null;
+    let finalItineraryId: string | null = null;
 
-    // Try to get data from tour first (most complete)
-    if (effectiveTourId) {
-      const { data: tour, error: tourError } = await supabase
+    // A candidate list to rank the best tour to show
+    const tourCandidates: any[] = [];
+
+    // Gather Candidate Tour IDs
+    const searchTourIds = new Set<string>();
+    if (tourId) searchTourIds.add(tourId);
+    if (tokenTourId) searchTourIds.add(tokenTourId);
+    if (referenceTourId) searchTourIds.add(referenceTourId);
+
+    // If Email was provided and we found candidate inquiry IDs
+    if (email) {
+      const emailStr = email.trim();
+      const { data: inquires } = await supabase.from("inquiries").select("id").eq("client_email", emailStr);
+      const { data: groupInquires } = await supabase.from("group_inquiries").select("id").or(`client_email.eq.${emailStr},head_client_email.eq.${emailStr}`);
+
+      const inquiryIds = (inquires || []).map(i => i.id);
+      const groupInquiryIds = (groupInquires || []).map(i => i.id);
+
+      if (inquiryIds.length > 0 || groupInquiryIds.length > 0) {
+        const { data: toursByInquiry } = await supabase.from("tours").select("id").in("inquiry_id", inquiryIds);
+        const { data: toursByGroup } = await supabase.from("tours").select("id").in("group_inquiry_id", groupInquiryIds);
+
+        (toursByInquiry || []).forEach(t => searchTourIds.add(t.id));
+        (toursByGroup || []).forEach(t => searchTourIds.add(t.id));
+      }
+    }
+
+    console.log(`Searching across ${searchTourIds.size} candidate tours:`, Array.from(searchTourIds));
+
+    // Fetch details for ALL candidate tours to pick the best one
+    for (const tid of Array.from(searchTourIds)) {
+      const { data: tour } = await supabase
         .from("tours")
         .select(`
           *,
-          driver_id,
-          itineraries (
-            id,
-            content,
-            inquiry_id,
-            group_inquiry_id
-          ),
-          inquiries (
-            id,
-            first_name,
-            last_name,
-            client_email,
-            country
-          ),
-          group_inquiries (
-            id,
-            head_first_name,
-            head_last_name,
-            client_email,
-            head_client_email,
-            country
-          ),
-          drivers (
-            id,
-            name,
-            contact_number,
-            vehicle_type,
-            vehicle_number
-          )
+          inquiries(*),
+          group_inquiries(*),
+          drivers(*),
+          itineraries(*)
         `)
-        .eq("id", effectiveTourId)
-        .single();
+        .eq("id", tid)
+        .maybeSingle();
 
-      if (tourError) {
-        console.error("Error fetching tour:", tourError);
+      if (tour) {
+        let score = 0;
+        if (tour.driver_id || tour.drivers) score += 10;
+        if (tour.itinerary_id || tour.itineraries) score += 5;
+        if (tour.client_name) score += 1;
+
+        tourCandidates.push({ tour, score });
       }
+    }
 
-      // Extract hotels from itinerary (exclude last day - departure day)
-      if (tour?.itineraries) {
-        const itinerary = Array.isArray(tour.itineraries) ? tour.itineraries[0] : tour.itineraries;
-        let content = itinerary.content;
+    // Sort by score descending, then by created_at descending
+    tourCandidates.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return new Date(b.tour.created_at).getTime() - new Date(a.tour.created_at).getTime();
+    });
 
-        // Parse content if it's a string
-        if (typeof content === 'string') {
-          try {
-            content = JSON.parse(content);
-          } catch (e) {
-            console.error("Error parsing itinerary content:", e);
-          }
-        }
+    const bestMatch = tourCandidates[0]?.tour;
 
-        if (content?.days && Array.isArray(content.days)) {
-          const hotelSet = new Set<string>();
-          // Exclude the last day (departure day - no overnight stay)
-          const daysWithHotels = content.days.slice(0, -1);
-          daysWithHotels.forEach((day: any) => {
-            if (day.hotel_suggestion && day.hotel_suggestion.trim()) {
-              hotelSet.add(day.hotel_suggestion.trim());
-            }
-          });
-          hotels = Array.from(hotelSet);
-        }
-      }
+    if (bestMatch) {
+      console.log(`Selected best tour: ${bestMatch.id} (Score: ${tourCandidates[0].score})`);
+      finalTourId = bestMatch.id;
+      finalItineraryId = bestMatch.itinerary_id;
 
-      // If hotels still empty and we have itinerary_id, try fetching directly
-      if (hotels.length === 0 && effectiveItineraryId) {
-        const { data: itinerary } = await supabase
-          .from("itineraries")
-          .select("content")
-          .eq("id", effectiveItineraryId)
-          .single();
+      // Extract Customer Info
+      const inquiryObj = Array.isArray(bestMatch.inquiries) ? bestMatch.inquiries[0] : bestMatch.inquiries;
+      const groupObj = Array.isArray(bestMatch.group_inquiries) ? bestMatch.group_inquiries[0] : bestMatch.group_inquiries;
 
-        if (itinerary?.content) {
-          let content = itinerary.content;
-          if (typeof content === 'string') {
-            try {
-              content = JSON.parse(content);
-            } catch (e) {
-              console.error("Error parsing itinerary content:", e);
-            }
-          }
-
-          if (content?.days && Array.isArray(content.days)) {
-            const hotelSet = new Set<string>();
-            const daysWithHotels = content.days.slice(0, -1);
-            daysWithHotels.forEach((day: any) => {
-              if (day.hotel_suggestion && day.hotel_suggestion.trim()) {
-                hotelSet.add(day.hotel_suggestion.trim());
-              }
-            });
-            hotels = Array.from(hotelSet);
-          }
-        }
-      }
-
-      // Get customer data
-      if (tour?.inquiries) {
-        const inquiry = tour.inquiries as any;
-        let fullName = "";
-        if (inquiry.client_name) {
-          fullName = inquiry.client_name;
-        } else if (inquiry.first_name || inquiry.last_name) {
-          fullName = `${inquiry.first_name || ""} ${inquiry.last_name || ""}`.trim();
-        }
-
+      if (inquiryObj) {
         customerData = {
-          name: fullName,
-          email: inquiry.client_email || "",
-          country: inquiry.country || inquiry.client_nationality || null,
-          inquiry_id: inquiry.id,
+          name: inquiryObj.client_name || `${inquiryObj.first_name || ""} ${inquiryObj.last_name || ""}`.trim() || bestMatch.client_name,
+          email: inquiryObj.client_email || "",
+          country: inquiryObj.client_nationality || inquiryObj.country || null,
+          inquiry_id: inquiryObj.id,
           group_inquiry_id: null,
           type: "individual",
         };
-      } else if (tour?.group_inquiries) {
-        const groupInquiry = tour.group_inquiries as any;
+      } else if (groupObj) {
         customerData = {
-          name: `${groupInquiry.head_first_name || ""} ${groupInquiry.head_last_name || ""}`.trim(),
-          email: groupInquiry.client_email || groupInquiry.head_client_email || "",
-          country: groupInquiry.country || null,
+          name: `${groupObj.head_first_name || ""} ${groupObj.head_last_name || ""}`.trim() || bestMatch.client_name,
+          email: groupObj.client_email || groupObj.head_client_email || "",
+          country: groupObj.country || null,
           inquiry_id: null,
-          group_inquiry_id: groupInquiry.id,
+          group_inquiry_id: groupObj.id,
           type: "group",
         };
-      }
-
-      // Get driver and vehicle data
-      // Debug: Log tour object to see what we have
-      console.log("Tour object:", JSON.stringify(tour, null, 2));
-      console.log("Tour driver_id:", (tour as any)?.driver_id);
-      console.log("Tour drivers nested:", tour?.drivers);
-
-      // Check if nested drivers query returned data
-      if (tour?.drivers) {
-        const driver = Array.isArray(tour.drivers) ? tour.drivers[0] : tour.drivers;
-        console.log("Found driver from nested query:", driver);
-        if (driver) {
-          driverData = {
-            id: driver.id,
-            name: driver.name,
-            vehicle_type: driver.vehicle_type,
-            vehicle_number: driver.vehicle_number,
-          };
-          vehicleData = {
-            type: driver.vehicle_type,
-            number: driver.vehicle_number,
-          };
-        }
-      }
-
-      // If driver not found from nested query, try direct lookup by driver_id
-      if (!driverData) {
-        const driverId = (tour as any)?.driver_id;
-        console.log("Attempting direct driver fetch with driver_id:", driverId);
-
-        if (driverId) {
-          const { data: driver, error: driverError } = await supabase
-            .from("drivers")
-            .select("id, name, vehicle_type, vehicle_number")
-            .eq("id", driverId)
-            .single();
-
-          console.log("Direct driver fetch result:", { driver, error: driverError });
-
-          if (driver && !driverError) {
-            driverData = {
-              id: driver.id,
-              name: driver.name,
-              vehicle_type: driver.vehicle_type,
-              vehicle_number: driver.vehicle_number,
-            };
-            vehicleData = {
-              type: driver.vehicle_type,
-              number: driver.vehicle_number,
-            };
-          }
-        }
-      }
-
-      // If customer data wasn't found from tour nested query, try direct inquiry lookup
-      if (!customerData && effectiveInquiryId) {
-        const { data: inquiry } = await supabase
-          .from("inquiries")
-          .select("*")
-          .eq("id", effectiveInquiryId)
-          .single();
-
-        if (inquiry) {
-          let fullName = "";
-          if (inquiry.client_name) {
-            fullName = inquiry.client_name;
-          } else if (inquiry.first_name || inquiry.last_name) {
-            fullName = `${inquiry.first_name || ""} ${inquiry.last_name || ""}`.trim();
-          }
-
-          customerData = {
-            name: fullName,
-            email: inquiry.client_email || "",
-            country: inquiry.country || inquiry.client_nationality || null,
-            inquiry_id: inquiry.id,
-            group_inquiry_id: null,
-            type: "individual",
-          };
-        }
-      }
-
-      // If still no customer data and we have group inquiry ID, try that
-      if (!customerData && effectiveGroupInquiryId) {
-        const { data: groupInquiry } = await supabase
-          .from("group_inquiries")
-          .select("*")
-          .eq("id", effectiveGroupInquiryId)
-          .single();
-
-        if (groupInquiry) {
-          customerData = {
-            name: `${groupInquiry.head_first_name || ""} ${groupInquiry.head_last_name || ""}`.trim(),
-            email: groupInquiry.client_email || groupInquiry.head_client_email || "",
-            country: groupInquiry.country || null,
-            inquiry_id: null,
-            group_inquiry_id: groupInquiry.id,
-            type: "group",
-          };
-        }
-      }
-    }
-    // Try itinerary next
-    else if (effectiveItineraryId) {
-      const { data: itinerary } = await supabase
-        .from("itineraries")
-        .select(`
-          *,
-          inquiries (
-            id,
-            first_name,
-            last_name,
-            client_email,
-            country
-          ),
-          group_inquiries (
-            id,
-            head_first_name,
-            head_last_name,
-            client_email,
-            head_client_email,
-            country
-          )
-        `)
-        .eq("id", effectiveItineraryId)
-        .single();
-
-      if (itinerary) {
-        let content = itinerary.content;
-
-        // Parse content if it's a string
-        if (typeof content === 'string') {
-          try {
-            content = JSON.parse(content);
-          } catch (e) {
-            console.error("Error parsing itinerary content:", e);
-          }
-        }
-
-        // Extract hotels (exclude last day - departure day)
-        if (content?.days && Array.isArray(content.days)) {
-          const hotelSet = new Set<string>();
-          // Exclude the last day (departure day - no overnight stay)
-          const daysWithHotels = content.days.slice(0, -1);
-          daysWithHotels.forEach((day: any) => {
-            if (day.hotel_suggestion && day.hotel_suggestion.trim()) {
-              hotelSet.add(day.hotel_suggestion.trim());
-            }
-          });
-          hotels = Array.from(hotelSet);
-        }
-
-        // Get customer data
-        if (itinerary.inquiries) {
-          const inquiry = itinerary.inquiries as any;
-          let fullName = "";
-          if (inquiry.client_name) {
-            fullName = inquiry.client_name;
-          } else if (inquiry.first_name || inquiry.last_name) {
-            fullName = `${inquiry.first_name || ""} ${inquiry.last_name || ""}`.trim();
-          }
-
-          customerData = {
-            name: fullName,
-            email: inquiry.client_email || "",
-            country: inquiry.country || inquiry.client_nationality || null,
-            inquiry_id: inquiry.id,
-            group_inquiry_id: null,
-            type: "individual",
-          };
-        } else if (itinerary.group_inquiries) {
-          const groupInquiry = itinerary.group_inquiries as any;
-          customerData = {
-            name: `${groupInquiry.head_first_name || ""} ${groupInquiry.head_last_name || ""}`.trim(),
-            email: groupInquiry.client_email || groupInquiry.head_client_email || "",
-            country: groupInquiry.country || null,
-            inquiry_id: null,
-            group_inquiry_id: groupInquiry.id,
-            type: "group",
-          };
-        }
-      }
-    }
-    // Try individual inquiry
-    else if (effectiveInquiryId) {
-      const { data: inquiry } = await supabase
-        .from("inquiries")
-        .select("*")
-        .eq("id", effectiveInquiryId)
-        .single();
-
-      if (inquiry) {
-        // Handle both client_name (single field) and first_name/last_name (separate fields)
-        let fullName = "";
-        if (inquiry.client_name) {
-          fullName = inquiry.client_name;
-        } else if (inquiry.first_name || inquiry.last_name) {
-          fullName = `${inquiry.first_name || ""} ${inquiry.last_name || ""}`.trim();
-        }
-
+      } else if (bestMatch.client_name) {
         customerData = {
-          name: fullName,
-          email: inquiry.client_email || "",
-          country: inquiry.country || inquiry.client_nationality || null,
-          inquiry_id: inquiry.id,
-          group_inquiry_id: null,
-          type: "individual",
+          name: bestMatch.client_name,
+          email: "",
+          country: null,
+          inquiry_id: bestMatch.inquiry_id,
+          group_inquiry_id: bestMatch.group_inquiry_id,
+          type: bestMatch.group_inquiry_id ? "group" : "individual",
         };
       }
-    }
-    // Try group inquiry
-    else if (effectiveGroupInquiryId) {
-      const { data: groupInquiry } = await supabase
-        .from("group_inquiries")
-        .select("*")
-        .eq("id", effectiveGroupInquiryId)
-        .single();
 
-      if (groupInquiry) {
-        customerData = {
-          name: `${groupInquiry.head_first_name || ""} ${groupInquiry.head_last_name || ""}`.trim(),
-          email: groupInquiry.client_email || groupInquiry.head_client_email || "",
-          country: groupInquiry.country || null,
-          inquiry_id: null,
-          group_inquiry_id: groupInquiry.id,
-          type: "group",
-        };
+      // Extract Hotels
+      const itineraryObj = Array.isArray(bestMatch.itineraries) ? bestMatch.itineraries[0] : bestMatch.itineraries;
+      if (itineraryObj?.content) {
+        const content = typeof itineraryObj.content === 'string' ? JSON.parse(itineraryObj.content) : itineraryObj.content;
+        if (content?.days) {
+          const hSet = new Set<string>();
+          const days = content.days.length > 1 ? content.days.slice(0, -1) : content.days;
+          days.forEach((d: any) => { if (d.hotel_suggestion) hSet.add(d.hotel_suggestion.trim()); });
+          hotels = Array.from(hSet);
+        }
+      }
+
+      // Extract Driver info
+      const driverObj = Array.isArray(bestMatch.drivers) ? bestMatch.drivers[0] : bestMatch.drivers;
+      if (driverObj) {
+        driverData = { id: driverObj.id, name: driverObj.name, vehicle_type: driverObj.vehicle_type, vehicle_number: driverObj.vehicle_number };
+        vehicleData = { type: driverObj.vehicle_type, number: driverObj.vehicle_number };
+      }
+
+      // Fallback 1: Direct lookup if tour has driver_id but join failed
+      if (!driverData && bestMatch.driver_id) {
+        console.log("Joined driver data null, attempting direct lookup for driver_id:", bestMatch.driver_id);
+        const { data: directDriver } = await supabase.from("drivers").select("*").eq("id", bestMatch.driver_id).maybeSingle();
+        if (directDriver) {
+          driverData = { id: directDriver.id, name: directDriver.name, vehicle_type: directDriver.vehicle_type, vehicle_number: directDriver.vehicle_number };
+          vehicleData = { type: directDriver.vehicle_type, number: directDriver.vehicle_number };
+        }
+      }
+
+      // Fallback 2: "Own Logic" - Search across ALL other tours for this inquiry to find a driver assignment
+      if (!driverData && (bestMatch.inquiry_id || bestMatch.group_inquiry_id)) {
+        console.log("No driver found on best tour, searching alternatives for inquiry:", bestMatch.inquiry_id || bestMatch.group_inquiry_id);
+        const { data: altTours } = await supabase
+          .from("tours")
+          .select("*, drivers(*)")
+          .or(`inquiry_id.eq.${bestMatch.inquiry_id},group_inquiry_id.eq.${bestMatch.group_inquiry_id}`)
+          .not("driver_id", "is", null);
+
+        if (altTours && altTours.length > 0) {
+          const altWithDriver = altTours.find(t => t.drivers && (Array.isArray(t.drivers) ? t.drivers.length > 0 : true));
+          if (altWithDriver) {
+            const d = Array.isArray(altWithDriver.drivers) ? altWithDriver.drivers[0] : altWithDriver.drivers;
+            console.log("Found alternative tour with driver:", d.name);
+            driverData = { id: d.id, name: d.name, vehicle_type: d.vehicle_type, vehicle_number: d.vehicle_number };
+            vehicleData = { type: d.vehicle_type, number: d.vehicle_number };
+          }
+        }
       }
     }
 
@@ -511,18 +271,17 @@ export async function GET(request: Request) {
       hotels: hotels,
       driver: driverData,
       vehicle: vehicleData,
-      itinerary_id: effectiveItineraryId || null,
-      tour_id: effectiveTourId || null,
-      inquiry_id: customerData?.inquiry_id || effectiveInquiryId || null,
-      group_inquiry_id: customerData?.group_inquiry_id || effectiveGroupInquiryId || null,
+      tour_id: finalTourId,
+      itinerary_id: finalItineraryId,
+      inquiry_id: customerData?.inquiry_id || null,
+      group_inquiry_id: customerData?.group_inquiry_id || null,
       token_id: tokenId || null,
       is_from_token: !!token,
     });
+
   } catch (error: any) {
-    console.error("Error fetching prefill data:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to fetch data" },
-      { status: 500 }
-    );
+    console.error("Critical error in feedback prefill:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+

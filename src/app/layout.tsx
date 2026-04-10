@@ -1,39 +1,52 @@
 import type { Metadata } from "next";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
+import { SessionProvider } from "@/lib/auth/SessionProvider";
 import { ThemeProvider } from "@/lib/ThemeContext";
 
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-dm-sans",
+});
+
 export const metadata: Metadata = {
-  title: "TravX - Travel Agency Inquiry Management",
+  title: "TraveX - Travel Agency Inquiry Management",
   description: "Professional inquiry management system for travel agencies",
+  icons: {
+    icon: [
+      { url: "/Serendia.png" },
+      { url: "/Serendia.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/Serendia.png",
+  },
 };
+
+// Inline script: apply saved theme before first paint (prevents flash)
+const themeScript = `
+  (function() {
+    try {
+      var t = localStorage.getItem('theme');
+      if (t === 'light') document.documentElement.classList.add('light');
+    } catch(e) {}
+  })();
+`;
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const themeScript = `(() => {
-    try {
-      const storageKey = "theme";
-      const root = document.documentElement;
-      let theme = window.localStorage.getItem(storageKey);
-      if (theme !== "light" && theme !== "dark") {
-        theme = "dark";
-      }
-      root.classList.remove("light", "dark");
-      root.classList.add(theme);
-    } catch (_) {
-      // fail silently
-    }
-  })();`;
-
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={dmSans.variable} suppressHydrationWarning>
       <head>
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="antialiased bg-surface-900 text-surface-100 light:bg-surface-100 light:text-surface-900">
-        <ThemeProvider>{children}</ThemeProvider>
+      <body className="antialiased" suppressHydrationWarning>
+        <ThemeProvider>
+          <SessionProvider>{children}</SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

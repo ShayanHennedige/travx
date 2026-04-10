@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Select, RoomQuantitySelector } from "@/components/ui";
-import { FormSection, AnimatedSuccessCard } from "@/components/ui/FormSection";
 import {
   publicInquirySchema,
   countries,
   hotelTypes,
   roomCategories,
   activityOptions,
+  mealPlans,
 } from "@/lib/validations/inquiry";
 
 const countryOptions = countries.map((country) => ({
@@ -27,6 +27,11 @@ const roomCategoryOptions = roomCategories.map((cat) => ({
   label: cat,
 }));
 
+const mealPlanOptions = mealPlans.map((plan) => ({
+  value: plan,
+  label: plan,
+}));
+
 export function IndividualInquiryForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -34,6 +39,7 @@ export function IndividualInquiryForm() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
+  const [arrangedByAgent, setArrangedByAgent] = useState(false);
 
   // Room quantities state
   const [roomsDbl, setRoomsDbl] = useState(0);
@@ -42,25 +48,43 @@ export function IndividualInquiryForm() {
   const [roomsQtpl, setRoomsQtpl] = useState(0);
 
   const [formData, setFormData] = useState({
+    arranged_by_agent: false,
+    agent_name: "",
+    agent_email: "",
+    agent_company: "",
     first_name: "",
     last_name: "",
     passport_no: "",
     contact_number: "",
-    client_email: "",
+    client_email: "", // Keeping in state but will remove from UI or mark optional
     country: "",
     arriving_date: "",
     departure_date: "",
+    inbound_flight_no: "",
+    inbound_arrival_date: "",
+    inbound_arrival_time: "",
+    outbound_flight_no: "",
+    outbound_departure_date: "",
+    outbound_departure_time: "",
     no_of_pax: 1,
     no_of_children: 0,
     hotel_type: "",
     room_category: "",
+    meal_plan: "",
+    client_desires: "",
   });
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target as any;
+    if (type === "checkbox") {
+      const isChecked = (e.target as HTMLInputElement).checked;
+      setFormData((prev) => ({ ...prev, [name]: isChecked }));
+      setArrangedByAgent(isChecked);
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
     setFieldErrors((prev) => ({ ...prev, [name]: "" }));
     setError(null);
   };
@@ -77,11 +101,11 @@ export function IndividualInquiryForm() {
   // Calculate number of nights
   const calculateNights = () => {
     if (formData.arriving_date && formData.departure_date) {
-      const arriving = new Date(formData.arriving_date);
-      const departure = new Date(formData.departure_date);
+      const arriving = new Date(formData.arriving_date + 'T00:00:00');
+      const departure = new Date(formData.departure_date + 'T00:00:00');
       const diffTime = departure.getTime() - arriving.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays > 0 ? diffDays : 0;
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays);
     }
     return 0;
   };
@@ -98,6 +122,8 @@ export function IndividualInquiryForm() {
     try {
       const dataToValidate = {
         ...formData,
+        inbound_arrival_date: formData.inbound_arrival_date || formData.arriving_date || "",
+        outbound_departure_date: formData.outbound_departure_date || formData.departure_date || "",
         rooms_dbl: roomsDbl,
         rooms_sgl: roomsSgl,
         rooms_tpl: roomsTpl,
@@ -144,38 +170,124 @@ export function IndividualInquiryForm() {
 
   if (submitted) {
     return (
-      <AnimatedSuccessCard className="card max-w-md mx-auto p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-900/50 light:bg-green-100 border border-green-700 light:border-green-200 flex items-center justify-center">
-          <svg className="w-8 h-8 text-green-400 light:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="card max-w-md mx-auto p-8 text-center animate-fade-in">
+        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
+          <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-2xl font-semibold text-surface-100 light:text-surface-900 mb-2">
+        <h1 className="text-2xl font-semibold text-surface-900 mb-2">
           Thank You!
         </h1>
-        <p className="text-surface-300 light:text-surface-600 mb-6">
+        <p className="text-surface-600 mb-6">
           Your travel inquiry has been submitted successfully. Our team will review your request and get back to you shortly.
         </p>
         <Button variant="primary" onClick={() => router.refresh()}>
           Submit Another Inquiry
         </Button>
-      </AnimatedSuccessCard>
+      </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="p-4 bg-red-900/30 light:bg-red-50 border border-red-700 light:border-red-200 rounded-lg">
-          <p className="text-sm text-red-300 light:text-red-700">{error}</p>
+        <div className="p-4 bg-accent-500/10 border border-accent-500/30 rounded-lg">
+          <p className="text-sm text-accent-600">{error}</p>
         </div>
       )}
 
-      {/* Personal Information */}
-      <FormSection index={0} className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
-          Personal Information
-        </h3>
+      {/* Trip Arrangement Type */}
+      <div className="card p-6 animate-slide-up">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+            <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-surface-900">
+              Trip Arrangement
+            </h3>
+            <p className="text-sm text-surface-500">How is this trip being arranged?</p>
+          </div>
+        </div>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            name="arranged_by_agent"
+            checked={arrangedByAgent}
+            onChange={handleChange}
+            className="w-5 h-5 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
+          />
+          <span className="text-sm font-medium text-surface-700">This trip is arranged by a travel agent</span>
+        </label>
+      </div>
+
+      {/* Travel Agent Details - Conditionally Visible */}
+      {arrangedByAgent && (
+        <div className="card p-6 animate-slide-up">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+              <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-surface-900">
+                Travel Agent Details
+              </h3>
+              <p className="text-sm text-surface-500">Agent information for this booking</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Agent Name"
+              name="agent_name"
+              value={formData.agent_name}
+              onChange={handleChange}
+              error={fieldErrors.agent_name}
+              placeholder="Enter agent name"
+              required={arrangedByAgent}
+            />
+            <Input
+              label="Agent Email"
+              name="agent_email"
+              type="email"
+              value={formData.agent_email}
+              onChange={handleChange}
+              error={fieldErrors.agent_email}
+              placeholder="agent@example.com"
+              required={arrangedByAgent}
+            />
+            <Input
+              label="Agent Company"
+              name="agent_company"
+              value={formData.agent_company}
+              onChange={handleChange}
+              error={fieldErrors.agent_company}
+              placeholder="Enter company name"
+              className="md:col-span-2"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Client Details */}
+      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.05s" }}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+            <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-surface-900">
+              Client Details
+            </h3>
+            <p className="text-sm text-surface-500">Essential client information</p>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="First Name"
@@ -183,8 +295,7 @@ export function IndividualInquiryForm() {
             value={formData.first_name}
             onChange={handleChange}
             error={fieldErrors.first_name}
-            placeholder="Enter your first name"
-            required
+            placeholder="Enter client first name"
           />
           <Input
             label="Last Name"
@@ -192,53 +303,31 @@ export function IndividualInquiryForm() {
             value={formData.last_name}
             onChange={handleChange}
             error={fieldErrors.last_name}
-            placeholder="Enter your last name"
-            required
+            placeholder="Enter client last name"
           />
           <Input
-            label="Passport No"
+            label="Passport Number"
             name="passport_no"
             value={formData.passport_no}
             onChange={handleChange}
             error={fieldErrors.passport_no}
             placeholder="Enter passport number"
           />
-          <Input
-            label="Contact Number"
-            name="contact_number"
-            type="tel"
-            value={formData.contact_number}
-            onChange={handleChange}
-            error={fieldErrors.contact_number}
-            placeholder="+94 77 123 4567"
-            required
-          />
-          <Input
-            label="Email"
-            name="client_email"
-            type="email"
-            value={formData.client_email}
-            onChange={handleChange}
-            error={fieldErrors.client_email}
-            placeholder="you@example.com"
-            required
-          />
           <Select
-            label="Country"
+            label="Client Country"
             name="country"
             value={formData.country}
             onChange={handleChange}
             options={countryOptions}
             error={fieldErrors.country}
-            placeholder="Select your country"
-            required
+            placeholder="Select client country"
           />
         </div>
-      </FormSection>
+      </div>
 
       {/* Travel Dates */}
-      <FormSection index={1} className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
+      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">
           Travel Dates
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -252,6 +341,22 @@ export function IndividualInquiryForm() {
             required
           />
           <Input
+            label="Arrival Flight No"
+            name="inbound_flight_no"
+            value={formData.inbound_flight_no}
+            onChange={handleChange}
+            error={fieldErrors.inbound_flight_no}
+            placeholder="e.g. UL 101"
+          />
+          <Input
+            label="Arrival Time"
+            name="inbound_arrival_time"
+            type="time"
+            value={formData.inbound_arrival_time}
+            onChange={handleChange}
+            error={fieldErrors.inbound_arrival_time}
+          />
+          <Input
             label="Departure Date"
             name="departure_date"
             type="date"
@@ -260,18 +365,35 @@ export function IndividualInquiryForm() {
             error={fieldErrors.departure_date}
             required
           />
-          <div>
-            <label className="label">No. of Nights</label>
-            <div className="input bg-surface-800 light:bg-surface-100 text-surface-200 light:text-surface-800 flex items-center border-surface-600 light:border-surface-300">
-              {calculateNights()} nights
-            </div>
+          <Input
+            label="Departure Flight No"
+            name="outbound_flight_no"
+            value={formData.outbound_flight_no}
+            onChange={handleChange}
+            error={fieldErrors.outbound_flight_no}
+            placeholder="e.g. UL 102"
+          />
+          <Input
+            label="Departure Time"
+            name="outbound_departure_time"
+            type="time"
+            value={formData.outbound_departure_time}
+            onChange={handleChange}
+            error={fieldErrors.outbound_departure_time}
+          />
+        </div>
+
+        <div className="mt-4 md:w-1/3">
+          <label className="label">No. of Nights</label>
+          <div className="input bg-surface-50 text-surface-700 flex items-center">
+            {calculateNights()} nights
           </div>
         </div>
-      </FormSection>
+      </div>
 
       {/* Travelers */}
-      <FormSection index={2} className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
+      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.15s" }}>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">
           Number of Travelers
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -297,11 +419,11 @@ export function IndividualInquiryForm() {
             error={fieldErrors.no_of_children}
           />
         </div>
-      </FormSection>
+      </div>
 
       {/* Accommodation */}
-      <FormSection index={3} className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">
+      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.2s" }}>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">
           Accommodation Preferences
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -325,24 +447,33 @@ export function IndividualInquiryForm() {
             placeholder="Select category"
             required
           />
+          <Select
+            label="Meal Plan"
+            name="meal_plan"
+            value={formData.meal_plan}
+            onChange={handleChange}
+            options={mealPlanOptions}
+            error={fieldErrors.meal_plan}
+            placeholder="Select meal plan"
+          />
         </div>
 
         {/* Room Quantities */}
-        <div className="border-t border-surface-600 light:border-surface-200 pt-6">
+        <div className="border-t border-surface-200 pt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h4 className="font-medium text-surface-100 light:text-surface-900">Number of Rooms</h4>
-              <p className="text-sm text-surface-400 light:text-surface-500">Select the number of each room type you need</p>
+              <h4 className="font-medium text-surface-900">Number of Rooms</h4>
+              <p className="text-sm text-surface-500">Select the number of each room type you need</p>
             </div>
             {totalRooms > 0 && (
-              <span className="px-3 py-1 bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-800 rounded-full text-sm font-medium border border-primary-700/50 light:border-primary-200">
+              <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
                 {totalRooms} room{totalRooms !== 1 ? "s" : ""} selected
               </span>
             )}
           </div>
-          
+
           {fieldErrors.rooms && (
-            <p className="text-sm text-red-600 mb-3">{fieldErrors.rooms}</p>
+            <p className="text-sm text-accent-500 mb-3">{fieldErrors.rooms}</p>
           )}
 
           <div className="space-y-3">
@@ -372,28 +503,27 @@ export function IndividualInquiryForm() {
             />
           </div>
         </div>
-      </FormSection>
+      </div>
 
       {/* Activities */}
-      <FormSection index={4} className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 mb-2">
+      <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.25s" }}>
+        <h3 className="text-lg font-semibold text-surface-900 mb-2">
           Activities
         </h3>
-        <p className="text-sm text-surface-400 light:text-surface-500 mb-4">
+        <p className="text-sm text-surface-500 mb-4">
           Select the activities you are interested in
         </p>
         {fieldErrors.activities && (
-          <p className="text-sm text-red-600 mb-3">{fieldErrors.activities}</p>
+          <p className="text-sm text-accent-500 mb-3">{fieldErrors.activities}</p>
         )}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {activityOptions.map((activity) => (
             <label
               key={activity}
-              className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                selectedActivities.includes(activity)
-                  ? "border-primary-500 bg-primary-900/50 light:bg-primary-50"
-                  : "border-surface-600 light:border-surface-300 hover:border-surface-500 light:hover:border-surface-400 bg-surface-800 light:bg-white"
-              }`}
+              className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${selectedActivities.includes(activity)
+                ? "border-primary-500 bg-primary-50"
+                : "border-surface-200 hover:border-surface-300 bg-white"
+                }`}
             >
               <input
                 type="checkbox"
@@ -401,17 +531,33 @@ export function IndividualInquiryForm() {
                 onChange={() => toggleActivity(activity)}
                 className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
               />
-              <span className={`text-sm font-medium ${
-                selectedActivities.includes(activity)
-                  ? "text-primary-300 light:text-primary-700"
-                  : "text-surface-300 light:text-surface-600"
-              }`}>
+              <span className={`text-sm font-medium ${selectedActivities.includes(activity)
+                ? "text-primary-700"
+                : "text-surface-700"
+                }`}>
                 {activity}
               </span>
             </label>
           ))}
         </div>
-      </FormSection>
+
+        {/* Client Desires */}
+        <div className="mt-6 pt-6 border-t border-surface-200">
+          <label className="label mb-2 block">
+            Client Desires / Preferred Places (Optional)
+          </label>
+          <textarea
+            name="client_desires"
+            value={formData.client_desires}
+            onChange={handleChange}
+            placeholder="Type client desires, places, etc. in plain English..."
+            className="input min-h-25 py-3 resize-none"
+          />
+          <p className="text-xs text-surface-500 mt-2">
+            This will help us personalize the itinerary according to client requirements.
+          </p>
+        </div>
+      </div>
 
       {/* Submit */}
       <div className="flex justify-center pt-4">

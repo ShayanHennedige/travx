@@ -131,12 +131,12 @@ export function ItineraryGenerator({ inquiryId, existingItinerary }: ItineraryGe
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-surface-900">
-              AI Travel Itinerary
+              Travel Itinerary
             </h2>
             <p className="text-sm text-surface-500 mt-1">
               {itinerary 
                 ? "Itinerary generated. You can edit or regenerate."
-                : "Generate a day-by-day travel plan using AI"
+                : "Generate a day-by-day travel plan"
               }
             </p>
           </div>
@@ -236,8 +236,8 @@ export function ItineraryGenerator({ inquiryId, existingItinerary }: ItineraryGe
         )}
 
         {error && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="mt-4 p-4 bg-accent-500/10 border border-accent-500/30 rounded-lg">
+            <p className="text-sm text-accent-500">{error}</p>
           </div>
         )}
       </div>

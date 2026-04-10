@@ -113,7 +113,11 @@ export async function POST(request: Request) {
 **Accommodation:**
 - Hotel Star Category: ${inquiry.hotel_type || "4-5 Star"}
 - Room Category: ${inquiry.room_category || "Deluxe"}
+- Meal Plan: ${inquiry.meal_plan || "Not specified"}
 - Rooms Required: ${(inquiry.rooms_dbl || 0)} Double, ${(inquiry.rooms_sgl || 0)} Single, ${(inquiry.rooms_tpl || 0)} Triple, ${(inquiry.rooms_qtpl || 0)} Quad
+
+**Client Desires & Preferences:**
+${inquiry.client_desires || "No specific desires mentioned. Please follow standard best practices for the chosen activities."}
 
 **Preferred Activities:**
 ${inquiry.activities && (inquiry.activities as string[]).length > 0
@@ -124,10 +128,11 @@ Please create a realistic, well-paced itinerary that:
 1. Starts from Colombo airport (Katunayake) on Day 1
 2. Ends back at Colombo airport (Katunayake) on the final day
 3. Incorporates the selected activities logically
-4. Suggests appropriate hotels for the ${inquiry.hotel_type || "4-5 Star"} category
+4. Suggesting appropriate hotels for the ${inquiry.hotel_type || "4-5 Star"} category and considering the ${inquiry.meal_plan || "selected"} meal plan
 5. Considers the group has ${inquiry.no_of_children || 0} children (if any, include family-friendly options)
-6. The mileage for each day itinerary should be displayed in km.
-7. MANDATORY FORMAT: Every driving_distance_km field MUST be "X km from [Origin] to [Destination]". Examples: "10 km from Katunayake Airport to Negombo", "150 km from Negombo to Sigiriya", "80 km from Kandy to Nuwara Eliya". Never use incomplete formats.
+6. Closely following the "Client Desires & Preferences" mentioned above to reform and personalize the itinerary
+7. The mileage for each day itinerary should be displayed in km.
+8. MANDATORY FORMAT: Every driving_distance_km field MUST be "X km from [Origin] to [Destination]". Examples: "10 km from Katunayake Airport to Negombo", "150 km from Negombo to Sigiriya", "80 km from Kandy to Nuwara Eliya". Never use incomplete formats.
 
 Return ONLY the JSON object, no additional text.`;
 
@@ -191,6 +196,7 @@ Return ONLY the JSON object, no additional text.`;
         model: openaiData.model,
         tokens_used: openaiData.usage?.total_tokens,
         generation_time_ms: generationTime,
+        status: "completed",
       })
       .select()
       .single();
@@ -202,6 +208,12 @@ Return ONLY the JSON object, no additional text.`;
         { status: 500 }
       );
     }
+
+    // Automatically update inquiry status to 'in_progress'
+    await supabase
+      .from("inquiries")
+      .update({ status: "in_progress" })
+      .eq("id", inquiry_id);
 
     return NextResponse.json({
       success: true,

@@ -1,4 +1,4 @@
-# TravX - 360° Travel Agency Inquiry Management System
+# Serendia Hub - 360° Travel Agency Inquiry Management System
 
 A production-ready Inquiry Module for a Travel Agency Management System built with Next.js 16, TypeScript, Tailwind CSS, and Supabase.
 

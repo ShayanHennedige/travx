@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { IndividualInquiryForm } from "./IndividualInquiryForm";
 import { GroupInquiryForm } from "./GroupInquiryForm";
 
@@ -10,42 +11,46 @@ export default function PublicInquiryPage() {
   const [inquiryType, setInquiryType] = useState<InquiryType>("individual");
 
   return (
-    <div className="min-h-screen bg-surface-900 light:bg-surface-100">
+    <div className="min-h-screen bg-[#f8fafc]">
       {/* Header */}
-      <header className="bg-surface-800 light:bg-white border-b border-surface-600 light:border-surface-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
-              <span className="text-white font-bold">TX</span>
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-surface-100 light:text-surface-900">TravX</h1>
-              <p className="text-xs text-surface-400 light:text-surface-500">Travel Inquiry Form</p>
-            </div>
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-10 transition-all duration-300">
+        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="relative w-40 h-14">
+            <Image
+              src="/Serendia.png"
+              alt="TraveX"
+              fill
+              className="object-contain object-left"
+              priority
+            />
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+              Official Inquiry Form
+            </p>
           </div>
         </div>
       </header>
 
       {/* Form */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-surface-100 light:text-surface-900 mb-2">
+      <main className="max-w-3xl mx-auto px-6 py-12">
+        <div className="mb-10 text-center space-y-4">
+          <h2 className="text-4xl font-bold text-slate-900 tracking-tight">
             Plan Your Perfect Trip
           </h2>
-          <p className="text-surface-300 light:text-surface-600 mb-6">
-            Fill out the form below and our travel experts will create a customized itinerary for you.
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+            Tell us about your dream vacation, and our experts will craft a personalized itinerary just for you.
           </p>
 
           {/* Toggle Switch */}
-          <div className="inline-flex items-center bg-surface-700 light:bg-surface-200 rounded-xl p-1.5">
+          <div className="inline-flex items-center bg-white border border-slate-200 rounded-xl p-1.5 shadow-sm mt-6">
             <button
               type="button"
               onClick={() => setInquiryType("individual")}
-              className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                inquiryType === "individual"
-                  ? "bg-surface-600 light:bg-surface-300 text-primary-300 light:text-primary-700 shadow-sm"
-                  : "text-surface-400 light:text-surface-600 hover:text-surface-200 light:hover:text-surface-900"
-              }`}
+              className={`px-8 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${inquiryType === "individual"
+                  ? "bg-slate-900 text-white shadow-md"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                }`}
             >
               <span className="flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -57,11 +62,10 @@ export default function PublicInquiryPage() {
             <button
               type="button"
               onClick={() => setInquiryType("group")}
-              className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                inquiryType === "group"
-                  ? "bg-surface-600 light:bg-surface-300 text-primary-300 light:text-primary-700 shadow-sm"
-                  : "text-surface-400 light:text-surface-600 hover:text-surface-200 light:hover:text-surface-900"
-              }`}
+              className={`px-8 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${inquiryType === "group"
+                  ? "bg-slate-900 text-white shadow-md"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                }`}
             >
               <span className="flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -72,8 +76,8 @@ export default function PublicInquiryPage() {
             </button>
           </div>
 
-          <p className="text-xs text-surface-400 light:text-surface-500 mt-3">
-            {inquiryType === "individual" 
+          <p className="text-xs text-slate-500 font-medium">
+            {inquiryType === "individual"
               ? "For solo travelers, couples, or families"
               : "For groups of 5 or more travelers"
             }
@@ -81,15 +85,23 @@ export default function PublicInquiryPage() {
         </div>
 
         {/* Render the appropriate form */}
-        {inquiryType === "individual" ? (
-          <IndividualInquiryForm />
-        ) : (
-          <GroupInquiryForm />
-        )}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden p-1">
+          {inquiryType === "individual" ? (
+            <IndividualInquiryForm />
+          ) : (
+            <GroupInquiryForm />
+          )}
+        </div>
 
         {/* Footer */}
-        <footer className="mt-12 text-center text-sm text-surface-400 light:text-surface-500">
-          <p>Need help? Contact us at support@travx.com</p>
+        <footer className="mt-12 text-center border-t border-slate-200 pt-8 pb-4">
+          <p className="text-sm text-slate-500 mb-2">Need assistance?</p>
+          <a href="mailto:info@Travex.com" className="text-primary-600 font-semibold hover:text-primary-700 transition-colors">
+            info@Travex.com
+          </a>
+          <p className="text-xs text-slate-400 mt-8">
+            &copy; {new Date().getFullYear()} TraveX. All rights reserved.
+          </p>
         </footer>
       </main>
     </div>

@@ -117,7 +117,7 @@ export async function POST(request: Request) {
 - Arrival Airport: CMB (Colombo Bandaranaike International Airport)
 
 **Group Information:**
-- Group Leader: ${inquiry.head_first_name} ${inquiry.head_last_name}
+- Group Leader: ${inquiry.head_first_name ? `${inquiry.head_first_name} ${inquiry.head_last_name}` : "Valued Guest"}
 - Total Group Size: ${totalPax} travelers
 - Adults: ${adultCount}
 - Children: ${childCount}
@@ -125,8 +125,12 @@ export async function POST(request: Request) {
 **Accommodation:**
 - Hotel Star Category: ${inquiry.hotel_type || "4-5 Star"}
 - Room Category: ${inquiry.room_category || "Deluxe"}
+- Meal Plan: ${inquiry.meal_plan || "Not specified"}
 - Rooms Required: ${(inquiry.rooms_dbl || 0)} Double, ${(inquiry.rooms_sgl || 0)} Single, ${(inquiry.rooms_tpl || 0)} Triple, ${(inquiry.rooms_qtpl || 0)} Quad
 - Total Rooms: ${(inquiry.rooms_dbl || 0) + (inquiry.rooms_sgl || 0) + (inquiry.rooms_tpl || 0) + (inquiry.rooms_qtpl || 0)}
+
+**Client Desires & Preferences:**
+${inquiry.client_desires || "No specific desires mentioned. Please follow standard best practices for group travel in Sri Lanka."}
 
 **Preferred Activities:**
 ${inquiry.activities && (inquiry.activities as string[]).length > 0
@@ -137,13 +141,14 @@ Please create a realistic, well-paced GROUP TOUR itinerary that:
 1. Starts from Colombo airport (Katunayake) on Day 1
 2. Ends back at Colombo airport (Katunayake) on the final day
 3. Incorporates the selected activities logically
-4. Suggests appropriate hotels for the ${inquiry.hotel_type || "4-5 Star"} category that can accommodate groups
+4. Suggesting appropriate hotels for the ${inquiry.hotel_type || "4-5 Star"} category and considering the ${inquiry.meal_plan || "selected"} meal plan
 5. ${childCount > 0 ? `Includes family-friendly options for the ${childCount} children in the group` : "Focuses on adult-oriented experiences"}
-6. Considers group dynamics - allow buffer time for group coordination
-7. Recommends group-friendly restaurants and venues
-8. Suggests a suitable transport arrangement for ${totalPax} travelers
-9. The mileage for each day itinerary should be displayed in km.
-10. MANDATORY FORMAT: Every driving_distance_km field MUST be "X km from [Origin] to [Destination]". Examples: "10 km from Katunayake Airport to Negombo", "150 km from Negombo to Sigiriya", "80 km from Kandy to Nuwara Eliya". Never use incomplete formats.
+6. Closely following the "Client Desires & Preferences" mentioned above to reform and personalize the group itinerary
+7. Considers group dynamics - allow buffer time for group coordination
+8. Recommends group-friendly restaurants and venues
+9. Suggests a suitable transport arrangement for ${totalPax} travelers
+10. The mileage for each day itinerary should be displayed in km.
+11. MANDATORY FORMAT: Every driving_distance_km field MUST be "X km from [Origin] to [Destination]". Examples: "10 km from Katunayake Airport to Negombo", "150 km from Negombo to Sigiriya", "80 km from Kandy to Nuwara Eliya". Never use incomplete formats.
 
 Return ONLY the JSON object, no additional text.`;
 
@@ -207,6 +212,7 @@ Return ONLY the JSON object, no additional text.`;
         model: openaiData.model,
         tokens_used: openaiData.usage?.total_tokens,
         generation_time_ms: generationTime,
+        status: "completed",
       })
       .select()
       .single();
@@ -218,6 +224,12 @@ Return ONLY the JSON object, no additional text.`;
         { status: 500 }
       );
     }
+
+    // Automatically update group inquiry status to 'in_progress'
+    await supabase
+      .from("group_inquiries")
+      .update({ status: "in_progress" })
+      .eq("id", group_inquiry_id);
 
     return NextResponse.json({
       success: true,

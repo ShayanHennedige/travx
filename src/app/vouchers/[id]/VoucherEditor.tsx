@@ -102,13 +102,48 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const toNumberOrNull = (value: unknown) => {
+        if (value === "" || value === null || value === undefined) return null;
+        const parsed = Number(value);
+        return Number.isNaN(parsed) ? null : parsed;
+      };
+
+      const normalizedPayload = {
+        ...formData,
+        pax_adults: Number(formData.pax_adults) || 0,
+        pax_children: Number(formData.pax_children) || 0,
+        pax_infants: Number(formData.pax_infants) || 0,
+        no_of_rooms: Number(formData.no_of_rooms) || 1,
+        no_of_nights: Number(formData.no_of_nights) || 0,
+        room_rate_sgl: toNumberOrNull(formData.room_rate_sgl),
+        room_rate_dbl: toNumberOrNull(formData.room_rate_dbl),
+        room_rate_tpl: toNumberOrNull(formData.room_rate_tpl),
+        arrival_time: formData.arrival_time || null,
+        departure_time: formData.departure_time || null,
+        confirmed_date: formData.confirmed_date || null,
+        booked_date: formData.booked_date || null,
+        confirmed_by: formData.confirmed_by || null,
+        booked_by: formData.booked_by || null,
+        remarks: formData.remarks || null,
+        nationality: formData.nationality || null,
+      };
+
       const response = await fetch(`/api/vouchers/${voucher.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(normalizedPayload),
       });
 
-      if (!response.ok) throw new Error("Failed to save");
+      if (!response.ok) {
+        let message = "Failed to save";
+        try {
+          const payload = await response.json();
+          message = payload?.error || message;
+        } catch {
+          // Keep fallback message if response is not JSON
+        }
+        throw new Error(message);
+      }
 
       router.refresh();
       alert("Voucher saved successfully!");
@@ -116,7 +151,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
       router.push("/vouchers");
     } catch (error) {
       console.error("Save error:", error);
-      alert("Failed to save voucher");
+      alert(error instanceof Error ? error.message : "Failed to save voucher");
     } finally {
       setIsSaving(false);
     }

@@ -18,6 +18,23 @@ interface AnalyticsData {
   lowScores: Array<{ category: string; score: number; feedbackId: string }>;
   keywords: Record<string, number>;
   totalFeedback: number;
+  driverPerformance: Array<{
+    name: string;
+    vehicleType: string;
+    averageScore: number;
+    reviewCount: number;
+  }>;
+  hotelPerformance: Array<{
+    name: string;
+    averageScore: number;
+    reviewCount: number;
+  }>;
+  vehiclePerformance: Array<{
+    type: string;
+    number: string;
+    averageScore: number;
+    reviewCount: number;
+  }>;
 }
 
 export function AnalyticsSection() {
@@ -74,22 +91,22 @@ export function AnalyticsSection() {
   if (loading) {
     return (
       <div className="card p-12 text-center">
-        <div className="w-12 h-12 mx-auto mb-4 border-4 border-surface-500 light:border-surface-300 border-t-primary-600 rounded-full animate-spin" />
-        <p className="text-surface-400 light:text-surface-500">Loading analytics...</p>
+        <div className="w-12 h-12 mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+        <p className="text-surface-600">Loading analytics...</p>
       </div>
     );
   }
 
-  if (!analytics || analytics.totalFeedback === 0) {
+  if (!analytics || (analytics.totalFeedback === 0 && analytics.driverPerformance.length === 0)) {
     return (
       <div className="card p-12 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-700 light:bg-surface-200 flex items-center justify-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-100 flex items-center justify-center">
           <svg className="w-8 h-8 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-surface-100 light:text-surface-900 mb-1">No Feedback Data</h3>
-        <p className="text-surface-400 light:text-surface-500">No feedback has been submitted yet for the selected filters.</p>
+        <h3 className="text-lg font-medium text-surface-900 mb-1">No Feedback Data</h3>
+        <p className="text-surface-500">No feedback has been submitted yet for the selected filters.</p>
       </div>
     );
   }
@@ -100,39 +117,39 @@ export function AnalyticsSection() {
       <div className="card p-4">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
-            <label className="block text-xs font-medium text-surface-300 light:text-surface-600 mb-1">From Date</label>
+            <label className="block text-xs font-medium text-surface-700 mb-1">From Date</label>
             <input
               type="date"
               value={filters.date_from}
               onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-surface-100 light:text-surface-900"
+              className="w-full px-3 py-2 text-sm border border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-surface-300 light:text-surface-600 mb-1">To Date</label>
+            <label className="block text-xs font-medium text-surface-700 mb-1">To Date</label>
             <input
               type="date"
               value={filters.date_to}
               onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-surface-100 light:text-surface-900"
+              className="w-full px-3 py-2 text-sm border border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-surface-300 light:text-surface-600 mb-1">Country</label>
+            <label className="block text-xs font-medium text-surface-700 mb-1">Country</label>
             <input
               type="text"
               value={filters.country}
               onChange={(e) => setFilters({ ...filters, country: e.target.value })}
               placeholder="Filter by country"
-              className="w-full px-3 py-2 text-sm border border-surface-600 light:border-surface-300 bg-surface-800 light:bg-white rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none text-surface-100 light:text-surface-900 placeholder:text-surface-500 light:placeholder:text-surface-400"
+              className="w-full px-3 py-2 text-sm border border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-surface-300 light:text-surface-600 mb-1">Age Group</label>
+            <label className="block text-xs font-medium text-surface-700 mb-1">Age Group</label>
             <select
               value={filters.age_group}
               onChange={(e) => setFilters({ ...filters, age_group: e.target.value })}
-              className="w-full px-3 py-2 text-sm border border-surface-600 light:border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none bg-surface-800 light:bg-white text-surface-100 light:text-surface-900"
+              className="w-full px-3 py-2 text-sm border border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none bg-white"
             >
               <option value="">All Ages</option>
               <option value="Under 18">Under 18</option>
@@ -165,30 +182,30 @@ export function AnalyticsSection() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-surface-400 light:text-surface-500">Total Feedback</p>
+            <p className="text-sm text-surface-500">Total Feedback</p>
           </div>
-          <p className="text-3xl font-bold text-surface-100 light:text-surface-900">{analytics.totalFeedback}</p>
+          <p className="text-3xl font-bold text-surface-900">{analytics.totalFeedback}</p>
         </div>
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-surface-500 light:text-surface-600">Overall Happiness</p>
+            <p className="text-sm text-surface-500">Overall Happiness</p>
             <Badge variant={getHappinessColor(analytics.overallHappiness)}>
               {getHappinessLabel(analytics.overallHappiness)}
             </Badge>
           </div>
-          <p className="text-3xl font-bold text-surface-100 light:text-surface-900">{analytics.overallHappiness}%</p>
+          <p className="text-3xl font-bold text-surface-900">{analytics.overallHappiness}%</p>
         </div>
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-surface-500 light:text-surface-600">Low Scores (&lt; 60%)</p>
+            <p className="text-sm text-surface-500">Low Scores (&lt; 60%)</p>
           </div>
-          <p className="text-3xl font-bold text-red-400 light:text-red-600">{analytics.lowScores.length}</p>
+          <p className="text-3xl font-bold text-accent-500">{analytics.lowScores.length}</p>
         </div>
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-surface-500 light:text-surface-600">Countries</p>
+            <p className="text-sm text-surface-500">Countries</p>
           </div>
-          <p className="text-3xl font-bold text-surface-100 light:text-surface-900">
+          <p className="text-3xl font-bold text-surface-900">
             {Object.keys(analytics.countryDistribution).length}
           </p>
         </div>
@@ -196,29 +213,28 @@ export function AnalyticsSection() {
 
       {/* Category Happiness */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Happiness by Category</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">Happiness by Category</h3>
         <div className="space-y-4">
           {Object.entries(analytics.categoryHappiness).map(([category, score]) => (
             <div key={category}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-surface-300 light:text-surface-600 capitalize">
+                <span className="text-sm font-medium text-surface-700 capitalize">
                   {category.replace(/([A-Z])/g, " $1").trim()}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-surface-100 light:text-surface-900">{score}%</span>
+                  <span className="text-sm font-bold text-surface-900">{score}%</span>
                   <Badge variant={getHappinessColor(score)}>
                     {getHappinessLabel(score)}
                   </Badge>
                 </div>
               </div>
-              <div className="w-full bg-surface-700 light:bg-surface-200 rounded-full h-3">
+              <div className="w-full bg-surface-200 rounded-full h-3">
                 <div
-                  className={`h-3 rounded-full transition-all ${
-                    score < 50 ? "bg-red-500" :
+                  className={`h-3 rounded-full transition-all ${score < 50 ? "bg-accent-500" :
                     score < 70 ? "bg-orange-500" :
-                    score < 90 ? "bg-blue-500" :
-                    "bg-green-500"
-                  }`}
+                      score < 90 ? "bg-blue-500" :
+                        "bg-green-500"
+                    }`}
                   style={{ width: `${score}%` }}
                 />
               </div>
@@ -231,7 +247,7 @@ export function AnalyticsSection() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Country Distribution */}
         <div className="card p-6">
-          <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Country Distribution</h3>
+          <h3 className="text-lg font-semibold text-surface-900 mb-4">Country Distribution</h3>
           <div className="space-y-3 max-h-64 overflow-y-auto">
             {Object.entries(analytics.countryDistribution)
               .sort(([, a], [, b]) => b - a)
@@ -241,7 +257,7 @@ export function AnalyticsSection() {
                   <div key={country}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-surface-700">{country}</span>
-                      <span className="text-sm text-surface-500 light:text-surface-600">{count} ({percentage}%)</span>
+                      <span className="text-sm text-surface-500">{count} ({percentage}%)</span>
                     </div>
                     <div className="w-full bg-surface-200 rounded-full h-2">
                       <div
@@ -257,7 +273,7 @@ export function AnalyticsSection() {
 
         {/* Age Group Distribution */}
         <div className="card p-6">
-          <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Age Group Distribution</h3>
+          <h3 className="text-lg font-semibold text-surface-900 mb-4">Age Group Distribution</h3>
           <div className="space-y-3 max-h-64 overflow-y-auto">
             {Object.entries(analytics.ageGroupDistribution)
               .sort(([, a], [, b]) => b - a)
@@ -267,7 +283,7 @@ export function AnalyticsSection() {
                   <div key={ageGroup}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-surface-700">{ageGroup}</span>
-                      <span className="text-sm text-surface-500 light:text-surface-600">{count} ({percentage}%)</span>
+                      <span className="text-sm text-surface-500">{count} ({percentage}%)</span>
                     </div>
                     <div className="w-full bg-surface-200 rounded-full h-2">
                       <div
@@ -282,20 +298,131 @@ export function AnalyticsSection() {
         </div>
       </div>
 
+      {/* Detailed Performance Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Driver Performance */}
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-surface-900 mb-4">Top Drivers</h3>
+          <div className="overflow-y-auto max-h-80">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-surface-50 text-surface-500 font-medium">
+                <tr>
+                  <th className="px-2 py-2">Name</th>
+                  <th className="px-2 py-2 text-center">Score</th>
+                  <th className="px-2 py-2 text-right">Trips</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-100">
+                {analytics.driverPerformance.map((driver, i) => (
+                  <tr key={i} className="hover:bg-surface-50">
+                    <td className="px-2 py-3">
+                      <div className="font-medium text-surface-900">{driver.name}</div>
+                      <div className="text-xs text-surface-500">{driver.vehicleType}</div>
+                    </td>
+                    <td className="px-2 py-3 text-center">
+                      <Badge variant={getHappinessColor(driver.averageScore)}>
+                        {driver.averageScore}%
+                      </Badge>
+                    </td>
+                    <td className="px-2 py-3 text-right text-surface-600">{driver.reviewCount}</td>
+                  </tr>
+                ))}
+                {analytics.driverPerformance.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-2 py-4 text-center text-surface-500">No driver data</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Hotel Performance */}
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-surface-900 mb-4">Top Hotels</h3>
+          <div className="overflow-y-auto max-h-80">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-surface-50 text-surface-500 font-medium">
+                <tr>
+                  <th className="px-2 py-2">Hotel</th>
+                  <th className="px-2 py-2 text-center">Score</th>
+                  <th className="px-2 py-2 text-right">Reviews</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-100">
+                {analytics.hotelPerformance.map((hotel, i) => (
+                  <tr key={i} className="hover:bg-surface-50">
+                    <td className="px-2 py-3 font-medium text-surface-900">{hotel.name}</td>
+                    <td className="px-2 py-3 text-center">
+                      <Badge variant={getHappinessColor(hotel.averageScore)}>
+                        {hotel.averageScore}%
+                      </Badge>
+                    </td>
+                    <td className="px-2 py-3 text-right text-surface-600">{hotel.reviewCount}</td>
+                  </tr>
+                ))}
+                {analytics.hotelPerformance.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-2 py-4 text-center text-surface-500">No hotel data</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Vehicle Performance */}
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-surface-900 mb-4">Top Vehicles</h3>
+          <div className="overflow-y-auto max-h-80">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-surface-50 text-surface-500 font-medium">
+                <tr>
+                  <th className="px-2 py-2">Vehicle</th>
+                  <th className="px-2 py-2 text-center">Score</th>
+                  <th className="px-2 py-2 text-right">Trips</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-100">
+                {analytics.vehiclePerformance.map((vehicle, i) => (
+                  <tr key={i} className="hover:bg-surface-50">
+                    <td className="px-2 py-3">
+                      <div className="font-medium text-surface-900">{vehicle.type}</div>
+                      <div className="text-xs text-surface-500">{vehicle.number}</div>
+                    </td>
+                    <td className="px-2 py-3 text-center">
+                      <Badge variant={getHappinessColor(vehicle.averageScore)}>
+                        {vehicle.averageScore}%
+                      </Badge>
+                    </td>
+                    <td className="px-2 py-3 text-right text-surface-600">{vehicle.reviewCount}</td>
+                  </tr>
+                ))}
+                {analytics.vehiclePerformance.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-2 py-4 text-center text-surface-500">No vehicle data</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       {/* Low Scores Alert */}
       {analytics.lowScores.length > 0 && (
-        <div className="card p-6 border-l-4 border-red-500">
+        <div className="card p-6 border-l-4 border-accent-500">
           <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">Low Scores Alert (&lt; 60%)</h3>
+            <h3 className="text-lg font-semibold text-surface-900">Low Scores Alert (&lt; 60%)</h3>
           </div>
           <div className="space-y-2">
             {analytics.lowScores.slice(0, 10).map((item, index) => (
-              <div key={index} className="flex items-center justify-between p-2 bg-red-50 rounded">
+              <div key={index} className="flex items-center justify-between p-2 bg-accent-500/10 rounded">
                 <span className="text-sm font-medium text-surface-700">{item.category}</span>
-                <span className="text-sm font-bold text-red-600">{item.score}%</span>
+                <span className="text-sm font-bold text-accent-500">{item.score}%</span>
               </div>
             ))}
           </div>
@@ -305,7 +432,7 @@ export function AnalyticsSection() {
       {/* Keywords */}
       {Object.keys(analytics.keywords).length > 0 && (
         <div className="card p-6">
-          <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Common Keywords from Remarks</h3>
+          <h3 className="text-lg font-semibold text-surface-900 mb-4">Common Keywords from Remarks</h3>
           <div className="flex flex-wrap gap-2">
             {Object.entries(analytics.keywords)
               .sort(([, a], [, b]) => b - a)

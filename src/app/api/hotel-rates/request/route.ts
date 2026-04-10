@@ -44,7 +44,7 @@ export async function POST(request: Request) {
                 hotel_email,
                 hotel_contact: hotel_contact || null,
                 hotel_address: hotel_address || null,
-                requested_by: requested_by || "TravX System",
+                requested_by: requested_by || "TraveX System",
                 inquiry_id: inquiry_id || null,
                 group_inquiry_id: group_inquiry_id || null,
                 check_in_date: check_in_date || null,

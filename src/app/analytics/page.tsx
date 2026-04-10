@@ -1,14 +1,16 @@
 import { AppLayout, Header } from "@/components/layout";
-import { AnalyticsSection } from "../dashboard/AnalyticsSection";
+import { AnalyticsDashboard } from "./AnalyticsDashboard";
 
-export default async function AnalyticsPage() {
+export default function AnalyticsPage() {
   return (
     <AppLayout>
       <Header
-        title="Analytics"
-        subtitle="Customer feedback & insights"
+        title="Insight Horizon"
+        subtitle="Intelligent analytics for the TraveX guest experience"
       />
-      <AnalyticsSection />
+      <div className="p-8">
+        <AnalyticsDashboard />
+      </div>
     </AppLayout>
   );
 }
