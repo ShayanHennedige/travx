@@ -52,6 +52,42 @@ export async function POST(request: Request) {
       notes,
     } = body;
 
+    // Validate prerequisites before finalizing tour
+    // 1. Check if costing sheet exists
+    const { data: costingSheet, error: costingError } = await supabase
+      .from("tour_costing_sheets")
+      .select("id, status")
+      .eq("itinerary_id", itinerary_id)
+      .single();
+
+    if (costingError || !costingSheet) {
+      return NextResponse.json(
+        {
+          error: "Costing sheet is required before finalizing tour",
+          missingPrerequisites: ["costing_sheet"]
+        },
+        { status: 400 }
+      );
+    }
+
+    // 2. [REMOVED] Check if vouchers exist - Vouchers are now generated AFTER tour finalization
+
+
+    // Check for existing tour to prevent duplicates
+    const { data: existingTour } = await supabase
+      .from("tours")
+      .select("id")
+      .eq("itinerary_id", itinerary_id)
+      .maybeSingle();
+
+    if (existingTour) {
+      return NextResponse.json({
+        success: true,
+        tour: existingTour,
+        message: "Tour already exists"
+      }, { status: 200 });
+    }
+
     const { data: tour, error } = await supabase
       .from("tours")
       .insert({
@@ -73,6 +109,19 @@ export async function POST(request: Request) {
     if (error) {
       console.error("Error creating tour:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Automatically update inquiry/group_inquiry status to 'confirmed'
+    if (inquiry_id) {
+      await supabase
+        .from("inquiries")
+        .update({ status: "confirmed" })
+        .eq("id", inquiry_id);
+    } else if (group_inquiry_id) {
+      await supabase
+        .from("group_inquiries")
+        .update({ status: "confirmed" })
+        .eq("id", group_inquiry_id);
     }
 
     return NextResponse.json({ success: true, tour }, { status: 201 });

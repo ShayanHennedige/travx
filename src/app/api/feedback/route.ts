@@ -20,10 +20,18 @@ export async function POST(request: Request) {
     // Extract token_id if present
     const { token_id, ...feedbackData } = result.data;
 
+    // Keep DB compatibility: feedback.guest_email is NOT NULL in existing schema.
+    // If email is intentionally omitted in the form, store a generated placeholder.
+    const normalizedGuestEmail =
+      typeof feedbackData.guest_email === "string" && feedbackData.guest_email.trim().length > 0
+        ? feedbackData.guest_email.trim()
+        : `anonymous+${Date.now()}@guest.local`;
+
     const { data: feedback, error } = await supabase
       .from("feedback")
       .insert({
         ...feedbackData,
+        guest_email: normalizedGuestEmail,
         token_id: token_id || null,
         submitted_at: new Date().toISOString(),
       })

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button, Input } from "@/components/ui";
-import { AnimatedSuccessCard } from "@/components/ui/FormSection";
+import { useState, useEffect, Suspense } from "react";
+import { Button, Input, Badge } from "@/components/ui";
 import { feedbackSchema, getRatingLabel } from "@/lib/validations/feedback";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -11,34 +10,43 @@ const countries = [
   "South Korea", "Sri Lanka", "Thailand", "UK", "USA", "Other"
 ];
 
-const ageGroups = [
-  "Under 18", "18-25", "26-35", "36-45", "46-60", "60+"
-];
-
 export default function FeedbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
+        <div className="card p-12 text-center">
+          <div className="w-12 h-12 mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+          <p className="text-surface-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <FeedbackContent />
+    </Suspense>
+  );
+}
+
+function FeedbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoadingPrefill, setIsLoadingPrefill] = useState(false);
-  const [referenceNumber, setReferenceNumber] = useState("");
-  const [isLoadingReference, setIsLoadingReference] = useState(false);
-  const [referenceLoaded, setReferenceLoaded] = useState(false);
+  const [tourReference, setTourReference] = useState("");  // Changed from email to tour reference
+  const [isLoadingLookup, setIsLoadingLookup] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
 
   const [formData, setFormData] = useState({
     guest_name: "",
     guest_email: "",
     country: "",
-    age_group: "",
     inquiry_id: "",
     itinerary_id: "",
     tour_id: "",
     group_inquiry_id: "",
     token_id: "",
     driver_id: "",
-    vehicle_id: "",
     airport_welcome_score: null as number | null,
     hotel_quality_scores: {} as Record<string, number>,
     driver_language_score: null as number | null,
@@ -55,22 +63,22 @@ export default function FeedbackPage() {
   const [driverInfo, setDriverInfo] = useState<{ name: string; vehicle_type: string | null; vehicle_number: string | null } | null>(null);
   const [vehicleInfo, setVehicleInfo] = useState<{ type: string | null; number: string | null } | null>(null);
 
-  // Function to fetch data by reference number
+  // Function to fetch data by tour reference
   const fetchDataByReference = async (refNumber: string) => {
     if (!refNumber || !refNumber.trim()) {
       return;
     }
 
-    setIsLoadingReference(true);
+    setIsLoadingLookup(true);
     setErrors({});
 
     try {
       const response = await fetch(`/api/feedback/prefill?reference=${encodeURIComponent(refNumber.trim())}`);
-      
+
       if (!response.ok) {
         const error = await response.json();
-        setErrors({ reference: error.error || "Could not find inquiry with this reference number" });
-        setIsLoadingReference(false);
+        setErrors({ tourReference: error.error || "Could not find booking with this reference number" });
+        setIsLoadingLookup(false);
         return;
       }
 
@@ -78,8 +86,8 @@ export default function FeedbackPage() {
       console.log("Prefill data received:", data);
 
       if (!data || (!data.customer && !data.hotels)) {
-        setErrors({ reference: "No data found for this reference number" });
-        setIsLoadingReference(false);
+        setErrors({ tourReference: "No active tours found for this reference number" });
+        setIsLoadingLookup(false);
         return;
       }
 
@@ -95,13 +103,18 @@ export default function FeedbackPage() {
 
       // Set driver and vehicle info
       if (data.driver) {
+        console.log("Setting driver info into state:", data.driver);
         setDriverInfo({
           name: data.driver.name || "",
           vehicle_type: data.driver.vehicle_type || null,
           vehicle_number: data.driver.vehicle_number || null,
         });
+      } else {
+        console.warn("API returned null for driver");
       }
+
       if (data.vehicle) {
+        console.log("Setting vehicle info into state:", data.vehicle);
         setVehicleInfo({
           type: data.vehicle.type || null,
           number: data.vehicle.number || null,
@@ -112,7 +125,7 @@ export default function FeedbackPage() {
       let customerName = "";
       let customerEmail = "";
       let customerCountry = "";
-      
+
       if (data.customer) {
         // Extract name
         if (data.customer.name) {
@@ -120,24 +133,22 @@ export default function FeedbackPage() {
         } else if (data.customer.first_name || data.customer.last_name) {
           customerName = `${data.customer.first_name || ""} ${data.customer.last_name || ""}`.trim();
         }
-        
+
         // Extract email
         customerEmail = data.customer.email || data.customer.client_email || "";
-        
+
         // Extract country
         customerCountry = data.customer.country || "";
       }
 
-      console.log("Raw API response:", JSON.stringify(data, null, 2));
-      console.log("Extracted customer data:", { 
-        customerName, 
-        customerEmail, 
+      console.log("Extracted customer data:", {
+        customerName,
+        customerEmail,
         customerCountry,
-        customer: data.customer,
-        hasCustomer: !!data.customer 
+        hasCustomer: !!data.customer
       });
 
-      // Update all form data - if customer data exists, use it; otherwise keep previous
+      // Update all form data
       setFormData((prev) => {
         const updated = {
           ...prev,
@@ -146,55 +157,39 @@ export default function FeedbackPage() {
           itinerary_id: data.itinerary_id || prev.itinerary_id || "",
           tour_id: data.tour_id || prev.tour_id || "",
           token_id: data.token_id || prev.token_id || "",
-          driver_id: data.driver?.id || prev.driver_id || "",
-          vehicle_id: prev.vehicle_id || "",
+          driver_id: data.driver_id || data.driver?.id || prev.driver_id || "",
           // Update customer fields if customer data exists
-          guest_name: data.customer ? customerName : prev.guest_name,
-          guest_email: data.customer ? customerEmail : prev.guest_email,
-          country: data.customer ? customerCountry : prev.country,
+          guest_name: customerName || prev.guest_name,
+          guest_email: customerEmail || prev.guest_email,
+          country: customerCountry || prev.country,
           hotel_quality_scores: Object.keys(hotelScores).length > 0 ? hotelScores : prev.hotel_quality_scores,
         };
-        console.log("Setting formData:", {
-          guest_name: updated.guest_name,
-          guest_email: updated.guest_email,
-          country: updated.country,
-          hasCustomerData: !!data.customer,
-          customerName,
-          customerEmail,
-          customerCountry
-        });
         return updated;
       });
-      
+
       setIsFromToken(false); // Not from token, so fields are editable
-      setReferenceLoaded(true);
-      
-      console.log("Form data updated with:", {
-        name: customerName,
-        email: customerEmail,
-        country: data.customer?.country,
-        hotels: Object.keys(hotelScores),
-      });
+      setDataLoaded(true);
     } catch (error: any) {
       console.error("Error loading prefill data:", error);
-      setErrors({ reference: error.message || "Failed to load form data" });
-      setReferenceLoaded(false);
+      setErrors({ tourReference: error.message || "Failed to load form data" });
+      setDataLoaded(false);
     } finally {
-      setIsLoadingReference(false);
+      setIsLoadingLookup(false);
     }
   };
 
+  // Handler for reference input change
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setReferenceNumber(e.target.value);
-    setErrors({ ...errors, reference: "" });
-    setReferenceLoaded(false);
+    setTourReference(e.target.value);
+    setErrors({ ...errors, tourReference: "" });
+    setDataLoaded(false);
   };
 
-  const handleReferenceSubmit = async (e?: React.MouseEvent | React.FormEvent) => {
+  const handleLookupSubmit = async (e?: React.MouseEvent | React.FormEvent) => {
     if (e) {
       e.preventDefault();
     }
-    await fetchDataByReference(referenceNumber);
+    await fetchDataByReference(tourReference);
   };
 
   const handleSliderChange = (field: string, value: number) => {
@@ -233,45 +228,46 @@ export default function FeedbackPage() {
     if (hasAutoLoaded) {
       return;
     }
-    
+
     // Try both searchParams and window.location as fallback
     const refParamFromSearch = searchParams.get("ref");
     const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     const refParamFromUrl = urlParams?.get("ref");
     const refParam = refParamFromSearch || refParamFromUrl;
-    
+
     console.log("URL params check - refParam from searchParams:", refParamFromSearch);
     console.log("URL params check - refParam from URL:", refParamFromUrl);
     console.log("Using refParam:", refParam);
     console.log("All searchParams:", typeof window !== "undefined" ? Object.fromEntries(new URLSearchParams(window.location.search).entries()) : "N/A");
-    
-    // Check for reference number parameter first
-    if (refParam && refParam.trim()) {
-      console.log("Found ref param, loading data for:", refParam.trim());
+
+    // Check for email parameter first (legacy ref param support removed or could be repurposed)
+    const emailParam = searchParams.get("email");
+    if (emailParam && emailParam.trim()) {
+      console.log("Found email param, loading data for:", emailParam.trim());
       setHasAutoLoaded(true);
-      setReferenceNumber(refParam.trim());
+      setTourReference(emailParam.trim());
       setIsLoadingPrefill(true);
-      
+
       // Use async IIFE to handle the async function
       (async () => {
         try {
-          await fetchDataByReference(refParam.trim());
+          await fetchDataByReference(emailParam.trim());  // Still checking for 'email' param for backwards compatibility
         } catch (error) {
-          console.error("Error loading data from reference:", error);
+          console.error("Error loading data from email:", error);
         } finally {
           setIsLoadingPrefill(false);
         }
       })();
       return;
     }
-    
+
     // Check for token or other prefill parameters
     const token = searchParams.get("token");
     const inquiryId = searchParams.get("inquiry_id");
     const groupInquiryId = searchParams.get("group_inquiry_id");
     const itineraryId = searchParams.get("itinerary_id");
     const tourId = searchParams.get("tour_id");
-    
+
     if (token || inquiryId || groupInquiryId || itineraryId || tourId) {
       setIsLoadingPrefill(true);
       // Build query string for prefill API
@@ -281,7 +277,7 @@ export default function FeedbackPage() {
       if (groupInquiryId) params.append("group_inquiry_id", groupInquiryId);
       if (itineraryId) params.append("itinerary_id", itineraryId);
       if (tourId) params.append("tour_id", tourId);
-      
+
       fetch(`/api/feedback/prefill?${params.toString()}`)
         .then(async (response) => {
           if (!response.ok) {
@@ -289,7 +285,7 @@ export default function FeedbackPage() {
             return;
           }
           const data = await response.json();
-          
+
           // Process the data similar to fetchDataByReference
           if (data && (data.customer || data.hotels)) {
             // Prepare hotel scores
@@ -304,6 +300,7 @@ export default function FeedbackPage() {
 
             // Set driver and vehicle info
             if (data.driver) {
+              console.log("Setting driver info:", data.driver);
               setDriverInfo({
                 name: data.driver.name || "",
                 vehicle_type: data.driver.vehicle_type || null,
@@ -311,6 +308,7 @@ export default function FeedbackPage() {
               });
             }
             if (data.vehicle) {
+              console.log("Setting vehicle info:", data.vehicle);
               setVehicleInfo({
                 type: data.vehicle.type || null,
                 number: data.vehicle.number || null,
@@ -321,14 +319,14 @@ export default function FeedbackPage() {
             let customerName = "";
             let customerEmail = "";
             let customerCountry = "";
-            
+
             if (data.customer) {
               if (data.customer.name) {
                 customerName = data.customer.name;
               } else if (data.customer.first_name || data.customer.last_name) {
                 customerName = `${data.customer.first_name || ""} ${data.customer.last_name || ""}`.trim();
               }
-              
+
               customerEmail = data.customer.email || data.customer.client_email || "";
               customerCountry = data.customer.country || "";
             }
@@ -341,16 +339,15 @@ export default function FeedbackPage() {
               itinerary_id: data.itinerary_id || prev.itinerary_id || "",
               tour_id: data.tour_id || prev.tour_id || "",
               token_id: data.token_id || prev.token_id || "",
-              driver_id: data.driver?.id || prev.driver_id || "",
-              vehicle_id: prev.vehicle_id || "",
-              guest_name: data.customer ? customerName : prev.guest_name,
-              guest_email: data.customer ? customerEmail : prev.guest_email,
-              country: data.customer ? customerCountry : prev.country,
+              driver_id: data.driver_id || data.driver?.id || prev.driver_id || "",
+              guest_name: customerName || prev.guest_name,
+              guest_email: customerEmail || prev.guest_email,
+              country: customerCountry || prev.country,
               hotel_quality_scores: Object.keys(hotelScores).length > 0 ? hotelScores : prev.hotel_quality_scores,
             }));
-            
+
             setIsFromToken(!!token);
-            setReferenceLoaded(true);
+            setDataLoaded(true);
           }
         })
         .catch((error) => {
@@ -366,10 +363,10 @@ export default function FeedbackPage() {
 
   // Debug: Log formData changes for guest info
   useEffect(() => {
-    console.log("formData guest info changed:", { 
-      guest_name: formData.guest_name, 
+    console.log("formData guest info changed:", {
+      guest_name: formData.guest_name,
       guest_email: formData.guest_email,
-      country: formData.country 
+      country: formData.country
     });
   }, [formData.guest_name, formData.guest_email, formData.country]);
 
@@ -384,20 +381,20 @@ export default function FeedbackPage() {
     });
   };
 
-  const RatingSelector = ({ 
-    label, 
-    value, 
-    onChange 
-  }: { 
-    label: string; 
-    value: number | null; 
+  const RatingSelector = ({
+    label,
+    value,
+    onChange
+  }: {
+    label: string;
+    value: number | null;
     onChange: (value: number) => void;
   }) => {
     const ratingOptions = [
-      { label: "Poor", score: 25, color: "bg-red-900/50 light:bg-red-50 border-red-600 light:border-red-200 text-red-300 light:text-red-700 hover:bg-red-900/70 light:hover:bg-red-100" },
-      { label: "Average", score: 60, color: "bg-orange-900/50 light:bg-orange-50 border-orange-600 light:border-orange-200 text-orange-300 light:text-orange-700 hover:bg-orange-900/70 light:hover:bg-orange-100" },
-      { label: "Good", score: 80, color: "bg-primary-900/50 light:bg-primary-50 border-primary-600 light:border-primary-200 text-primary-300 light:text-primary-700 hover:bg-primary-900/70 light:hover:bg-primary-100" },
-      { label: "Excellent", score: 100, color: "bg-green-900/50 light:bg-green-50 border-green-600 light:border-green-200 text-green-300 light:text-green-700 hover:bg-green-900/70 light:hover:bg-green-100" },
+      { label: "Poor", score: 25, color: "bg-accent-500/10 border-accent-500/40 text-accent-600 hover:bg-accent-500/20" },
+      { label: "Average", score: 60, color: "bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100" },
+      { label: "Good", score: 80, color: "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100" },
+      { label: "Excellent", score: 100, color: "bg-green-50 border-green-300 text-green-700 hover:bg-green-100" },
     ];
 
     // Determine which option is selected based on value
@@ -412,24 +409,24 @@ export default function FeedbackPage() {
     const selectedScore = getSelectedOption();
 
     return (
-      <div className="space-y-3">
-        {label && <label className="block text-sm font-medium text-surface-300 mb-3">{label}</label>}
-        <div className="flex gap-2">
+      <div className="space-y-4">
+        {label && <label className="block text-sm font-semibold text-surface-900">{label}</label>}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {ratingOptions.map((option) => {
             const isSelected = selectedScore === option.score;
-            
+
             return (
               <button
                 key={option.score}
                 type="button"
                 onClick={() => onChange(option.score)}
-                className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all font-medium text-sm ${
-                  isSelected 
-                    ? `${option.color} border-current shadow-sm` 
-                    : "bg-surface-800 light:bg-white border-surface-600 light:border-surface-300 text-surface-400 light:text-surface-600 hover:bg-surface-700 light:hover:bg-surface-100 hover:border-surface-500 light:hover:border-surface-400 hover:text-surface-300 light:hover:text-surface-900"
-                }`}
+                className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 gap-2 ${isSelected
+                  ? `border-primary-500 bg-primary-50 text-primary-900 shadow-md transform scale-[1.02]`
+                  : "border-surface-200 bg-white text-surface-600 hover:border-primary-200 hover:bg-surface-50"
+                  }`}
               >
-                {option.label}
+                <div className={`w-3 h-3 rounded-full ${isSelected ? "bg-primary-500 animate-pulse" : "bg-surface-200"}`} />
+                <span className="font-semibold text-xs uppercase tracking-wider">{option.label}</span>
               </button>
             );
           })}
@@ -450,11 +447,7 @@ export default function FeedbackPage() {
         setIsSubmitting(false);
         return;
       }
-      if (!formData.guest_email.trim()) {
-        setErrors({ guest_email: "Email is required" });
-        setIsSubmitting(false);
-        return;
-      }
+
 
       // Validate all required ratings
       const requiredRatings = [
@@ -499,7 +492,6 @@ export default function FeedbackPage() {
         token_id: formData.token_id || null,
         driver_id: formData.driver_id || null,
         country: formData.country || null,
-        age_group: formData.age_group || null,
         remarks: formData.remarks || null,
       };
 
@@ -528,320 +520,315 @@ export default function FeedbackPage() {
 
   if (submitSuccess) {
     return (
-      <div className="min-h-screen bg-surface-900 light:bg-surface-100 flex items-center justify-center">
-        <AnimatedSuccessCard className="max-w-md w-full card p-8 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-900/50 light:bg-green-100 border border-green-700 light:border-green-200 flex items-center justify-center">
-            <svg className="w-8 h-8 text-green-400 light:text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-xl p-8 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+            <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-surface-100 light:text-surface-900 mb-2">Thank You!</h2>
-          <p className="text-surface-300 light:text-surface-600">Your feedback has been submitted successfully.</p>
-        </AnimatedSuccessCard>
+          <h2 className="text-2xl font-bold text-surface-900 mb-2">Thank You!</h2>
+          <p className="text-surface-600">Your feedback has been submitted successfully.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface-900 light:bg-surface-100">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100">
       {/* Header */}
-      <header className="bg-surface-800 light:bg-white border-b border-surface-600 light:border-surface-200 sticky top-0 z-10">
+      <header className="bg-white border-b border-surface-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center">
-              <span className="text-white font-bold">TX</span>
-            </div>
+            <img
+              src="/Serendia.png"
+              alt="TraveX Logo"
+              className="h-12 w-auto object-contain"
+            />
             <div>
-              <h1 className="text-lg font-semibold text-surface-100 light:text-surface-900">TravX</h1>
-              <p className="text-xs text-surface-400 light:text-surface-500">Customer Feedback Form</p>
+              <h1 className="text-lg font-semibold text-surface-900">TraveX</h1>
+              <p className="text-xs text-surface-500">Customer Feedback Form</p>
             </div>
           </div>
         </div>
       </header>
 
       {/* Form */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-surface-100 light:text-surface-900 mb-2">
+      <main className="max-w-4xl mx-auto px-4 py-12">
+        <div className="mb-12 text-center animate-fade-in text-balance">
+          <Badge className="mb-4 bg-primary-100 text-primary-700 hover:bg-primary-100 border-none px-4 py-1">Guest Feedback</Badge>
+          <h2 className="text-4xl md:text-5xl font-black text-surface-900 mb-4 tracking-tight">
             Share Your Experience
           </h2>
-          <p className="text-surface-300">
-            Help us improve by sharing your feedback about your trip with TravX.
+          <p className="text-lg text-surface-600 max-w-2xl mx-auto">
+            Your insights help us craft even better journeys. Tell us about your recent trip with <span className="text-primary-600 font-bold">TraveX</span>.
           </p>
         </div>
 
         {isLoadingPrefill ? (
           <div className="card p-12 text-center">
-            <div className="w-12 h-12 mx-auto mb-4 border-4 border-surface-600 border-t-primary-500 rounded-full animate-spin" />
-            <p className="text-surface-300">Loading your information...</p>
+            <div className="w-12 h-12 mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+            <p className="text-surface-600">Loading your information...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="card p-8 space-y-8">
-            {/* Reference Number Input */}
-            <div>
-              <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Enter Your Reference Number</h3>
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <Input
-                    type="text"
-                    placeholder="Enter your inquiry reference number (e.g., INQ-20260115-0001 or GRP-20260115-0001)"
-                    value={referenceNumber}
-                    onChange={handleReferenceChange}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && referenceNumber.trim() && !isLoadingReference) {
-                        e.preventDefault();
-                        fetchDataByReference(referenceNumber);
-                      }
-                    }}
-                    error={errors.reference}
-                    disabled={isLoadingReference}
+          <form onSubmit={handleSubmit} className="space-y-12 animate-slide-up">
+            <div className="space-y-12">
+              {/* Find Your Booking section removed - data auto-fills via token */}
+
+              <div className="grid grid-cols-1 gap-12">
+                {/* Guest Info */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3 border-b border-surface-200 pb-4">
+                    <h3 className="text-2xl font-bold text-surface-900">1. Guest Information</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-8 rounded-2xl border border-surface-200 shadow-sm">
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1">
+                        Name <span className="text-accent-500">*</span>
+                      </label>
+                      <Input
+                        type="text"
+                        value={formData.guest_name}
+                        onChange={(e) => setFormData({ ...formData, guest_name: e.target.value })}
+                        required
+                        error={errors.guest_name}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1">
+                        Country
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder="e.g. United Kingdom"
+                        value={formData.country}
+                        onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                        className="h-12 text-base"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Airport Welcome */}
+                <div>
+                  <RatingSelector
+                    label="Overall Airport Welcome Experience"
+                    value={formData.airport_welcome_score}
+                    onChange={(value) => handleSliderChange("airport_welcome_score", value)}
                   />
                 </div>
-                <Button
-                  type="button"
-                  onClick={handleReferenceSubmit}
-                  disabled={isLoadingReference || !referenceNumber.trim()}
-                  loading={isLoadingReference}
-                >
-                  Load Details
-                </Button>
-              </div>
-              {referenceLoaded && !errors.reference && (
-                <div className="mt-3 p-3 bg-green-900/30 light:bg-green-50 border border-green-700 light:border-green-200 rounded-lg">
-                  <p className="text-sm text-green-300 light:text-green-700">
-                    ✓ Booking details loaded successfully! Please review the information below and complete your feedback.
-                  </p>
-                </div>
-              )}
-            </div>
 
-            {/* Guest Info */}
-            <div>
-              <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Guest Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Name <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  type="text"
-                  value={formData.guest_name}
-                  onChange={(e) => setFormData({ ...formData, guest_name: e.target.value })}
-                  required
-                  error={errors.guest_name}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  type="email"
-                  value={formData.guest_email}
-                  onChange={(e) => setFormData({ ...formData, guest_email: e.target.value })}
-                  required
-                  error={errors.guest_email}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Country
-                </label>
-                <select
-                  value={formData.country}
-                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                  className="w-full px-3 py-2 border border-surface-600 light:border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none bg-surface-800 light:bg-white text-surface-100 light:text-surface-900 text-sm"
-                >
-                  <option value="">Select Country</option>
-                  {countries.map((country) => (
-                    <option key={country} value={country}>{country}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1">
-                  Age Group
-                </label>
-                <select
-                  value={formData.age_group}
-                  onChange={(e) => setFormData({ ...formData, age_group: e.target.value })}
-                  className="w-full px-3 py-2 border border-surface-600 light:border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none bg-surface-800 light:bg-white text-surface-100 light:text-surface-900 text-sm"
-                >
-                  <option value="">Select Age Group</option>
-                  {ageGroups.map((age) => (
-                    <option key={age} value={age}>{age}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Airport Welcome */}
-          <div>
-            <RatingSelector
-              label="Overall Airport Welcome Experience"
-              value={formData.airport_welcome_score}
-              onChange={(value) => handleSliderChange("airport_welcome_score", value)}
-            />
-          </div>
-
-          {/* Hotel Quality */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">Hotel Quality</h3>
-              <Button type="button" variant="secondary" size="sm" onClick={addHotelField}>
-                + Add Hotel
-              </Button>
-            </div>
-            {Object.keys(formData.hotel_quality_scores).length === 0 ? (
-              <div className="flex items-center justify-between p-3 bg-surface-800 light:bg-surface-50 rounded-lg border border-surface-600 light:border-surface-300">
-                <p className="text-sm text-surface-400">
-                  Click "+ Add Hotel" to rate hotels
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {Object.keys(formData.hotel_quality_scores).map((hotelName) => (
-                  <div key={hotelName} className="p-4 bg-surface-800 light:bg-surface-50 rounded-lg border border-surface-600 light:border-surface-300">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-surface-300">{hotelName}</label>
-                      <button
-                        type="button"
-                        onClick={() => removeHotel(hotelName)}
-                        className="text-red-500 hover:text-red-700 text-sm"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <RatingSelector
-                      label=""
-                      value={formData.hotel_quality_scores[hotelName]}
-                      onChange={(value) => handleHotelScoreChange(hotelName, value)}
-                    />
+                {/* Hotel Quality */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between border-b border-surface-200 pb-4">
+                    <h3 className="text-2xl font-bold text-surface-900">2. Accommodation Quality</h3>
+                    <Button type="button" variant="secondary" size="sm" onClick={addHotelField} className="rounded-full px-4">
+                      + Add Hotel
+                    </Button>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* Driver */}
-          <div>
-            <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Driver</h3>
-            {driverInfo && (
-              <div className="mb-4 p-3 bg-surface-800 light:bg-surface-50 rounded-lg border border-surface-600 light:border-surface-300">
-                <p className="text-sm text-surface-300">
-                  <span className="font-medium">Driver:</span> {driverInfo.name}
-                  {driverInfo.vehicle_type && (
-                    <span className="text-surface-500 ml-2">
-                      ({driverInfo.vehicle_type}{driverInfo.vehicle_number ? ` • ${driverInfo.vehicle_number}` : ""})
-                    </span>
+                  {Object.keys(formData.hotel_quality_scores).length === 0 ? (
+                    <div className="p-12 border-2 border-dashed border-surface-200 rounded-2xl text-center bg-surface-50">
+                      <p className="text-surface-500 font-medium">
+                        No hotels found. Click "+ Add Hotel" if you'd like to rate your stays.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-6">
+                      {Object.keys(formData.hotel_quality_scores).map((hotelName) => (
+                        <div key={hotelName} className="bg-white p-6 rounded-2xl border border-surface-200 shadow-sm transition-all hover:border-primary-200">
+                          <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center text-primary-600">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                              </div>
+                              <label className="text-lg font-bold text-surface-900">{hotelName}</label>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeHotel(hotelName)}
+                              className="text-surface-400 hover:text-accent-500 transition-colors p-2"
+                            >
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                          <RatingSelector
+                            label=""
+                            value={formData.hotel_quality_scores[hotelName]}
+                            onChange={(value) => handleHotelScoreChange(hotelName, value)}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </p>
-              </div>
-            )}
-            <div className="space-y-6">
-              <RatingSelector
-                label="Language"
-                value={formData.driver_language_score}
-                onChange={(value) => handleSliderChange("driver_language_score", value)}
-              />
-              <RatingSelector
-                label="Appearance"
-                value={formData.driver_appearance_score}
-                onChange={(value) => handleSliderChange("driver_appearance_score", value)}
-              />
-              <RatingSelector
-                label="Hospitality"
-                value={formData.driver_hospitality_score}
-                onChange={(value) => handleSliderChange("driver_hospitality_score", value)}
-              />
-              <RatingSelector
-                label="Helpfulness"
-                value={formData.driver_helpfulness_score}
-                onChange={(value) => handleSliderChange("driver_helpfulness_score", value)}
-              />
-            </div>
-          </div>
+                </div>
 
-          {/* Vehicle */}
-          <div>
-            <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900 mb-4">Vehicle</h3>
-            {(vehicleInfo || driverInfo?.vehicle_type) && (
-              <div className="mb-4 p-3 bg-surface-800 light:bg-surface-50 rounded-lg border border-surface-600 light:border-surface-300">
-                <p className="text-sm text-surface-300">
-                  <span className="font-medium">Vehicle:</span>{" "}
-                  {(vehicleInfo?.type || driverInfo?.vehicle_type) || "N/A"}
-                  {(vehicleInfo?.number || driverInfo?.vehicle_number) && (
-                    <span className="text-surface-500 ml-2">
-                      • {vehicleInfo?.number || driverInfo?.vehicle_number}
-                    </span>
+                {/* Driver & Vehicle */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                  {/* Driver */}
+                  <div className="space-y-6">
+                    <div className="border-b border-surface-200 pb-4">
+                      <h3 className="text-2xl font-bold text-surface-900">3. Driver Rating</h3>
+                    </div>
+
+                    {driverInfo && (
+                      <div className="bg-primary-50 p-4 rounded-xl border border-primary-100 flex items-center gap-4 mb-6">
+                        <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-bold text-xl">
+                          {driverInfo.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-xs text-primary-600 font-bold uppercase tracking-wider">Your Driver</p>
+                          <p className="text-surface-900 font-bold">{driverInfo.name}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-8 bg-white p-8 rounded-2xl border border-surface-200 shadow-sm">
+                      <RatingSelector
+                        label="Language Proficiency"
+                        value={formData.driver_language_score}
+                        onChange={(value) => handleSliderChange("driver_language_score", value)}
+                      />
+                      <RatingSelector
+                        label="Professional Appearance"
+                        value={formData.driver_appearance_score}
+                        onChange={(value) => handleSliderChange("driver_appearance_score", value)}
+                      />
+                      <RatingSelector
+                        label="Hospitality & Courtesy"
+                        value={formData.driver_hospitality_score}
+                        onChange={(value) => handleSliderChange("driver_hospitality_score", value)}
+                      />
+                      <RatingSelector
+                        label="Helpfulness with Baggage/Info"
+                        value={formData.driver_helpfulness_score}
+                        onChange={(value) => handleSliderChange("driver_helpfulness_score", value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Vehicle */}
+                  <div className="space-y-6">
+                    <div className="border-b border-surface-200 pb-4">
+                      <h3 className="text-2xl font-bold text-surface-900">4. Vehicle Rating</h3>
+                    </div>
+
+                    {(vehicleInfo || driverInfo?.vehicle_type) && (
+                      <div className="bg-surface-100 p-4 rounded-xl border border-surface-200 flex items-center gap-4 mb-6">
+                        <div className="w-12 h-12 rounded-full bg-surface-200 flex items-center justify-center text-surface-600">
+                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-xs text-surface-500 font-bold uppercase tracking-wider">Your Vehicle</p>
+                          <p className="text-surface-900 font-bold">
+                            {(vehicleInfo?.type || driverInfo?.vehicle_type) || "Standard Vehicle"}
+                            {(vehicleInfo?.number || driverInfo?.vehicle_number) && (
+                              <span className="text-surface-400 font-normal ml-2">
+                                • {vehicleInfo?.number || driverInfo?.vehicle_number}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-8 bg-white p-8 rounded-2xl border border-surface-200 shadow-sm">
+                      <RatingSelector
+                        label="Vehicle Overall Quality"
+                        value={formData.vehicle_quality_score}
+                        onChange={(value) => handleSliderChange("vehicle_quality_score", value)}
+                      />
+                      <RatingSelector
+                        label="Cleanliness (Interior/Exterior)"
+                        value={formData.vehicle_cleanliness_score}
+                        onChange={(value) => handleSliderChange("vehicle_cleanliness_score", value)}
+                      />
+                      <RatingSelector
+                        label="Comfort & Ride Quality"
+                        value={formData.vehicle_comfort_score}
+                        onChange={(value) => handleSliderChange("vehicle_comfort_score", value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Final Thoughts */}
+                <div className="space-y-8 pt-8 border-t border-surface-200">
+                  <div className="bg-surface-900 text-white p-10 rounded-3xl shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl -mr-32 -mt-32" />
+
+                    <div className="relative z-10 space-y-8">
+                      <div className="text-center space-y-2">
+                        <h3 className="text-3xl font-black italic">The TraveX Experience</h3>
+                        <p className="text-surface-400">How would you rate your overall journey with us?</p>
+                      </div>
+
+                      <div className="max-w-2xl mx-auto">
+                        <RatingSelector
+                          label=""
+                          value={formData.overall_experience_score}
+                          onChange={(value) => handleSliderChange("overall_experience_score", value)}
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="block text-sm font-semibold text-surface-300">
+                          Additional Remarks (Optional)
+                        </label>
+                        <textarea
+                          value={formData.remarks}
+                          onChange={(e) => {
+                            if (e.target.value.length <= 800) {
+                              setFormData({ ...formData, remarks: e.target.value });
+                            }
+                          }}
+                          rows={4}
+                          className="w-full px-6 py-4 bg-surface-800 border border-surface-700 rounded-2xl text-white placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all resize-none"
+                          placeholder="Is there anything else you'd like to share about your trip?"
+                        />
+                        <p className="text-right text-xs text-surface-500">
+                          {formData.remarks.length}/800 characters
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Error Message */}
+                  {errors.submit && (
+                    <div className="p-4 bg-accent-500/10 border border-accent-500/30 rounded-2xl text-accent-600 text-sm font-medium flex items-center gap-3 animate-shake">
+                      <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {errors.submit}
+                    </div>
                   )}
-                </p>
+
+                  {/* Submit Action */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-6 bg-surface-50 p-6 rounded-2xl border border-surface-200">
+                    <p className="text-sm text-surface-500">
+                      Your feedback is anonymous and helps us improve our services.
+                    </p>
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting}
+                      loading={isSubmitting}
+                      className="w-full sm:w-auto px-12 h-14 text-lg font-bold btn-primary shadow-lg shadow-primary-500/20 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      Submit My Feedback
+                    </Button>
+                  </div>
+                </div>
               </div>
-            )}
-            <div className="space-y-6">
-              <RatingSelector
-                label="Quality"
-                value={formData.vehicle_quality_score}
-                onChange={(value) => handleSliderChange("vehicle_quality_score", value)}
-              />
-              <RatingSelector
-                label="Cleanliness"
-                value={formData.vehicle_cleanliness_score}
-                onChange={(value) => handleSliderChange("vehicle_cleanliness_score", value)}
-              />
-              <RatingSelector
-                label="Comfort"
-                value={formData.vehicle_comfort_score}
-                onChange={(value) => handleSliderChange("vehicle_comfort_score", value)}
-              />
             </div>
-          </div>
-
-          {/* Overall Experience */}
-          <div>
-            <RatingSelector
-              label="Overall Tour Experience"
-              value={formData.overall_experience_score}
-              onChange={(value) => handleSliderChange("overall_experience_score", value)}
-            />
-          </div>
-
-          {/* Remarks */}
-          <div>
-            <label className="block text-sm font-medium text-surface-300 mb-1">
-              Remarks (Optional, max 800 characters)
-            </label>
-            <textarea
-              value={formData.remarks}
-              onChange={(e) => {
-                if (e.target.value.length <= 800) {
-                  setFormData({ ...formData, remarks: e.target.value });
-                }
-              }}
-              rows={4}
-              className="w-full px-3 py-2 border border-surface-600 light:border-surface-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none resize-none bg-surface-800 light:bg-white text-surface-100 light:text-surface-900 placeholder:text-surface-500 light:placeholder:text-surface-400"
-              placeholder="Share any additional comments or suggestions..."
-            />
-            <p className="text-xs text-surface-400 mt-1">
-              {formData.remarks.length}/800 characters
-            </p>
-          </div>
-
-          {/* Error Message */}
-          {errors.submit && (
-            <div className="p-3 bg-red-900/30 light:bg-red-50 border border-red-700 light:border-red-200 rounded-lg text-red-300 light:text-red-700 text-sm">
-              {errors.submit}
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-surface-600 light:border-surface-200">
-            <Button type="submit" disabled={isSubmitting} loading={isSubmitting}>
-              Submit Feedback
-            </Button>
-          </div>
-        </form>
+          </form>
         )}
       </main>
     </div>

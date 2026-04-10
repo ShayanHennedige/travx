@@ -30,15 +30,15 @@ export async function POST(request: Request, { params }: RouteParams) {
     .order("amendment_number", { ascending: false })
     .limit(1);
 
-  const nextAmendmentNumber = amendments && amendments.length > 0 
-    ? (amendments[0].amendment_number || 0) + 1 
+  const nextAmendmentNumber = amendments && amendments.length > 0
+    ? (amendments[0].amendment_number || 0) + 1
     : 1;
 
   // Create the amendment voucher
   const amendmentData = {
     ...originalVoucher,
     id: undefined, // Let the database generate a new ID
-    voucher_number: null, // Will be auto-generated with amendment suffix
+    voucher_number: `${originalVoucher.voucher_number || `V-${id.slice(0, 8)}`}-A${nextAmendmentNumber}`,
     original_voucher_id: id,
     is_amendment: true,
     amendment_number: nextAmendmentNumber,

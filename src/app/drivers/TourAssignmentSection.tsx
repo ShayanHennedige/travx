@@ -43,6 +43,7 @@ export function TourAssignmentSection({ tours: initialTours, drivers }: TourAssi
   const [assigning, setAssigning] = useState<string | null>(null);
   const [selectedTour, setSelectedTour] = useState<string | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"pending" | "upcoming" | "ongoing" | "completed">("pending");
   const [downloadingLogSheet, setDownloadingLogSheet] = useState<string | null>(null);
 
   // Sync with initialTours when parent refreshes
@@ -50,37 +51,68 @@ export function TourAssignmentSection({ tours: initialTours, drivers }: TourAssi
     setTours(initialTours);
   }, [initialTours]);
 
-  // Filter tours that need drivers:
-  // - Vouchers must be completed (vouchers_completed === true)
+  // Current date for date-based comparison
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Helper to check if a tour has ended (end_date < today)
+  const hasTourEnded = (tour: Tour) => {
+    const endDate = parseISO(tour.end_date);
+    return endDate < today;
+  };
+
+  // Helper to check if a tour is starting in the future
+  const isFutureTour = (tour: Tour) => {
+    const startDate = parseISO(tour.start_date);
+    return startDate > today;
+  };
+
+  // Filter tours that need drivers (PENDING):
   // - No driver assigned yet (driver_id is null)
-  // - Tour is upcoming or ongoing
-  const toursNeedingDrivers = tours.filter((tour) => {
-    const vouchersReady = tour.vouchers_completed === true;
+  // - Tour hasn't ended yet
+  const pendingTours = tours.filter((tour) => {
     const noDriver = !tour.driver_id;
-    const isActive = tour.status === "upcoming" || tour.status === "ongoing";
-
-    // Debug logging
-    if (process.env.NODE_ENV === "development") {
-      console.log(`Tour ${tour.client_name} filter check:`, {
-        vouchersReady,
-        vouchers_completed: tour.vouchers_completed,
-        noDriver,
-        driver_id: tour.driver_id,
-        isActive,
-        status: tour.status,
-        passesFilter: vouchersReady && noDriver && isActive,
-      });
-    }
-
-    return vouchersReady && noDriver && isActive;
+    const notEnded = !hasTourEnded(tour);
+    const notCancelled = tour.status !== "cancelled";
+    return noDriver && notEnded && notCancelled;
   });
 
-  // Filter tours that already have drivers assigned
-  const toursWithDrivers = tours.filter((tour) => {
+  // Filter UPCOMING tours:
+  // - Has driver assigned
+  // - Tour start_date is in the future
+  const upcomingTours = tours.filter((tour) => {
     const hasDriver = !!tour.driver_id;
-    const isActive = tour.status === "upcoming" || tour.status === "ongoing";
-    return hasDriver && isActive;
+    const isFuture = isFutureTour(tour);
+    const notCancelled = tour.status !== "cancelled";
+    return hasDriver && isFuture && notCancelled;
   });
+
+  // Filter ONGOING tours:
+  // - Has driver assigned  
+  // - Tour has started but not ended (start_date <= today < end_date)
+  const ongoingTours = tours.filter((tour) => {
+    const hasDriver = !!tour.driver_id;
+    const startDate = parseISO(tour.start_date);
+    const endDate = parseISO(tour.end_date);
+    const hasStarted = startDate <= today;
+    const notEnded = endDate >= today;
+    const notCancelled = tour.status !== "cancelled";
+    return hasDriver && hasStarted && notEnded && notCancelled;
+  });
+
+  // Filter COMPLETED tours:
+  // - Tour end_date has passed (this is the key change - date-based completion)
+  const completedTours = tours.filter((tour) => {
+    const hasEnded = hasTourEnded(tour);
+    const notCancelled = tour.status !== "cancelled";
+    return hasEnded && notCancelled;
+  });
+
+  // Legacy groupings for backwards compatibility
+  const toursNeedingDrivers = pendingTours;
+  const newTours = upcomingTours.filter(t => t.driver_status === "new");
+  const inProgressTours = ongoingTours;
+  const completedDriverTours = completedTours.filter(t => !!t.driver_id);
 
   // Debug: Log all tours and their voucher status
   useEffect(() => {
@@ -276,190 +308,300 @@ export function TourAssignmentSection({ tours: initialTours, drivers }: TourAssi
 
   return (
     <div className="space-y-6">
-      {/* Tours Needing Drivers */}
-      {toursNeedingDrivers.length > 0 && (
-        <div className="card">
-          <div className="px-6 py-4 border-b border-surface-600 light:border-surface-200">
-            <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">
-              Unassigned Tours ({toursNeedingDrivers.length})
-            </h3>
-            <p className="text-sm text-surface-400 light:text-surface-500 mt-1">
-              Tours with completed vouchers ready for driver assignment
-            </p>
-          </div>
-          <div className="divide-y divide-surface-600 light:divide-surface-200">
-            {toursNeedingDrivers.map((tour) => {
-              const isAssigning = assigning === tour.id && selectedTour === tour.id;
+      {/* Tab Navigation */}
+      <div className="card p-1.5 flex items-center gap-1 bg-surface-100 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab("pending")}
+          className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === "pending"
+            ? "bg-white shadow-sm text-primary-600"
+            : "text-surface-600 hover:text-surface-900 hover:bg-surface-50"
+            }`}
+        >
+          Pending
+          {pendingTours.length > 0 && (
+            <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs ${activeTab === "pending" ? "bg-primary-100 text-primary-700" : "bg-surface-200 text-surface-600"
+              }`}>
+              {pendingTours.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("upcoming")}
+          className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === "upcoming"
+            ? "bg-white shadow-sm text-purple-600"
+            : "text-surface-600 hover:text-surface-900 hover:bg-surface-50"
+            }`}
+        >
+          Upcoming
+          {upcomingTours.length > 0 && (
+            <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs ${activeTab === "upcoming" ? "bg-purple-100 text-purple-700" : "bg-surface-200 text-surface-600"
+              }`}>
+              {upcomingTours.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("ongoing")}
+          className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === "ongoing"
+            ? "bg-white shadow-sm text-blue-600"
+            : "text-surface-600 hover:text-surface-900 hover:bg-surface-50"
+            }`}
+        >
+          Ongoing
+          {ongoingTours.length > 0 && (
+            <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs animate-pulse ${activeTab === "ongoing" ? "bg-blue-100 text-blue-700" : "bg-surface-200 text-surface-600"
+              }`}>
+              {ongoingTours.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("completed")}
+          className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === "completed"
+            ? "bg-white shadow-sm text-green-600"
+            : "text-surface-600 hover:text-surface-900 hover:bg-surface-50"
+            }`}
+        >
+          Completed
+          {completedTours.length > 0 && (
+            <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs ${activeTab === "completed" ? "bg-green-100 text-green-700" : "bg-surface-200 text-surface-600"
+              }`}>
+              {completedTours.length}
+            </span>
+          )}
+        </button>
+      </div>
 
-              return (
-                <div key={tour.id} className="p-4 hover:bg-surface-700/50 light:hover:bg-surface-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h4 className="font-medium text-surface-100 light:text-surface-900">{tour.client_name}</h4>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tour.status === "ongoing" ? "bg-green-900/50 light:bg-green-100 text-green-300 light:text-green-700" : "bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-700"
-                          }`}>
-                          {tour.status === "ongoing" ? "Ongoing" : "Upcoming"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-surface-400 light:text-surface-500">
-                        <span>
-                          {format(parseISO(tour.start_date), "MMM d")} - {format(parseISO(tour.end_date), "MMM d, yyyy")}
-                        </span>
-                        <span>{tour.pax_adults + tour.pax_children} pax</span>
-                      </div>
-                    </div>
-                    {selectedTour === tour.id ? (
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={selectedDriver}
-                          onChange={(e) => setSelectedDriver(e.target.value)}
-                          className="px-3 py-1.5 text-sm border border-surface-600 light:border-surface-300 rounded-lg focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none bg-surface-800 light:bg-white text-surface-100 light:text-surface-900"
-                        >
-                          <option value="">Select Driver</option>
-                          {drivers.map((driver) => {
-                            const availability = checkDriverAvailability(
-                              driver.id,
-                              tour.id,
-                              tour.start_date,
-                              tour.end_date
-                            );
-                            return (
-                              <option
-                                key={driver.id}
-                                value={driver.id}
-                                disabled={!availability.available}
-                              >
-                                {driver.name} {driver.vehicle_type ? `(${driver.vehicle_type})` : ""}
-                                {!availability.available ? " - Not Available" : ""}
-                              </option>
-                            );
-                          })}
-                        </select>
-                        <Button
-                          size="sm"
-                          onClick={() => handleAssignDriver(tour.id, selectedDriver)}
-                          disabled={!selectedDriver || isAssigning}
-                          loading={isAssigning}
-                        >
-                          Assign
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedTour(null);
-                            setSelectedDriver("");
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={() => setSelectedTour(tour.id)}
-                        disabled={!!assigning}
-                      >
-                        Assign Driver
-                      </Button>
-                    )}
-                  </div>
+      {/* Pending Tab - Tours Needing Drivers */}
+      {activeTab === "pending" && (
+        <>
+          {toursNeedingDrivers.length > 0 ? (
+            <div className="card shadow-sm border-primary-100">
+              <div className="px-6 py-5 border-b border-surface-100 flex items-center justify-between bg-primary-50/30">
+                <div>
+                  <h3 className="text-lg font-bold text-surface-900 tracking-tight">
+                    Pending Driver Assignments
+                  </h3>
+                  <p className="text-sm text-surface-500 mt-0.5">
+                    {toursNeedingDrivers.length} tours are ready for transport planning
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {toursNeedingDrivers.length === 0 && (
-        <div className="card p-12 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-700 light:bg-surface-200 flex items-center justify-center">
-            <svg className="w-8 h-8 text-surface-500 light:text-surface-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-surface-100 light:text-surface-900 mb-1">
-            No tours ready for driver assignment
-          </h3>
-          <p className="text-surface-400 light:text-surface-500">
-            Tours will appear here once vouchers are marked as completed
-          </p>
-        </div>
-      )}
-
-      {/* Assigned Tours */}
-      {toursWithDrivers.length > 0 && (
-        <div className="card">
-          <div className="px-6 py-4 border-b border-surface-600 light:border-surface-200">
-            <h3 className="text-lg font-semibold text-surface-100 light:text-surface-900">
-              Active Assignments ({toursWithDrivers.length})
-            </h3>
-            <p className="text-sm text-surface-400 light:text-surface-500 mt-1">
-              Tours with drivers currently assigned
-            </p>
-          </div>
-          <div className="divide-y divide-surface-600 light:divide-surface-200">
-            {toursWithDrivers.map((tour) => {
-              const isUnassigning = assigning === tour.id;
-              const driver = tour.drivers;
-
-              return (
-                <div key={tour.id} className="p-4 hover:bg-surface-700/50 light:hover:bg-surface-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h4 className="font-medium text-surface-100 light:text-surface-900">{tour.client_name}</h4>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tour.status === "ongoing" ? "bg-green-900/50 light:bg-green-100 text-green-300 light:text-green-700" : "bg-primary-900/50 light:bg-primary-100 text-primary-300 light:text-primary-700"
-                          }`}>
-                          {tour.status === "ongoing" ? "Ongoing" : "Upcoming"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-surface-400 light:text-surface-500">
-                        <span>
-                          {format(parseISO(tour.start_date), "MMM d")} - {format(parseISO(tour.end_date), "MMM d, yyyy")}
-                        </span>
-                        <span>{tour.pax_adults + tour.pax_children} pax</span>
-                      </div>
-                      {driver && (
-                        <div className="mt-2 flex items-center gap-2 text-sm">
-                          <span className="text-surface-400 light:text-surface-500">Driver:</span>
-                          <span className="font-medium text-surface-100 light:text-surface-900">{driver.name}</span>
-                          {driver.vehicle_type && (
-                            <span className="text-surface-400 light:text-surface-500">({driver.vehicle_type}{driver.vehicle_number ? ` • ${driver.vehicle_number}` : ""})</span>
-                          )}
+                <div className="px-2 py-1 bg-primary-100 text-primary-700 text-xs font-bold rounded-lg uppercase tracking-wider">
+                  Priority
+                </div>
+              </div>
+              <div className="divide-y divide-surface-100">
+                {toursNeedingDrivers.map((tour) => {
+                  const isAssigning = assigning === tour.id && selectedTour === tour.id;
+                  return (
+                    <div key={tour.id} className="p-5 hover:bg-surface-50 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h4 className="font-bold text-surface-900 truncate">{tour.client_name}</h4>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${tour.status === "ongoing" ? "bg-[#059669]/10 text-[#059669]" : "bg-blue-50 text-blue-600"}`}>
+                              {tour.status === "ongoing" ? "Ongoing" : "Upcoming"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs font-medium text-surface-500">
+                            <span>{format(parseISO(tour.start_date), "MMM d")} - {format(parseISO(tour.end_date), "MMM d, yyyy")}</span>
+                            <span>{tour.pax_adults + tour.pax_children} Pax</span>
+                          </div>
                         </div>
-                      )}
+                        {selectedTour === tour.id ? (
+                          <div className="flex flex-wrap items-center gap-2 animate-fade-in">
+                            <select
+                              value={selectedDriver}
+                              onChange={(e) => setSelectedDriver(e.target.value)}
+                              className="px-3 py-2 text-sm border border-surface-200 rounded-xl focus:border-primary-500 outline-none bg-white min-w-45"
+                            >
+                              <option value="">Choose a Driver</option>
+                              {drivers.map((driver) => {
+                                const availability = checkDriverAvailability(driver.id, tour.id, tour.start_date, tour.end_date);
+                                return (
+                                  <option key={driver.id} value={driver.id} disabled={!availability.available}>
+                                    {driver.name} {driver.vehicle_type ? `(${driver.vehicle_type})` : ""}
+                                    {!availability.available ? " (Conflict)" : ""}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <Button size="sm" onClick={() => handleAssignDriver(tour.id, selectedDriver)} disabled={!selectedDriver || isAssigning} loading={isAssigning} className="rounded-xl">
+                              Assign
+                            </Button>
+                            <Button variant="secondary" size="sm" onClick={() => { setSelectedTour(null); setSelectedDriver(""); }} className="rounded-xl">
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button size="sm" onClick={() => setSelectedTour(tour.id)} disabled={!!assigning} className="rounded-xl px-6">
+                            Assign Driver
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDownloadLogSheet(tour.id)}
-                        disabled={downloadingLogSheet === tour.id}
-                        loading={downloadingLogSheet === tour.id}
-                      >
-                        <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="card p-12 text-center bg-surface-50/50 border-dashed">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white shadow-sm flex items-center justify-center text-surface-300">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-surface-900 tracking-tight">All tours assigned</h3>
+              <p className="text-sm text-surface-500 mt-1 max-w-xs mx-auto">
+                Great work! All currently ready tours have been matched with a driver.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Upcoming Tab */}
+      {activeTab === "upcoming" && (
+        <>
+          {upcomingTours.length > 0 ? (
+            <div className="card shadow-sm border-purple-200 bg-purple-50/20">
+              <div className="px-6 py-5 border-b border-purple-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-surface-900 tracking-tight">Upcoming Tours</h3>
+                  <p className="text-sm text-surface-500 mt-0.5">{upcomingTours.length} assigned tours starting soon</p>
+                </div>
+                <span className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-lg uppercase tracking-wider">Upcoming</span>
+              </div>
+              <div className="divide-y divide-surface-100">
+                {upcomingTours.map((tour) => (
+                  <div key={tour.id} className="p-5 hover:bg-surface-50 transition-colors">
+                    <div className="flex items-center justify-between gap-6">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-surface-900 truncate mb-1">{tour.client_name}</h4>
+                        <div className="flex items-center gap-4 text-xs font-medium text-surface-500">
+                          <span>{format(parseISO(tour.start_date), "MMM d")} - {format(parseISO(tour.end_date), "MMM d, yyyy")}</span>
+                          <span>{tour.pax_adults + tour.pax_children} Pax</span>
+                        </div>
+                        {tour.drivers && (
+                          <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-purple-50 w-fit">
+                            <span className="text-xs font-bold text-purple-700">{tour.drivers.name}</span>
+                            {tour.drivers.vehicle_type && <span className="text-xs text-purple-500">{tour.drivers.vehicle_type}</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleDownloadLogSheet(tour.id)} disabled={downloadingLogSheet === tour.id} loading={downloadingLogSheet === tour.id} className="rounded-xl text-[#E04344]">
+                          Log Sheet
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={() => handleUnassignDriver(tour.id)} disabled={assigning === tour.id} className="rounded-xl">
+                          Unassign
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="card p-12 text-center bg-surface-50/50 border-dashed">
+              <h3 className="text-lg font-bold text-surface-900">No Upcoming Tours</h3>
+              <p className="text-sm text-surface-500 mt-1">Tours with assigned drivers starting in the future will appear here.</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Ongoing Tab */}
+      {activeTab === "ongoing" && (
+        <>
+          {ongoingTours.length > 0 ? (
+            <div className="card shadow-sm border-blue-200 bg-blue-50/20">
+              <div className="px-6 py-5 border-b border-blue-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-surface-900 tracking-tight">Ongoing Tours</h3>
+                  <p className="text-sm text-surface-500 mt-0.5">{ongoingTours.length} tours currently in operation</p>
+                </div>
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-lg uppercase tracking-wider animate-pulse">Live</span>
+              </div>
+              <div className="divide-y divide-surface-100">
+                {ongoingTours.map((tour) => (
+                  <div key={tour.id} className="p-5 hover:bg-surface-50 transition-colors">
+                    <div className="flex items-center justify-between gap-6">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-surface-900 truncate mb-1">{tour.client_name}</h4>
+                        <div className="flex items-center gap-4 text-xs font-medium text-surface-500">
+                          <span>{format(parseISO(tour.start_date), "MMM d")} - {format(parseISO(tour.end_date), "MMM d, yyyy")}</span>
+                          <span>{tour.pax_adults + tour.pax_children} Pax</span>
+                        </div>
+                        {tour.drivers && (
+                          <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-blue-50 w-fit">
+                            <span className="text-xs font-bold text-blue-700">{tour.drivers.name}</span>
+                            {tour.drivers.vehicle_type && <span className="text-xs text-blue-500">{tour.drivers.vehicle_type}</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleDownloadLogSheet(tour.id)} disabled={downloadingLogSheet === tour.id} loading={downloadingLogSheet === tour.id} className="rounded-xl text-[#E04344]">
+                          Log Sheet
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="card p-12 text-center bg-surface-50/50 border-dashed">
+              <h3 className="text-lg font-bold text-surface-900">No Ongoing Tours</h3>
+              <p className="text-sm text-surface-500 mt-1">Tours that have started but not ended will appear here.</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Completed Tab */}
+      {activeTab === "completed" && (
+        <>
+          {completedTours.length > 0 ? (
+            <div className="card shadow-sm border-surface-200">
+              <div className="px-6 py-5 border-b border-surface-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-surface-900 tracking-tight">Completed Tours</h3>
+                  <p className="text-sm text-surface-500 mt-0.5">{completedTours.length} tours finished (end date passed)</p>
+                </div>
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-lg uppercase tracking-wider">Done</span>
+              </div>
+              <div className="divide-y divide-surface-100">
+                {completedTours.map((tour) => (
+                  <div key={tour.id} className="p-5 hover:bg-surface-50 transition-colors opacity-80">
+                    <div className="flex items-center justify-between gap-6">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-surface-900 truncate mb-1">{tour.client_name}</h4>
+                        <div className="flex items-center gap-4 text-xs font-medium text-surface-500">
+                          <span>{format(parseISO(tour.start_date), "MMM d")} - {format(parseISO(tour.end_date), "MMM d, yyyy")}</span>
+                          <span>{tour.pax_adults + tour.pax_children} Pax</span>
+                        </div>
+                        {tour.drivers && (
+                          <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-green-50 w-fit">
+                            <span className="text-xs font-bold text-green-700">{tour.drivers.name}</span>
+                          </div>
+                        )}
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => handleDownloadLogSheet(tour.id)} disabled={downloadingLogSheet === tour.id} loading={downloadingLogSheet === tour.id} className="rounded-xl text-[#E04344]">
                         Log Sheet
                       </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleUnassignDriver(tour.id)}
-                        disabled={isUnassigning}
-                        loading={isUnassigning}
-                      >
-                        Unassign Driver
-                      </Button>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="card p-12 text-center bg-surface-50/50 border-dashed">
+              <h3 className="text-lg font-bold text-surface-900">No Completed Tours</h3>
+              <p className="text-sm text-surface-500 mt-1">Tours whose end date has passed will appear here.</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

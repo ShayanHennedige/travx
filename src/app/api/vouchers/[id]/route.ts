@@ -52,6 +52,29 @@ export async function PUT(request: Request, { params }: RouteParams) {
   try {
     const body = await request.json();
 
+    const optionalStringFields = [
+      "arrival_time",
+      "departure_time",
+      "confirmed_by",
+      "confirmed_date",
+      "booked_by",
+      "booked_date",
+      "remarks",
+      "nationality",
+      "room_rate_currency",
+    ] as const;
+
+    const numericFields = [
+      "pax_adults",
+      "pax_children",
+      "pax_infants",
+      "no_of_rooms",
+      "no_of_nights",
+      "room_rate_sgl",
+      "room_rate_dbl",
+      "room_rate_tpl",
+    ] as const;
+
     // Remove fields that shouldn't be updated directly
     const {
       id: _id,
@@ -60,6 +83,25 @@ export async function PUT(request: Request, { params }: RouteParams) {
       group_inquiries,
       ...updateData
     } = body;
+
+    for (const field of optionalStringFields) {
+      if (field in updateData && updateData[field] === "") {
+        updateData[field] = null;
+      }
+    }
+
+    for (const field of numericFields) {
+      if (!(field in updateData)) continue;
+      const value = updateData[field];
+      if (value === "" || value === null || value === undefined) {
+        updateData[field] = null;
+        continue;
+      }
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) {
+        updateData[field] = parsed;
+      }
+    }
 
     const { data: voucher, error } = await supabase
       .from("hotel_vouchers")
@@ -72,7 +114,12 @@ export async function PUT(request: Request, { params }: RouteParams) {
       .single();
 
     if (error) {
-      console.error("Error updating voucher:", error);
+      console.error("Error updating voucher:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

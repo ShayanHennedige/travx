@@ -29,7 +29,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           className={`input min-h-[100px] resize-y ${error ? "input-error" : ""} ${className}`}
           {...props}
         />
-        {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
+        {error && <p className="text-sm text-accent-500 mt-1">{error}</p>}
       </div>
     );
   }
