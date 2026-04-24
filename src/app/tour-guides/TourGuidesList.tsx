@@ -190,7 +190,7 @@ export function TourGuidesList({ guides: initialGuides }: TourGuidesListProps) {
       {/* Guides Table */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" suppressHydrationWarning>
             <thead>
               <tr className="border-b border-surface-200 bg-surface-50">
                 <th className="px-4 py-3 text-left text-sm font-semibold text-surface-700">Name</th>

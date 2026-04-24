@@ -41,7 +41,7 @@ export default function RootLayout({
     <html lang="en" className={dmSans.variable} suppressHydrationWarning>
       <head>
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="antialiased" suppressHydrationWarning>
         <ThemeProvider>

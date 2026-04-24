@@ -11,13 +11,26 @@ const tourGuideUpdateSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
+const idParamSchema = z.object({
+  id: z.string().uuid("Invalid tour guide ID"),
+});
+
 // GET - Fetch single tour guide
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
-  const { id } = params;
+  const parsedParams = idParamSchema.safeParse(await params);
+
+  if (!parsedParams.success) {
+    return NextResponse.json(
+      { error: parsedParams.error.issues[0]?.message ?? "Invalid tour guide ID" },
+      { status: 400 }
+    );
+  }
+
+  const { id } = parsedParams.data;
 
   const { data: guide, error } = await supabase
     .from("tour_guides")
@@ -35,10 +48,19 @@ export async function GET(
 // PUT - Update tour guide
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
-  const { id } = params;
+  const parsedParams = idParamSchema.safeParse(await params);
+
+  if (!parsedParams.success) {
+    return NextResponse.json(
+      { error: parsedParams.error.issues[0]?.message ?? "Invalid tour guide ID" },
+      { status: 400 }
+    );
+  }
+
+  const { id } = parsedParams.data;
 
   try {
     const body = await request.json();
@@ -87,10 +109,19 @@ export async function PUT(
 // DELETE - Delete tour guide
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
-  const { id } = params;
+  const parsedParams = idParamSchema.safeParse(await params);
+
+  if (!parsedParams.success) {
+    return NextResponse.json(
+      { error: parsedParams.error.issues[0]?.message ?? "Invalid tour guide ID" },
+      { status: 400 }
+    );
+  }
+
+  const { id } = parsedParams.data;
 
   try {
     const { error } = await supabase
