@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { Button, Badge } from "@/components/ui";
+import { AdminPinModal } from "@/components/AdminPinModal";
 
 type ComponentStatus = "new" | "in_progress" | "completed";
 
@@ -161,7 +162,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
   if (itineraries.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 animate-in fade-in duration-700">
-        <div className="w-24 h-24 rounded-4xl bg-surface-50 flex items-center justify-center border border-surface-100 shadow-sm mb-6">
+        <div className="w-24 h-24 rounded-[2rem] bg-surface-50 flex items-center justify-center border border-surface-100 shadow-sm mb-6">
           <svg className="w-10 h-10 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
           </svg>
@@ -182,7 +183,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Glass Filters */}
-      <div className="sticky top-0 lg:top-4 z-40 bg-white/80 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-2xl md:rounded-4xl p-2">
+      <div className="sticky top-0 lg:top-4 z-40 bg-white/80 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/40 rounded-2xl md:rounded-[2rem] p-2">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col md:flex-row md:items-center gap-2">
             {/* Search */}
@@ -200,13 +201,13 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                 placeholder="Search by client, inquiry #, or title..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-slate-50/50 hover:bg-white border-0 rounded-3xl focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all text-sm font-medium text-slate-700 placeholder:text-slate-400"
+                className="w-full pl-12 pr-4 py-3 bg-slate-50/50 hover:bg-white border-0 rounded-[1.5rem] focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all text-sm font-medium text-slate-700 placeholder:text-slate-400"
               />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               {/* View Mode Toggle */}
-              <div className="flex items-center gap-1 p-1 bg-slate-100/50 rounded-3xl flex-1 sm:flex-none">
+              <div className="flex items-center gap-1 p-1 bg-slate-100/50 rounded-[1.5rem] flex-1 sm:flex-none">
                 <button
                   onClick={() => setViewMode("grouped")}
                   className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 flex items-center justify-center gap-2 rounded-2xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all ${viewMode === "grouped"
@@ -238,7 +239,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortBy)}
-                  className="w-full sm:w-auto appearance-none pl-4 pr-10 py-2.5 bg-slate-50/50 hover:bg-white border-0 rounded-3xl focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all text-xs sm:text-sm font-bold text-slate-700 cursor-pointer outline-none"
+                  className="w-full sm:w-auto appearance-none pl-4 pr-10 py-2.5 bg-slate-50/50 hover:bg-white border-0 rounded-[1.5rem] focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all text-xs sm:text-sm font-bold text-slate-700 cursor-pointer outline-none"
                 >
                   <option value="newest">Newest First</option>
                   <option value="oldest">Oldest First</option>
@@ -291,11 +292,11 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                   <div className="relative px-4 sm:px-8 py-5 sm:py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6">
                     {/* Left Side: Client Info */}
                     <div className="flex items-center gap-4 sm:gap-6 flex-1">
-                      <div className="relative shrink-0">
+                      <div className="relative flex-shrink-0">
                         {group.inquiry ? (
                           <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center text-base sm:text-lg font-black shadow-inner border border-white/20 ${group.type === "group"
-                            ? "bg-linear-to-br from-purple-500 to-indigo-600 text-white shadow-purple-200"
-                            : "bg-linear-to-br from-blue-500 to-cyan-600 text-white shadow-blue-200"
+                            ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-purple-200"
+                            : "bg-gradient-to-br from-blue-500 to-cyan-600 text-white shadow-blue-200"
                             }`}>
                             {(group.inquiry.first_name || 'G').charAt(0)}{(group.inquiry.last_name || '').charAt(0) || ''}
                           </div>
@@ -359,12 +360,12 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
 
                 {/* Itineraries in Group */}
                 <div
-                  className={`transition-all duration-500 ease-in-out ${isExpanded ? "max-h-750 opacity-100" : "max-h-0 opacity-0"
+                  className={`transition-all duration-500 ease-in-out ${isExpanded ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0"
                     }`}
                 >
                   <div className="px-8 pb-8 pt-2 grid grid-cols-1 gap-4">
                     {group.itineraries.map((itinerary) => (
-                      <div key={itinerary.id} className="group/card relative bg-slate-50 hover:bg-white p-6 rounded-3xl border border-slate-100 hover:border-primary-100 hover:shadow-xl hover:shadow-primary-500/5 transition-all duration-300">
+                      <div key={itinerary.id} className="group/card relative bg-slate-50 hover:bg-white p-6 rounded-[1.5rem] border border-slate-100 hover:border-primary-100 hover:shadow-xl hover:shadow-primary-500/5 transition-all duration-300">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
 
                           <div className="flex-1 min-w-0">
@@ -403,7 +404,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                             </Link>
                             <button
                               onClick={() => setDeleteConfirm(itinerary.id)}
-                              className="p-2 text-slate-400 hover:text-accent-500 hover:bg-accent-500/10 rounded-xl transition-colors"
+                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
                               title="Delete itinerary"
                             >
                               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -486,7 +487,7 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
                         </Link>
                         <button
                           onClick={() => setDeleteConfirm(itinerary.id)}
-                          className="p-2 text-slate-400 hover:text-accent-500 hover:bg-accent-500/10 rounded-lg transition-colors"
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -516,43 +517,15 @@ export function ItinerariesList({ itineraries: initialItineraries }: Itineraries
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal via PIN */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-4xl shadow-2xl max-w-md w-full p-8 scale-100 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-accent-500/10 flex items-center justify-center border border-accent-500/20">
-                <svg className="w-6 h-6 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">Delete Itinerary</h3>
-                <p className="text-sm text-slate-500 font-medium">This action cannot be undone</p>
-              </div>
-            </div>
-            <p className="text-slate-600 mb-8 leading-relaxed">
-              Are you sure you want to delete this itinerary? This valid travel plan will be permanently removed.
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => setDeleteConfirm(null)}
-                disabled={isDeleting}
-                className="rounded-xl hover:bg-slate-50 text-slate-600"
-              >
-                Cancel
-              </Button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                disabled={isDeleting}
-                className="px-6 py-2.5 bg-accent-600 hover:bg-accent-700 text-black rounded-xl font-bold text-sm transition-all shadow-lg shadow-accent-500/20 disabled:opacity-50 disabled:shadow-none"
-              >
-                {isDeleting ? "Deleting..." : "Delete Itinerary"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminPinModal
+            isOpen={!!deleteConfirm}
+            title="Authorize Deletion"
+            description="Are you sure you want to delete this itinerary? This valid travel plan will be permanently removed."
+            onAuthorized={() => handleDelete(deleteConfirm)}
+            onClose={() => setDeleteConfirm(null)}
+        />
       )}
     </div>
   );

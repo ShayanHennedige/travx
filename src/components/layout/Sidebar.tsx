@@ -6,7 +6,6 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { useTheme } from "@/lib/ThemeContext";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: DashboardIcon },
@@ -14,8 +13,7 @@ const navigation = [
   { name: "Itineraries", href: "/itineraries", icon: ItinerariesIcon },
   { name: "Operations", href: "/operations", icon: OperationsIcon },
   { name: "Vouchers", href: "/vouchers", icon: VouchersIcon },
-  { name: "Drivers", href: "/drivers", icon: DriversIcon },
-  { name: "Tour Guides", href: "/tour-guides", icon: TourGuideIcon },
+  { name: "Transport", href: "/drivers", icon: DriversIcon },
   { name: "Analytics", href: "/analytics", icon: AnalyticsIcon },
   { name: "P&L", href: "/pnl", icon: PnlIcon },
 ];
@@ -29,9 +27,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const [companyName, setCompanyName] = useState("TraveX");
+  const [companyName, setCompanyName] = useState("TravX");
   const [logoUrl, setLogoUrl] = useState(process.env.NEXT_PUBLIC_LOGO_URL || "/Serendia.png");
-  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     // Load saved settings from localStorage
@@ -103,29 +100,29 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Mobile Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-surface-950/70 backdrop-blur-sm z-30 lg:hidden"
+          className="fixed inset-0 bg-surface-900/60 backdrop-blur-sm z-30 lg:hidden"
           onClick={onClose}
         />
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-40 h-screen w-64 bg-surface-900 text-white shadow-2xl transition-transform duration-300 ease-in-out lg:translate-x-0 border-r border-surface-800 ${isOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed left-0 top-0 z-40 h-screen w-64 bg-surface-900 text-surface-100 shadow-xl transition-transform duration-300 ease-in-out lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"
           }`}
       >
         <div className="flex h-full flex-col relative">
           {/* Close button - mobile only */}
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 p-1.5 rounded-lg bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-colors lg:hidden"
+            className="absolute right-4 top-4 p-2 rounded-lg bg-white/5 text-surface-400 hover:text-surface-100 lg:hidden"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
 
           {/* Logo */}
           <div className="flex h-20 items-center gap-3 px-4 border-b border-surface-800 bg-surface-950">
-            <div className="relative w-11 h-11 shrink-0 rounded-lg overflow-hidden ring-1 ring-accent-700/40">
+            <div className="relative w-12 h-12 flex-shrink-0">
               <Image
                 src={logoUrl}
                 alt={`${companyName} Logo`}
@@ -136,29 +133,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               />
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-white text-base font-bold tracking-tight truncate">{companyName}</h1>
-              <p className="text-surface-400 text-xs font-medium">Travel Management</p>
+              <h1 className="text-white text-lg font-bold tracking-tight truncate">{companyName}</h1>
+              <p className="text-surface-400 text-xs">Travel Management</p>
             </div>
-            {/* Desktop Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              className="hidden lg:flex p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-surface-800 transition-all duration-200"
-              title={theme === "dark" ? "Light mode" : "Dark mode"}
-            >
-              {theme === "dark" ? (
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              ) : (
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              )}
-            </button>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
@@ -166,12 +147,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   key={item.name}
                   href={item.href}
                   onClick={onClose}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 group ${isActive
-                    ? "bg-accent-500 text-black shadow-lg shadow-accent-500/20"
-                    : "text-surface-400 hover:bg-surface-800 hover:text-white"
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${isActive
+                    ? "bg-accent-500 text-black shadow-lg shadow-accent-500/30"
+                    : "text-surface-400 hover:bg-white/5 hover:text-surface-100"
                     }`}
                 >
-                  <item.icon className={`h-4.5 w-4.5 shrink-0 transition-colors ${isActive ? "text-black" : "text-surface-500 group-hover:text-white"}`} />
+                  <item.icon className={`h-5 w-5 flex-shrink-0 transition-colors ${isActive ? "text-black" : "text-surface-500 group-hover:text-surface-100"}`} />
                   {item.name}
                 </Link>
               );
@@ -179,49 +160,48 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </nav>
 
           {/* Form Links */}
-          <div className="px-3 pb-3 space-y-1.5 border-t border-surface-800 pt-3">
-            <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-surface-600 mb-2">Quick Links</p>
+          <div className="px-3 pb-3 space-y-2 border-t border-surface-800 pt-3">
             <button
               onClick={copyInquiryLink}
-              className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-surface-500 hover:bg-surface-800 hover:text-accent-400 transition-all duration-200 border border-dashed border-surface-700 hover:border-accent-700"
+              className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-surface-400 hover:bg-white/5 hover:text-surface-100 transition-all duration-200 border border-dashed border-surface-700 hover:border-surface-500"
             >
-              <LinkIcon className="h-3.5 w-3.5 shrink-0" />
+              <LinkIcon className="h-4 w-4 flex-shrink-0 text-surface-500" />
               <span className="truncate">Inquiry Link</span>
             </button>
             <button
               onClick={copyFeedbackLink}
-              className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-surface-500 hover:bg-surface-800 hover:text-accent-400 transition-all duration-200 border border-dashed border-surface-700 hover:border-accent-700"
+              className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-surface-400 hover:bg-white/5 hover:text-surface-100 transition-all duration-200 border border-dashed border-surface-700 hover:border-surface-500"
             >
-              <LinkIcon className="h-3.5 w-3.5 shrink-0" />
+              <LinkIcon className="h-4 w-4 flex-shrink-0 text-surface-500" />
               <span className="truncate">Feedback Link</span>
             </button>
             <button
               onClick={copyHotelRatesLink}
-              className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-surface-500 hover:bg-surface-800 hover:text-accent-400 transition-all duration-200 border border-dashed border-surface-700 hover:border-accent-700"
+              className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-surface-400 hover:bg-white/5 hover:text-surface-100 transition-all duration-200 border border-dashed border-surface-700 hover:border-surface-500"
             >
-              <LinkIcon className="h-3.5 w-3.5 shrink-0" />
+              <LinkIcon className="h-4 w-4 flex-shrink-0 text-surface-500" />
               <span className="truncate">Hotel Rates Link</span>
             </button>
           </div>
 
           {/* Profile & Sign out */}
-          <div className="p-3 border-t border-surface-800 space-y-0.5">
+          <div className="p-3 border-t border-surface-800 space-y-1 bg-surface-900">
             <Link
               href="/profile"
               onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${pathname === "/profile" || pathname.startsWith("/profile/")
-                ? "bg-accent-500 text-black shadow-lg shadow-accent-500/20"
-                : "text-surface-400 hover:bg-surface-800 hover:text-white"
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${pathname === "/profile" || pathname.startsWith("/profile/")
+                ? "bg-accent-500 text-black shadow-lg shadow-accent-500/30"
+                : "text-surface-400 hover:bg-white/5 hover:text-surface-100"
                 }`}
             >
-              <ProfileIcon className={`h-4 w-4 shrink-0 ${pathname === "/profile" || pathname.startsWith("/profile/") ? "text-black" : "text-surface-500"}`} />
+              <ProfileIcon className={`h-5 w-5 flex-shrink-0 ${pathname === "/profile" || pathname.startsWith("/profile/") ? "text-black" : "text-surface-500"}`} />
               Profile
             </Link>
             <button
               onClick={handleSignOut}
-              className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-surface-400 hover:bg-accent-500/10 hover:text-accent-400 transition-all duration-200"
+              className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-400 hover:bg-white/5 hover:text-red-400 transition-all duration-200"
             >
-              <LogoutIcon className="h-4 w-4 shrink-0 text-surface-500" />
+              <LogoutIcon className="h-5 w-5 flex-shrink-0 text-surface-500" />
               Sign Out
             </button>
           </div>
@@ -299,14 +279,6 @@ function LinkIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-    </svg>
-  );
-}
-
-function TourGuideIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
     </svg>
   );
 }

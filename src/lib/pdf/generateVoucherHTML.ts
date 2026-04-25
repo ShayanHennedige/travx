@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 
 export function generateVoucherHTML(voucher: any, tourNo: string, totalPax: number, inquiry: any): string {
-  const logoUrl = process.env.NEXT_PUBLIC_LOGO_URL || 'https://tvxwjknpdzvuovjgqvvi.supabase.co/storage/v1/object/public/logo/Serendia.png';
+  const logoUrl = process.env.NEXT_PUBLIC_LOGO_URL || 'https://axcfwwdahunzxsdeohkv.supabase.co/storage/v1/object/public/logo/Serendia.png';
   const checkInDate = voucher.check_in_date ? format(new Date(voucher.check_in_date), "dd-MMM-yy") : "";
   const checkOutDate = voucher.check_out_date ? format(new Date(voucher.check_out_date), "dd-MMM-yy") : "";
   const confirmedDate = voucher.confirmed_date ? format(new Date(voucher.confirmed_date), "yyyy-MM-dd") : "";
@@ -30,25 +30,25 @@ export function generateVoucherHTML(voucher: any, tourNo: string, totalPax: numb
         .header {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          padding: 14px 0 16px;
-          border-bottom: 2px solid #2c2c2c;
-          margin-bottom: 22px;
+          align-items: flex-end;
+          padding-bottom: 10px;
+          border-bottom: 1.5px solid #2c2c2c;
+          margin-bottom: 18px;
         }
-        .logo { height: 110px; width: auto; }
+        .logo { height: 42px; width: auto; }
         .company-info {
           text-align: right;
-          font-size: 12px;
-          color: #444;
-          line-height: 1.65;
+          font-size: 9px;
+          color: #555;
+          line-height: 1.45;
         }
         .company-name {
-          font-size: 17px;
+          font-size: 13px;
           font-weight: bold;
           color: #2c2c2c;
-          letter-spacing: 3px;
+          letter-spacing: 2px;
           text-transform: uppercase;
-          margin-bottom: 4px;
+          margin-bottom: 2px;
         }
 
         /* Title */
@@ -217,11 +217,11 @@ export function generateVoucherHTML(voucher: any, tourNo: string, totalPax: numb
     <body>
       <!-- Header -->
       <div class="header">
-        <img src="${logoUrl}" alt="TraveX" class="logo" />
+        <img src="${logoUrl}" alt="TravX" class="logo" />
         <div class="company-info">
-          <div class="company-name">TraveX</div>
+          <div class="company-name">TravX</div>
           63A, Old Road, Pannipitiya, Sri Lanka<br>
-          +94 77 346 9998 &nbsp;·&nbsp; info@Travex.com
+          +94 77 346 9998 &nbsp;·&nbsp; info@serendiaholidays.com
         </div>
       </div>
 
@@ -276,10 +276,17 @@ export function generateVoucherHTML(voucher: any, tourNo: string, totalPax: numb
         <tbody>
           <tr>
             <td style="font-weight: bold;">No. of Rooms</td>
-            <td>${voucher.room_type === "SGL" ? voucher.no_of_rooms : "—"}</td>
-            <td>${voucher.room_type === "DBL" ? voucher.no_of_rooms : "—"}</td>
-            <td>${voucher.room_type === "TPL" ? voucher.no_of_rooms : "—"}</td>
-            <td>${voucher.room_type === "QUAD" || voucher.room_type === "QTPL" ? voucher.no_of_rooms : "—"}</td>
+            <td>${voucher.rooms_sgl > 0 ? voucher.rooms_sgl : "—"}</td>
+            <td>${voucher.rooms_dbl > 0 ? voucher.rooms_dbl : "—"}</td>
+            <td>${voucher.rooms_tpl > 0 ? voucher.rooms_tpl : "—"}</td>
+            <td>${voucher.rooms_qtpl > 0 ? voucher.rooms_qtpl : "—"}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">Room Rate (USD)</td>
+            <td>${voucher.rooms_sgl > 0 && voucher.room_rate_sgl ? '$' + Number(voucher.room_rate_sgl).toFixed(2) : "—"}</td>
+            <td>${voucher.rooms_dbl > 0 && voucher.room_rate_dbl ? '$' + Number(voucher.room_rate_dbl).toFixed(2) : "—"}</td>
+            <td>${voucher.rooms_tpl > 0 && voucher.room_rate_tpl ? '$' + Number(voucher.room_rate_tpl).toFixed(2) : "—"}</td>
+            <td>${voucher.rooms_qtpl > 0 && voucher.room_rate_qtpl ? '$' + Number(voucher.room_rate_qtpl).toFixed(2) : "—"}</td>
           </tr>
         </tbody>
       </table>

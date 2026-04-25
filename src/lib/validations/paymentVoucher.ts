@@ -16,6 +16,14 @@ export const payeeTypes = [
     "Miscellaneous",
 ] as const;
 
+// Voucher categories
+export const voucherCategories = [
+    "hotel",
+    "transport",
+    "extras",
+    "admin",
+] as const;
+
 // Voucher statuses
 export const voucherStatuses = [
     "draft",
@@ -55,13 +63,13 @@ export const paymentVoucherSchema = z.object({
 
     // Description
     description: z.string().optional(),
-    nights_count: z.coerce.number().int().min(0).default(0),
+    nights_count: z.number().int().min(0).default(0),
 
     // Amounts
-    rate_usd: z.coerce.number().min(0).default(0),
-    total_usd: z.coerce.number().min(0).default(0),
-    exchange_rate: z.coerce.number().min(0).default(300),
-    total_lkr: z.coerce.number().min(0).default(0),
+    rate_usd: z.number().min(0).default(0),
+    total_usd: z.number().min(0).default(0),
+    exchange_rate: z.number().min(0).default(300),
+    total_lkr: z.number().min(0).default(0),
     amount_in_words: z.string().optional(),
 
     // Payment Method
@@ -79,6 +87,9 @@ export const paymentVoucherSchema = z.object({
 
     // Status
     status: z.enum(voucherStatuses).default("draft"),
+
+    // Category
+    voucher_category: z.enum(voucherCategories).default("hotel"),
 });
 
 export type Payee = z.infer<typeof payeeSchema>;
@@ -86,6 +97,7 @@ export type PaymentVoucher = z.infer<typeof paymentVoucherSchema>;
 export type PaymentMode = typeof paymentModes[number];
 export type PayeeType = typeof payeeTypes[number];
 export type VoucherStatus = typeof voucherStatuses[number];
+export type VoucherCategory = typeof voucherCategories[number];
 
 // Helper function to convert number to words
 export function numberToWords(amount: number): string {

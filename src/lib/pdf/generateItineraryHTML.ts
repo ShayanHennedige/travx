@@ -6,11 +6,15 @@ interface ItineraryDay {
   title: string;
   overnight_location: string;
   hotel_suggestion: string;
+  hotel_tier?: string;
+  room_category?: string;
+  meal_plan?: string;
   day_total_km?: string;
   activities: {
     time: string;
     activity: string;
     location: string;
+    site_description?: string;
     duration: string;
     driving_time?: string;
     driving_distance_km?: string;
@@ -46,8 +50,8 @@ interface InquiryData {
   head_passport_no?: string | null;
   country?: string | null;
   hotel_type: string;
-  room_category?: string;
-  meal_plan?: string;
+  room_category?: string | string[];
+  meal_plan?: string | string[];
   is_group?: boolean;
   rooms_dbl?: number;
   rooms_sgl?: number;
@@ -131,7 +135,7 @@ function generateDayHTML(day: ItineraryDay, isLastDay: boolean = false, mealPlan
       </div>
       
       <ul class="activities">
-        ${day.activities.map(a => `<li>${a.activity}</li>`).join("")}
+        ${day.activities.map(a => `<li>${a.activity}${a.site_description ? `<div class="site-desc">${a.site_description}</div>` : ''}</li>`).join("")}
       </ul>
 
       ${travelTimesList}
@@ -147,7 +151,7 @@ export function generateItineraryHTML(
   options: PDFOptions = {}
 ): string {
   const { includeRates = false, costingData = null } = options;
-  const logoUrl = process.env.NEXT_PUBLIC_LOGO_URL || 'https://tvxwjknpdzvuovjgqvvi.supabase.co/storage/v1/object/public/logo/Serendia.png';
+  const logoUrl = process.env.NEXT_PUBLIC_LOGO_URL || 'https://axcfwwdahunzxsdeohkv.supabase.co/storage/v1/object/public/logo/Serendia.png';
   const totalPax = inquiry
     ? (inquiry.no_of_pax || 0) + (inquiry.no_of_children || 0)
     : 2;
@@ -170,29 +174,47 @@ export function generateItineraryHTML(
 
   const nights = inquiry?.no_of_nights || itinerary.days.length - 1;
 
-  const accommodationMap = new Map<string, { hotel: string; nights: number }>();
+  const getMealPlanAbbreviation = (mealPlan?: string | string[]): string => {
+    if (!mealPlan) return 'BB';
+    
+    // If array, grab the first element as the primary meal plan basis for the itinerary overview
+    const planStr = Array.isArray(mealPlan) ? mealPlan[0] : mealPlan;
+    if (typeof planStr !== 'string') return 'BB';
+    
+    const lowerPlan = planStr.toLowerCase();
+    if (lowerPlan.includes('all inclusive') || lowerPlan === 'ai') return 'AI';
+    if (lowerPlan.includes('full board') || lowerPlan === 'fb') return 'FB';
+    if (lowerPlan.includes('half board') || lowerPlan === 'hb') return 'HB';
+    if (lowerPlan.includes('bed & breakfast') || lowerPlan.includes('bed and breakfast') || lowerPlan === 'bb') return 'BB';
+    return planStr;
+  };
+
+  const accommodationMap = new Map<string, { hotel: string; nights: number; roomCategory: string; mealPlan: string }>();
   const daysWithOvernight = itinerary.days.slice(0, -1);
 
   daysWithOvernight.forEach((day) => {
     if (day.overnight_location && day.hotel_suggestion) {
       const key = day.overnight_location;
+      // Get day-specific properties, fallback to global inquiry properties if missing
+      const globalRoomCat = Array.isArray(inquiry?.room_category) ? inquiry.room_category[0] : inquiry?.room_category;
+      const globalMealPlan = Array.isArray(inquiry?.meal_plan) ? inquiry.meal_plan[0] : inquiry?.meal_plan;
+      
+      const dayRoomCategory = day.room_category || globalRoomCat || "Standard";
+      const rawDayMealPlan = day.meal_plan || globalMealPlan || "BB";
+      const dayMealPlan = getMealPlanAbbreviation(rawDayMealPlan);
+
       if (accommodationMap.has(key)) {
         accommodationMap.get(key)!.nights += 1;
       } else {
-        accommodationMap.set(key, { hotel: day.hotel_suggestion, nights: 1 });
+        accommodationMap.set(key, { 
+           hotel: day.hotel_suggestion, 
+           nights: 1,
+           roomCategory: dayRoomCategory,
+           mealPlan: dayMealPlan
+        });
       }
     }
   });
-
-  const getMealPlanAbbreviation = (mealPlan?: string): string => {
-    if (!mealPlan) return 'BB';
-    const lowerPlan = mealPlan.toLowerCase();
-    if (lowerPlan.includes('all inclusive') || lowerPlan === 'ai') return 'AI';
-    if (lowerPlan.includes('full board') || lowerPlan === 'fb') return 'FB';
-    if (lowerPlan.includes('half board') || lowerPlan === 'hb') return 'HB';
-    if (lowerPlan.includes('bed & breakfast') || lowerPlan.includes('bed and breakfast') || lowerPlan === 'bb') return 'BB';
-    return mealPlan;
-  };
 
   const mealPlanDisplay = getMealPlanAbbreviation(inquiry?.meal_plan);
 
@@ -202,8 +224,8 @@ export function generateItineraryHTML(
         <td>${location}</td>
         <td>${data.hotel}</td>
         <td class="center">${data.nights} Night${data.nights > 1 ? 's' : ''}</td>
-        <td class="center">${inquiry?.room_category || "Deluxe"}</td>
-        <td class="center accent">${mealPlanDisplay}</td>
+        <td class="center">${data.roomCategory}</td>
+        <td class="center accent">${data.mealPlan}</td>
       </tr>
     `)
     .join("");
@@ -212,8 +234,17 @@ export function generateItineraryHTML(
   const oddDays = itinerary.days.filter((_, i) => i % 2 === 0);
   const evenDays = itinerary.days.filter((_, i) => i % 2 === 1);
 
-  const leftColumnHTML = oddDays.map(day => generateDayHTML(day, day.day === totalDays, mealPlanDisplay)).join("");
-  const rightColumnHTML = evenDays.map(day => generateDayHTML(day, day.day === totalDays, mealPlanDisplay)).join("");
+  const globalMealPlanFallback = Array.isArray(inquiry?.meal_plan) ? inquiry.meal_plan[0] : inquiry?.meal_plan;
+
+  const leftColumnHTML = oddDays.map(day => {
+     const dayMp = getMealPlanAbbreviation(day.meal_plan || globalMealPlanFallback || "BB");
+     return generateDayHTML(day, day.day === totalDays, dayMp);
+  }).join("");
+  
+  const rightColumnHTML = evenDays.map(day => {
+     const dayMp = getMealPlanAbbreviation(day.meal_plan || globalMealPlanFallback || "BB");
+     return generateDayHTML(day, day.day === totalDays, dayMp);
+  }).join("");
 
   return `
 <!DOCTYPE html>
@@ -237,28 +268,28 @@ export function generateItineraryHTML(
     .header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 14px 0 16px;
-      border-bottom: 2px solid #2c2c2c;
-      margin-bottom: 26px;
+      align-items: flex-end;
+      padding-bottom: 10px;
+      border-bottom: 1.5px solid #2c2c2c;
+      margin-bottom: 22px;
     }
 
-    .logo { height: 110px; width: auto; }
+    .logo { height: 42px; }
 
     .company-info {
       text-align: right;
-      font-size: 12px;
-      color: #444;
-      line-height: 1.65;
+      font-size: 9px;
+      color: #555;
+      line-height: 1.45;
     }
 
     .company-name {
-      font-size: 17px;
+      font-size: 13px;
       font-weight: bold;
       color: #2c2c2c;
-      letter-spacing: 3px;
+      letter-spacing: 2px;
       text-transform: uppercase;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     /* ── Hero ── */
@@ -279,7 +310,7 @@ export function generateItineraryHTML(
     .hero-line {
       width: 60px;
       height: 1.5px;
-      background: #c09853;
+      background: #e0c16c;
       margin: 8px auto;
     }
 
@@ -330,7 +361,7 @@ export function generateItineraryHTML(
       color: #2c2c2c;
       margin-bottom: 12px;
       padding-bottom: 4px;
-      border-bottom: 1px solid #c09853;
+      border-bottom: 1px solid #e0c16c;
       display: inline-block;
     }
 
@@ -375,7 +406,7 @@ export function generateItineraryHTML(
     .day-divider {
       width: 1px;
       height: 22px;
-      background: #c09853;
+      background: #e0c16c;
     }
 
     .day-title-block {
@@ -419,6 +450,15 @@ export function generateItineraryHTML(
       height: 4px;
       border-radius: 50%;
       background: #c09853;
+    }
+
+    .site-desc {
+      font-size: 9px;
+      color: #777;
+      font-style: italic;
+      margin-top: 1px;
+      margin-bottom: 3px;
+      line-height: 1.4;
     }
 
     .travel-info {
@@ -595,11 +635,11 @@ export function generateItineraryHTML(
 
   <!-- Header -->
   <div class="header">
-    <img src="${logoUrl}" alt="TraveX" class="logo" />
+    <img src="${logoUrl}" alt="TravX" class="logo" />
     <div class="company-info">
-      <div class="company-name">TraveX</div>
+      <div class="company-name">TravX</div>
       63A, Old Road, Pannipitiya, Sri Lanka<br>
-      +94 77 346 9998 &nbsp;·&nbsp; info@Travex.com
+      +94 77 346 9998 &nbsp;·&nbsp; info@serendiaholidays.com
     </div>
   </div>
 
@@ -669,6 +709,18 @@ export function generateItineraryHTML(
         return 'single room';
       };
 
+      const accommodationSummary = (() => {
+        if (accommodationMap.size === 0) {
+          return `Accommodation in ${costingData.hotel_type || inquiry?.hotel_type || '4/5 star'} hotels`;
+        }
+
+        const hotelDetails = Array.from(accommodationMap.entries())
+          .map(([location, data]) => `${location} – ${data.hotel} (${data.nights} Night${data.nights > 1 ? 's' : ''})`)
+          .join(' / ');
+
+        return `Accommodation in ${costingData.hotel_type || inquiry?.hotel_type || '4/5 star'} hotels – ${hotelDetails}`;
+      })();
+
       // Build meal plan description from accommodation data
       const buildMealPlanDesc = (): string => {
         const accomData = costingData.accommodation_data || [];
@@ -698,24 +750,19 @@ export function generateItineraryHTML(
 
       // Build includes list
       const includes: string[] = [];
-      includes.push(`Accommodation on ${costingData.hotel_type || inquiry?.hotel_type || '4/5*'} hotels`);
+      includes.push(accommodationSummary);
       includes.push(`Meal plan – ${buildMealPlanDesc()}`);
 
-      // Add transport if exists
-      if (costingData.transport_data && costingData.transport_data.length > 0) {
-        includes.push('Airport return transfer shuttles');
-      }
-
-      // Add extras
-      if (costingData.extras_data) {
-        costingData.extras_data.forEach((extra: any) => {
-          if (extra.name) includes.push(extra.name);
-        });
-      }
+      includes.push(
+        inquiry?.is_group
+          ? 'Transport in a Coach with an English-speaking guide. (Group trip)'
+          : 'Transport in a Car/Van with an English-speaking chauffeur guide. (FIT trip)'
+      );
 
       // Standard excludes
       const excludes = [
-        'Entrance tickets or boat rides',
+        'Last-minute hotel or room or itinerary changes will incur an extra charge.',
+        'Entrance tickets',
         'Tips',
         'Personal expenses',
       ];
@@ -751,7 +798,7 @@ export function generateItineraryHTML(
   <div class="footer">
     <div class="footer-line"></div>
     This itinerary is subject to availability at the time of booking.<br>
-    Thank you for choosing <strong style="color:#2c2c2c;">TraveX</strong>.
+    Thank you for choosing <strong style="color:#2c2c2c;">TravX</strong>.
   </div>
 
 </body>

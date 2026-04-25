@@ -14,6 +14,16 @@ export async function GET(request: Request, { params }: RouteParams) {
     .from("tours")
     .select(`
       *,
+      inquiries (
+        id,
+        first_name,
+        last_name
+      ),
+      group_inquiries (
+        id,
+        head_first_name,
+        head_last_name
+      ),
       drivers (
         id,
         name,
@@ -21,6 +31,14 @@ export async function GET(request: Request, { params }: RouteParams) {
         vehicle_type,
         vehicle_number,
         languages
+      ),
+      tour_guide_id,
+      tour_guide_status,
+      tour_guides (
+        id,
+        name,
+        language,
+        contact_number
       ),
       itineraries (
         id,
@@ -37,7 +55,17 @@ export async function GET(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ tour });
+  const inquiry = Array.isArray((tour as any).inquiries) ? (tour as any).inquiries[0] : (tour as any).inquiries;
+  const groupInquiry = Array.isArray((tour as any).group_inquiries) ? (tour as any).group_inquiries[0] : (tour as any).group_inquiries;
+  const inquiryName = inquiry ? `${inquiry.first_name || ""} ${inquiry.last_name || ""}`.trim() : "";
+  const groupHeadName = groupInquiry ? `${groupInquiry.head_first_name || ""} ${groupInquiry.head_last_name || ""}`.trim() : "";
+
+  return NextResponse.json({
+    tour: {
+      ...tour,
+      client_name: inquiryName || groupHeadName || (tour as any).client_name,
+    },
+  });
 }
 
 // PUT - Update tour (assign driver, update status, etc.)
@@ -61,6 +89,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
       .update({
         ...updateData,
         driver_status: updateData.driver_id ? "completed" : currentTour?.driver_status,
+        tour_guide_status: updateData.tour_guide_id ? "completed" : (updateData.tour_guide_status || null),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)

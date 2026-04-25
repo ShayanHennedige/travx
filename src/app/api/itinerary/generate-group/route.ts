@@ -17,6 +17,7 @@ Core Rules (Must Follow Strictly):
    - Driving times between locations (be realistic - Sri Lanka roads can be slow)
    - Accurate driving distances in kilometers (km) between locations
    - Overnight location with hotel recommendation matching the star category
+   - SITE DESCRIPTIONS: Every activity MUST include a brief 1-2 sentence description of the attraction, city, or site being visited. This description should highlight what makes the location special, its historical/cultural significance, or natural beauty. This is mandatory for all activities.
 3. Geographic Logic: Plan routes that minimize backtracking
 4. Activity Distribution: Spread selected activities logically across days
 5. Realistic Pacing: Don't overload days - factor in rest, meals, and travel fatigue (especially important for groups)
@@ -52,6 +53,7 @@ Output your response as a valid JSON object with this structure:
           "time": "Morning/Afternoon/Evening",
           "activity": "Description",
           "location": "Place name",
+          "site_description": "1-2 sentence description of the attraction, city, or site highlighting its significance, history, or natural beauty",
           "duration": "X hours",
           "driving_time": "X hours from previous" (optional),
           "driving_distance_km": "X km from [Origin Location] to [Destination Location]" (optional, e.g., "10 km from Katunayake to CMB", "150 km from Negombo to Sigiriya")
@@ -107,6 +109,17 @@ export async function POST(request: Request) {
     const childCount = members?.filter(m => m.member_type === "child").length || inquiry.no_of_children || 0;
     const totalPax = adultCount + childCount;
 
+    // Normalize array fields from DB (hotel_type, room_category, meal_plan are text[] in DB)
+    const hotelTypeStr = Array.isArray(inquiry.hotel_type)
+      ? inquiry.hotel_type.join(", ")
+      : (inquiry.hotel_type || "4-5 Star");
+    const roomCategoryStr = Array.isArray(inquiry.room_category)
+      ? inquiry.room_category.join(", ")
+      : (inquiry.room_category || "Deluxe");
+    const mealPlanStr = Array.isArray(inquiry.meal_plan)
+      ? inquiry.meal_plan.join(", ")
+      : (inquiry.meal_plan || "Not specified");
+
     // Build the user prompt with inquiry data
     const userPrompt = `Generate a detailed day-by-day GROUP TOUR itinerary for Sri Lanka with the following requirements:
 
@@ -123,9 +136,9 @@ export async function POST(request: Request) {
 - Children: ${childCount}
 
 **Accommodation:**
-- Hotel Star Category: ${inquiry.hotel_type || "4-5 Star"}
-- Room Category: ${inquiry.room_category || "Deluxe"}
-- Meal Plan: ${inquiry.meal_plan || "Not specified"}
+- Hotel Star Category: ${hotelTypeStr}
+- Room Category: ${roomCategoryStr}
+- Meal Plan: ${mealPlanStr}
 - Rooms Required: ${(inquiry.rooms_dbl || 0)} Double, ${(inquiry.rooms_sgl || 0)} Single, ${(inquiry.rooms_tpl || 0)} Triple, ${(inquiry.rooms_qtpl || 0)} Quad
 - Total Rooms: ${(inquiry.rooms_dbl || 0) + (inquiry.rooms_sgl || 0) + (inquiry.rooms_tpl || 0) + (inquiry.rooms_qtpl || 0)}
 
@@ -141,7 +154,7 @@ Please create a realistic, well-paced GROUP TOUR itinerary that:
 1. Starts from Colombo airport (Katunayake) on Day 1
 2. Ends back at Colombo airport (Katunayake) on the final day
 3. Incorporates the selected activities logically
-4. Suggesting appropriate hotels for the ${inquiry.hotel_type || "4-5 Star"} category and considering the ${inquiry.meal_plan || "selected"} meal plan
+4. Suggesting appropriate hotels for the ${hotelTypeStr} category and considering the ${mealPlanStr} meal plan
 5. ${childCount > 0 ? `Includes family-friendly options for the ${childCount} children in the group` : "Focuses on adult-oriented experiences"}
 6. Closely following the "Client Desires & Preferences" mentioned above to reform and personalize the group itinerary
 7. Considers group dynamics - allow buffer time for group coordination
@@ -149,6 +162,7 @@ Please create a realistic, well-paced GROUP TOUR itinerary that:
 9. Suggests a suitable transport arrangement for ${totalPax} travelers
 10. The mileage for each day itinerary should be displayed in km.
 11. MANDATORY FORMAT: Every driving_distance_km field MUST be "X km from [Origin] to [Destination]". Examples: "10 km from Katunayake Airport to Negombo", "150 km from Negombo to Sigiriya", "80 km from Kandy to Nuwara Eliya". Never use incomplete formats.
+12. MANDATORY: Every activity MUST include a site_description field with 1-2 engaging sentences describing the attraction, city, or site being visited.
 
 Return ONLY the JSON object, no additional text.`;
 

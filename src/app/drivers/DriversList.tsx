@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { useRouter } from "next/navigation";
+import { AdminPinModal } from "@/components/AdminPinModal";
 
 interface Driver {
   id: string;
@@ -25,6 +26,7 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [editPending, setEditPending] = useState<Driver | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -63,8 +65,14 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
     setShowAddModal(true);
   };
 
-  const handleEdit = (driver: Driver) => {
-    setFormData({
+  const requestEdit = (driver: Driver) => {
+    setEditPending(driver);
+  };
+
+  const executeEdit = () => {
+      if (!editPending) return;
+      const driver = editPending;
+      setFormData({
       name: driver.name,
       contact_number: driver.contact_number,
       vehicle_type: driver.vehicle_type || "",
@@ -72,6 +80,7 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
       languages: driver.languages || [],
     });
     setEditingDriver(driver);
+    setEditPending(null);
     setShowAddModal(true);
   };
 
@@ -191,7 +200,7 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-sm text-left" suppressHydrationWarning>
               <thead className="text-xs text-surface-500 uppercase bg-surface-50 border-b border-surface-200">
                 <tr>
                   <th className="px-6 py-3 font-medium">Driver Name</th>
@@ -224,12 +233,12 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
                     </td>
                     <td className="px-6 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(driver)}>
+                        <Button variant="ghost" size="sm" onClick={() => requestEdit(driver)}>
                           Edit
                         </Button>
                         <button
                           onClick={() => setDeleteConfirm(driver.id)}
-                          className="p-1.5 text-surface-400 hover:text-accent-500 hover:bg-accent-500/10 rounded transition-colors"
+                          className="p-1.5 text-surface-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -331,38 +340,26 @@ export function DriversList({ drivers: initialDrivers }: DriversListProps) {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal via PIN */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-accent-500/10 flex items-center justify-center">
-                <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-surface-900">Delete Driver</h3>
-                <p className="text-sm text-surface-500">This action cannot be undone</p>
-              </div>
-            </div>
-            <p className="text-surface-600 mb-6">
-              Are you sure you want to delete this driver?
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <Button variant="secondary" onClick={() => setDeleteConfirm(null)} disabled={isLoading}>
-                Cancel
-              </Button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                disabled={isLoading}
-                className="px-4 py-2 bg-accent-600 hover:bg-accent-700 text-black rounded-lg font-medium text-sm transition-colors disabled:opacity-50"
-              >
-                {isLoading ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminPinModal
+            isOpen={!!deleteConfirm}
+            title="Authorize Deletion"
+            description="Are you sure you want to delete this driver? This action cannot be undone."
+            onAuthorized={() => handleDelete(deleteConfirm)}
+            onClose={() => setDeleteConfirm(null)}
+        />
+      )}
+
+      {/* Edit Authorization PIN */}
+      {editPending && (
+        <AdminPinModal
+            isOpen={!!editPending}
+            title="Authorize Edit"
+            description="Enter the admin PIN to edit this driver profile."
+            onAuthorized={() => executeEdit()}
+            onClose={() => setEditPending(null)}
+        />
       )}
     </div>
   );

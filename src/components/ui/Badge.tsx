@@ -10,19 +10,19 @@ interface BadgeProps {
 }
 
 const variantClasses: Record<string, string> = {
-  primary:   "bg-primary-900/50 text-primary-300 ring-1 ring-primary-700/50 light:bg-primary-100 light:text-primary-800 light:ring-primary-200",
-  secondary: "bg-surface-700 text-surface-300 ring-1 ring-surface-600 light:bg-surface-100 light:text-surface-700 light:ring-surface-200",
-  blue:      "bg-primary-900/60 text-primary-300 ring-1 ring-primary-700/50 light:bg-primary-100 light:text-primary-800 light:ring-primary-200",
-  purple:    "bg-purple-900/50 text-purple-300 ring-1 ring-purple-700/50 light:bg-purple-100 light:text-purple-800 light:ring-purple-200",
-  green:     "bg-green-900/50 text-green-300 ring-1 ring-green-700/50 light:bg-green-100 light:text-green-800 light:ring-green-200",
-  yellow:    "bg-accent-900/50 text-accent-300 ring-1 ring-accent-700/50 light:bg-accent-100 light:text-accent-900 light:ring-accent-200",
-  red:       "bg-accent-900/50 text-accent-300 ring-1 ring-accent-700/50 light:bg-accent-100 light:text-accent-800 light:ring-accent-200",
-  orange:    "bg-orange-900/50 text-orange-300 ring-1 ring-orange-700/50 light:bg-orange-100 light:text-orange-800 light:ring-orange-200",
+  primary: "bg-[#E04344] bg-opacity-10 text-[#E04344]",
+  secondary: "bg-surface-100 text-surface-700",
+  blue: "bg-blue-100 text-blue-700",
+  purple: "bg-purple-100 text-purple-700",
+  green: "bg-green-100 text-green-700",
+  yellow: "bg-yellow-100 text-yellow-700",
+  red: "bg-red-200 text-red-900",
+  orange: "bg-orange-100 text-orange-700",
 };
 
 export function Badge({ children, variant = "secondary", className = "" }: BadgeProps) {
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${variantClasses[variant]} ${className}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variantClasses[variant]} ${className}`}>
       {children}
     </span>
   );

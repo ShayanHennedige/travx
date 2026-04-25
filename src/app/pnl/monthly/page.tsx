@@ -97,7 +97,7 @@ export default function MonthlyPnlPage() {
                     <div>
                         <h1 className="text-2xl font-bold text-surface-900">Monthly P&L Summary</h1>
                         <p className="text-sm text-surface-500 mt-1">
-                            Financial overview of completed tours by month
+                            Financial overview of tours by month
                         </p>
                     </div>
                     <Link href="/pnl">
@@ -120,7 +120,7 @@ export default function MonthlyPnlPage() {
                             </p>
                             <div className="flex items-center gap-2 mt-2">
                                 <span className="text-xs text-surface-500">{month.tourCount} tours</span>
-                                <span className={`text-xs font-semibold ${month.profitMargin >= 0 ? "text-green-600" : "text-accent-500"}`}>
+                                <span className={`text-xs font-semibold ${month.profitMargin >= 0 ? "text-green-600" : "text-red-600"}`}>
                                     {month.profitMargin.toFixed(1)}% margin
                                 </span>
                             </div>
@@ -142,7 +142,7 @@ export default function MonthlyPnlPage() {
                                 />
                                 <Legend />
                                 <Bar dataKey="Income" fill="#22c55e" />
-                                <Bar dataKey="Expenses" fill="#e0c16c" />
+                                <Bar dataKey="Expenses" fill="#ef4444" />
                                 <Bar dataKey="Profit" fill="#3b82f6" />
                             </BarChart>
                         </ResponsiveContainer>
@@ -190,7 +190,7 @@ export default function MonthlyPnlPage() {
                             </div>
                             <div>
                                 <p className="text-xs text-surface-500">Net Profit</p>
-                                <p className={`text-lg font-bold ${selectedMonth.netProfit >= 0 ? "text-green-600" : "text-accent-500"}`}>
+                                <p className={`text-lg font-bold ${selectedMonth.netProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
                                     ${selectedMonth.netProfit.toLocaleString()}
                                 </p>
                             </div>
@@ -230,7 +230,7 @@ export default function MonthlyPnlPage() {
                                             <td className="px-4 py-3 text-right text-surface-600">
                                                 ${tour.miscExpenses.toLocaleString()}
                                             </td>
-                                            <td className={`px-4 py-3 text-right font-semibold ${tour.netProfit >= 0 ? "text-green-600" : "text-accent-500"}`}>
+                                            <td className={`px-4 py-3 text-right font-semibold ${tour.netProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
                                                 ${tour.netProfit.toLocaleString()}
                                             </td>
                                             <td className="px-4 py-3">
@@ -254,9 +254,9 @@ export default function MonthlyPnlPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                             </svg>
                         </div>
-                        <h3 className="text-lg font-semibold text-surface-900">No Completed Tours</h3>
+                        <h3 className="text-lg font-semibold text-surface-900">No Tours Found</h3>
                         <p className="text-sm text-surface-500 mt-1">
-                            Monthly P&L will appear here once tours are completed.
+                            Monthly P&L will appear here once tours are available in the selected months.
                         </p>
                     </div>
                 )}

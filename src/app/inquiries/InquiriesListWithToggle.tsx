@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { StatusBadge, Badge, Button } from "@/components/ui";
 import { InquiryStatus } from "@/types/database";
 import { inquiryStatuses } from "@/lib/validations/inquiry";
+import { getEffectiveStatus } from "@/lib/utils/status";
+import { AdminPinModal } from "@/components/AdminPinModal";
 
 interface IndividualInquiry {
   id: string;
@@ -68,10 +70,76 @@ interface InquiriesListWithToggleProps {
 type ViewMode = "individual" | "group";
 
 export function InquiriesListWithToggle({
-  individualInquiries,
-  groupInquiries,
+  individualInquiries: initialIndividualInquiries,
+  groupInquiries: initialGroupInquiries,
 }: InquiriesListWithToggleProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("individual");
+  const [individualInquiries, setIndividualInquiries] = useState(initialIndividualInquiries);
+  const [groupInquiries, setGroupInquiries] = useState(initialGroupInquiries);
+  const router = useRouter();
+
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{id: string, type: "individual" | "group"} | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const filteredIndividual = individualInquiries.filter((inq) => {
+    const q = search.toLowerCase();
+    const matchSearch = !q ||
+      inq.inquiry_number?.toLowerCase().includes(q) ||
+      `${inq.first_name} ${inq.last_name}`.toLowerCase().includes(q) ||
+      inq.country?.toLowerCase().includes(q) ||
+      inq.agent_name?.toLowerCase().includes(q) ||
+      inq.agent_company?.toLowerCase().includes(q);
+    const matchStatus = statusFilter === "all" || inq.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  const filteredGroup = groupInquiries.filter((inq) => {
+    const q = search.toLowerCase();
+    const matchSearch = !q ||
+      inq.inquiry_number?.toLowerCase().includes(q) ||
+      `${inq.head_first_name} ${inq.head_last_name}`.toLowerCase().includes(q) ||
+      inq.country?.toLowerCase().includes(q) ||
+      inq.agent_name?.toLowerCase().includes(q) ||
+      inq.agent_company?.toLowerCase().includes(q);
+    const matchStatus = statusFilter === "all" || inq.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  const handleDelete = (id: string, type: "individual" | "group") => {
+    setPendingDelete({ id, type });
+    setShowPinModal(true);
+  };
+
+  const handlePinAuthorized = () => {
+    setShowPinModal(false);
+    if (pendingDelete) {
+        executeDelete(pendingDelete.id, pendingDelete.type);
+    }
+    setPendingDelete(null);
+  };
+
+  const executeDelete = async (id: string, type: "individual" | "group") => {
+
+    try {
+      const endpoint = type === "individual" ? `/api/inquiries/${id}` : `/api/group-inquiries/${id}`;
+      const res = await fetch(endpoint, { method: "DELETE" });
+      
+      if (!res.ok) throw new Error("Failed to delete");
+      
+      if (type === "individual") {
+        setIndividualInquiries((prev) => prev.filter((i) => i.id !== id));
+      } else {
+        setGroupInquiries((prev) => prev.filter((i) => i.id !== id));
+      }
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete inquiry");
+    }
+  };
 
   const individualCount = individualInquiries.length;
   const groupCount = groupInquiries.length;
@@ -126,19 +194,67 @@ export function InquiriesListWithToggle({
         </div>
       </div>
 
+      {/* Search & Filter Bar */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search by ref, name, country, or agent..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 text-sm border border-surface-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-slate-400 transition-all"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-4 py-2.5 text-sm border border-surface-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-slate-700 font-medium cursor-pointer transition-all min-w-[160px]"
+        >
+          <option value="all">All Statuses</option>
+          <option value="new">New</option>
+          <option value="in_progress">In Progress</option>
+          <option value="quoted">Quoted</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="completed">Completed</option>
+        </select>
+      </div>
+
       {/* Table */}
       <div className="card">
         {viewMode === "individual" ? (
-          <IndividualInquiriesTable inquiries={individualInquiries} />
+          <IndividualInquiriesTable inquiries={filteredIndividual} onDelete={handleDelete} />
         ) : (
-          <GroupInquiriesTable inquiries={groupInquiries} />
+          <GroupInquiriesTable inquiries={filteredGroup} onDelete={handleDelete} />
         )}
       </div>
+
+      {showPinModal && (
+        <AdminPinModal
+            isOpen={showPinModal}
+            title="Authorize Deletion"
+            onAuthorized={handlePinAuthorized}
+            onClose={() => {
+                setShowPinModal(false);
+                setPendingDelete(null);
+            }}
+        />
+      )}
     </div>
   );
 }
 
-function IndividualInquiriesTable({ inquiries }: { inquiries: IndividualInquiry[] }) {
+function IndividualInquiriesTable({ inquiries, onDelete }: { inquiries: IndividualInquiry[], onDelete: (id: string, type: "individual" | "group") => void }) {
   if (inquiries.length === 0) {
     return (
       <div className="p-20 text-center">
@@ -266,12 +382,19 @@ function IndividualInquiriesTable({ inquiries }: { inquiries: IndividualInquiry[
                 </td>
                 <td className="px-6 py-5">
                   <div className="flex items-center justify-end gap-3">
-                    <StatusBadge status={inquiry.status as InquiryStatus} />
+                    <StatusBadge status={getEffectiveStatus(inquiry.status, inquiry.arriving_date, inquiry.departure_date) as InquiryStatus} />
                     <Link href={`/inquiries/${inquiry.id}`}>
                       <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors group">
                         <ArrowRightIcon className="w-4 h-4 text-slate-400 group-hover:text-primary-600" />
                       </button>
                     </Link>
+                    <button
+                      onClick={() => onDelete(inquiry.id, "individual")}
+                      className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
+                      title="Delete Inquiry"
+                    >
+                      <TrashIcon className="w-4 h-4 text-slate-400 group-hover:text-red-600" />
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -283,7 +406,7 @@ function IndividualInquiriesTable({ inquiries }: { inquiries: IndividualInquiry[
   );
 }
 
-function GroupInquiriesTable({ inquiries }: { inquiries: GroupInquiry[] }) {
+function GroupInquiriesTable({ inquiries, onDelete }: { inquiries: GroupInquiry[], onDelete: (id: string, type: "individual" | "group") => void }) {
   if (inquiries.length === 0) {
     return (
       <div className="p-12 text-center">
@@ -419,12 +542,19 @@ function GroupInquiriesTable({ inquiries }: { inquiries: GroupInquiry[] }) {
                 </td>
                 <td className="px-6 py-5">
                   <div className="flex items-center justify-end gap-3">
-                    <StatusBadge status={inquiry.status as InquiryStatus} />
+                    <StatusBadge status={getEffectiveStatus(inquiry.status, inquiry.arriving_date, inquiry.departure_date) as InquiryStatus} />
                     <Link href={`/group-inquiries/${inquiry.id}`}>
                       <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors group">
                         <ArrowRightIcon className="w-4 h-4 text-slate-400 group-hover:text-primary-600" />
                       </button>
                     </Link>
+                    <button
+                      onClick={() => onDelete(inquiry.id, "group")}
+                      className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
+                      title="Delete Inquiry"
+                    >
+                      <TrashIcon className="w-4 h-4 text-slate-400 group-hover:text-red-600" />
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -453,6 +583,24 @@ function UsersIcon({ className }: { className?: string }) {
 }
 
 
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      className={className} 
+      fill="none" 
+      viewBox="0 0 24 24" 
+      strokeWidth={1.5} 
+      stroke="currentColor"
+    >
+      <path 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" 
+      />
+    </svg>
+  );
+}
 
 function ArrowRightIcon({ className }: { className?: string }) {
   return (

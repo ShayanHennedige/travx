@@ -6,8 +6,8 @@ export const SESSION_CONFIG = {
     activityCheckInterval: 60 * 1000,     // Check every minute
 };
 
-const LAST_ACTIVITY_KEY = 'travex_last_activity';
-const SESSION_START_KEY = 'travex_session_start';
+const LAST_ACTIVITY_KEY = 'serendia_last_activity';
+const SESSION_START_KEY = 'serendia_session_start';
 
 export class SessionManager {
     private activityCheckInterval: NodeJS.Timeout | null = null;

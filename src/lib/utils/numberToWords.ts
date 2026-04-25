@@ -1,15 +1,18 @@
 /**
  * Converts a number to standard English words (Million, Thousand, etc.)
- * Example: 4150 -> Four thousand one hundred and fifty only
+ * Example: 4150.50 -> Four thousand one hundred and fifty and fifty cents
  */
-export function numberToWordsUSD(num: number): string {
+export function numberToWords(num: number): string {
     const ones = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
     const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
     const scales = ['', 'thousand', 'million', 'billion'];
 
     if (num === 0) return 'zero';
 
-    let numStr = Math.floor(num).toString();
+    const integerPart = Math.floor(num);
+    const decimalPart = Math.round((num - integerPart) * 100);
+
+    let numStr = integerPart.toString();
     let words: string[] = [];
 
     // Split into groups of three
@@ -47,8 +50,26 @@ export function numberToWordsUSD(num: number): string {
         words.unshift(groupWords.join(' '));
     }
 
-    const result = words.join(' ').trim();
-    return (result.charAt(0).toUpperCase() + result.slice(1) + ' only').replace(/\s+/g, ' ');
+    let result = words.join(' ').trim();
+    
+    // Handle cents
+    if (decimalPart > 0) {
+        let centsResult = '';
+        if (decimalPart < 20) {
+            centsResult = ones[decimalPart];
+        } else {
+            centsResult = tens[Math.floor(decimalPart / 10)];
+            if (decimalPart % 10 > 0) centsResult += ' ' + ones[decimalPart % 10];
+        }
+        result += ` and ${centsResult} cents`;
+    }
+
+    return (result.charAt(0).toUpperCase() + result.slice(1)).replace(/\s+/g, ' ');
+}
+
+// Deprecated: use numberToWords instead. Keeping for backward compatibility if needed, but updated logic.
+export function numberToWordsUSD(num: number): string {
+    return numberToWords(num) + ' only';
 }
 
 /**
@@ -57,5 +78,5 @@ export function numberToWordsUSD(num: number): string {
  */
 export function formatUSDAmountInWords(amount: number): string {
     if (amount === 0) return "USD Zero only";
-    return `USD ${numberToWordsUSD(amount)}`;
+    return `USD ${numberToWords(amount)} only`;
 }

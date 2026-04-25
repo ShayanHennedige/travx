@@ -16,10 +16,20 @@ export async function POST(request: Request) {
             );
         }
 
-        // Get tour details (flat query — no FK constraints defined in schema)
+        // Get tour details
         const { data: tour, error: tourError } = await supabase
             .from("tours")
-            .select("id, itinerary_id")
+            .select(`
+                id,
+                itinerary_id,
+                itineraries (
+                    id,
+                    inquiry_id,
+                    group_inquiry_id,
+                    inquiries (inquiry_number),
+                    group_inquiries (inquiry_number)
+                )
+            `)
             .eq("id", tour_id)
             .single();
 
@@ -41,30 +51,12 @@ export async function POST(request: Request) {
 
         console.log("Payment voucher generation - Tour ID:", tour_id, "Itinerary ID:", tour.itinerary_id);
 
-        // Fetch itinerary separately
-        const { data: itinerary } = await supabase
-            .from("itineraries")
-            .select("id, inquiry_id, group_inquiry_id")
-            .eq("id", tour.itinerary_id)
-            .single();
-
-        // Fetch inquiry number separately
-        let tourReference = `TOUR-${tour.id.slice(0, 8)}`;
-        if (itinerary?.inquiry_id) {
-            const { data: inq } = await supabase
-                .from("inquiries")
-                .select("inquiry_number")
-                .eq("id", itinerary.inquiry_id)
-                .single();
-            if (inq?.inquiry_number) tourReference = inq.inquiry_number;
-        } else if (itinerary?.group_inquiry_id) {
-            const { data: grpInq } = await supabase
-                .from("group_inquiries")
-                .select("inquiry_number")
-                .eq("id", itinerary.group_inquiry_id)
-                .single();
-            if (grpInq?.inquiry_number) tourReference = grpInq.inquiry_number;
-        }
+        // Get inquiry number for tour reference
+        const itinerary = tour.itineraries as any;
+        const tourReference =
+            itinerary?.inquiries?.inquiry_number ||
+            itinerary?.group_inquiries?.inquiry_number ||
+            `TOUR-${tour.id.slice(0, 8)}`;
 
         // Get costing sheet for rates
         const { data: costingSheet } = await supabase
@@ -91,22 +83,11 @@ export async function POST(request: Request) {
 
         if (!hotelVouchers || hotelVouchers.length === 0) {
             // Try to find if there are any vouchers linked by inquiry instead
-            const inquiryId = itinerary?.inquiry_id;
-            const groupInquiryId = itinerary?.group_inquiry_id;
-            const orFilter = [
-                inquiryId ? `inquiry_id.eq.${inquiryId}` : null,
-                groupInquiryId ? `group_inquiry_id.eq.${groupInquiryId}` : null,
-            ].filter(Boolean).join(",");
-
-            let altVouchers = null;
-            if (orFilter) {
-                const { data } = await supabase
-                    .from("hotel_vouchers")
-                    .select("id, itinerary_id")
-                    .or(orFilter)
-                    .limit(5);
-                altVouchers = data;
-            }
+            const { data: altVouchers } = await supabase
+                .from("hotel_vouchers")
+                .select("id, itinerary_id")
+                .or(`inquiry_id.eq.${itinerary?.inquiry_id},group_inquiry_id.eq.${itinerary?.group_inquiry_id}`)
+                .limit(5);
 
             console.log("Alternative voucher check:", altVouchers);
 
@@ -236,8 +217,8 @@ export async function POST(request: Request) {
                     nights_count: nightsCount,
                     rate_usd: ratePerNight,
                     total_usd: totalUsd,
-                    exchange_rate: 300, // Default exchange rate
-                    total_lkr: totalUsd * 300,
+                    exchange_rate: Number(costingSheet?.exchange_rate) || 330,
+                    total_lkr: totalUsd * (Number(costingSheet?.exchange_rate) || 330),
                     status: "draft",
                     created_by: user?.id,
                     voucher_date: mergedHotel.checkIn || new Date().toISOString().split('T')[0],

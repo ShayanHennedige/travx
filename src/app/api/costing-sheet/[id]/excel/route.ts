@@ -41,6 +41,14 @@ export async function GET(
             per_person_usd = 0,
         } = costingSheet;
 
+        const paxCount = Number(no_of_pax) || 1;
+        const usdRate = Number(exchange_rate) || 1;
+
+        const sumFormula = (col: string, start: number, end: number) => {
+            if (end < start) return "0";
+            return `SUM(${col}${start}:${col}${end})`;
+        };
+
         // Create workbook
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet("Costing Sheet");
@@ -99,7 +107,7 @@ export async function GET(
         // Metadata Alignment rows 3-5
         // Accommodation Meta
         worksheet.getCell("A3").value = "Name of Agent";
-        worksheet.getCell("B3").value = agent_name || "TraveX";
+        worksheet.getCell("B3").value = agent_name || "TravX";
         worksheet.getCell("A4").value = "Arrival Date";
         worksheet.getCell("B4").value = arrival_date || "";
         worksheet.getCell("A5").value = "No. of Pax";
@@ -209,6 +217,8 @@ export async function GET(
             accomTotals.tri += (row.tri || 0);
             accomRow++;
         });
+        const accomDataStartRow = 9;
+        const accomDataEndRow = accomRow - 1;
 
         // 2. Transport Data
         let transRow = 9;
@@ -217,17 +227,27 @@ export async function GET(
             worksheet.getCell(`I${transRow}`).value = row.description;
             worksheet.getCell(`J${transRow}`).value = row.mileage;
             worksheet.getCell(`K${transRow}`).value = row.rate;
-            worksheet.getCell(`L${transRow}`).value = row.total;
+            const lineTotal = Number(row.total) || (Number(row.mileage) || 0) * (Number(row.rate) || 0);
+            worksheet.getCell(`L${transRow}`).value = {
+                formula: `J${transRow}*K${transRow}`,
+                result: lineTotal,
+            };
             ["I", "J", "K", "L"].forEach(c => Object.assign(worksheet.getCell(`${c}${transRow}`), dataStyle));
-            transTotalLKR += (row.total || 0);
+            transTotalLKR += lineTotal;
             transRow++;
         });
+        const transDataStartRow = 9;
+        const transDataEndRow = transRow - 1;
+        const transTotalRow = transRow;
         // Transport Total Row
-        worksheet.getCell(`I${transRow}`).value = "Total";
-        worksheet.getCell(`L${transRow}`).value = transTotalLKR;
-        ["I", "J", "K", "L"].forEach(c => Object.assign(worksheet.getCell(`${c}${transRow}`), dataStyle));
-        worksheet.getCell(`I${transRow}`).font = { bold: true, size: 9 };
-        worksheet.getCell(`L${transRow}`).font = { bold: true, size: 9 };
+        worksheet.getCell(`I${transTotalRow}`).value = "Total";
+        worksheet.getCell(`L${transTotalRow}`).value = {
+            formula: sumFormula("L", transDataStartRow, transDataEndRow),
+            result: transTotalLKR,
+        };
+        ["I", "J", "K", "L"].forEach(c => Object.assign(worksheet.getCell(`${c}${transTotalRow}`), dataStyle));
+        worksheet.getCell(`I${transTotalRow}`).font = { bold: true, size: 9 };
+        worksheet.getCell(`L${transTotalRow}`).font = { bold: true, size: 9 };
         transRow++;
 
         // 3. Extras Data
@@ -241,6 +261,8 @@ export async function GET(
             extrasTotalUSD += (row.count || 0) * (row.unit_price || 0);
             extrasRow++;
         });
+        const extrasDataStartRow = 9;
+        const extrasDataEndRow = extrasRow - 1;
 
         // Placeholder for missing extras rows to maintain structure
         while (extrasRow < 15) {
@@ -265,23 +287,36 @@ export async function GET(
             mRow++;
         });
         const mealTotalUSD = (meal_extras?.ex_lunch || 0) + (meal_extras?.ex_dinner || 0) + (meal_extras?.ex_breakfast || 0);
-        worksheet.getCell(`N${mRow}`).value = "LKR Total";
-        worksheet.getCell(`P${mRow}`).value = mealTotalUSD * exchange_rate;
+        const mealExtrasStartRow = mealRowStart;
+        const mealExtrasEndRow = mRow - 1;
+        const mealLkrTotalRow = mRow;
+        worksheet.getCell(`N${mealLkrTotalRow}`).value = "LKR Total";
+        worksheet.getCell(`P${mealLkrTotalRow}`).value = {
+            formula: `SUM(P${mealExtrasStartRow}:P${mealExtrasEndRow})*$O$3`,
+            result: mealTotalUSD * usdRate,
+        };
         Object.assign(worksheet.getCell(`N${mRow}`), dataStyle);
         Object.assign(worksheet.getCell(`P${mRow}`), dataStyle);
         mRow++;
-        worksheet.getCell(`N${mRow}`).value = "P/P USD";
-        worksheet.getCell(`O${mRow}`).value = "Total";
-        worksheet.getCell(`P${mRow}`).value = mealTotalUSD;
-        worksheet.getCell(`P${mRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.headerGreen } };
-        ["N", "O", "P"].forEach(c => Object.assign(worksheet.getCell(`${c}${mRow}`), dataStyle));
+        const mealUsdTotalRow = mRow;
+        worksheet.getCell(`N${mealUsdTotalRow}`).value = "P/P USD";
+        worksheet.getCell(`O${mealUsdTotalRow}`).value = "Total";
+        worksheet.getCell(`P${mealUsdTotalRow}`).value = {
+            formula: `SUM(P${mealExtrasStartRow}:P${mealExtrasEndRow})`,
+            result: mealTotalUSD,
+        };
+        worksheet.getCell(`P${mealUsdTotalRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.headerGreen } };
+        ["N", "O", "P"].forEach(c => Object.assign(worksheet.getCell(`${c}${mealUsdTotalRow}`), dataStyle));
 
         // Transport Summary in Middle Column (Whole Numbers)
         const transSummaryRow = transRow + 1;
-        const ppTransLKR = Math.round(transTotalLKR / (no_of_pax || 1));
+        const ppTransLKR = Math.round(transTotalLKR / paxCount);
         worksheet.getCell(`I${transSummaryRow}`).value = "P/P LKR";
         worksheet.getCell(`J${transSummaryRow}`).value = "Total";
-        worksheet.getCell(`L${transSummaryRow}`).value = ppTransLKR;
+        worksheet.getCell(`L${transSummaryRow}`).value = {
+            formula: `ROUND(L${transTotalRow}/$B$5,0)`,
+            result: ppTransLKR,
+        };
         worksheet.getCell(`L${transSummaryRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.headerGreen } };
         ["I", "J", "L"].forEach(c => Object.assign(worksheet.getCell(`${c}${transSummaryRow}`), dataStyle));
         worksheet.getCell(`I${transSummaryRow}`).font = { bold: true, size: 9, color: { argb: "FFEF4444" } }; // Red text
@@ -289,13 +324,20 @@ export async function GET(
         const transUsdRow = transSummaryRow + 2;
         worksheet.getCell(`I${transUsdRow}`).value = "P/P USD";
         worksheet.getCell(`J${transUsdRow}`).value = "Total";
+        worksheet.getCell(`L${transUsdRow}`).value = {
+            formula: `ROUND(L${transTotalRow}/$O$3,0)`,
+            result: Math.round(transTotalLKR / usdRate),
+        };
         worksheet.getCell(`I${transUsdRow}`).font = { bold: true, size: 9, color: { argb: "FFEF4444" } };
         ["I", "J", "L"].forEach(c => Object.assign(worksheet.getCell(`${c}${transUsdRow}`), dataStyle));
 
-        const ppTransUSD = Math.round((transTotalLKR / exchange_rate) / (no_of_pax || 1));
+        const ppTransUSD = Math.round((transTotalLKR / usdRate) / paxCount);
         const ppUsdRow = transUsdRow + 1;
         worksheet.getCell(`J${ppUsdRow}`).value = "PP";
-        worksheet.getCell(`L${ppUsdRow}`).value = ppTransUSD;
+        worksheet.getCell(`L${ppUsdRow}`).value = {
+            formula: `ROUND(L${transUsdRow}/$B$5,0)`,
+            result: ppTransUSD,
+        };
         ["J", "L"].forEach(c => Object.assign(worksheet.getCell(`${c}${ppUsdRow}`), dataStyle));
 
         // Group Total Summary (Consolidated Single Column)
@@ -322,7 +364,10 @@ export async function GET(
         };
 
         // Header Pink Row - Consolidated Accomadation
-        worksheet.getCell(`F${summaryStartRow}`).value = groupTotalAccom;
+        worksheet.getCell(`F${summaryStartRow}`).value = {
+            formula: `ROUND(${sumFormula("E", accomDataStartRow, accomDataEndRow)}+${sumFormula("F", accomDataStartRow, accomDataEndRow)}+${sumFormula("G", accomDataStartRow, accomDataEndRow)},0)`,
+            result: groupTotalAccom,
+        };
         ["E", "F", "G"].forEach(c => {
             const cell = worksheet.getCell(`${c}${summaryStartRow}`);
             Object.assign(cell, dataStyle);
@@ -331,36 +376,75 @@ export async function GET(
         });
 
         let sRow = summaryStartRow + 1;
-        const totalTransportUSD = Math.round(transTotalLKR / exchange_rate);
+        const totalAccommodationRow = sRow;
+        const totalTransportUSD = Math.round(transTotalLKR / usdRate);
         const totalExtrasUSD = Math.round(extrasTotalUSD + mealTotalUSD);
 
-        consolidatedRow("Total Accomadation", groupTotalAccom, sRow);
+        consolidatedRow("Total Accomadation", { formula: `F${summaryStartRow}`, result: groupTotalAccom }, sRow);
         sRow++;
-        consolidatedRow("Total Transport", totalTransportUSD, sRow);
+        const totalTransportRow = sRow;
+        consolidatedRow("Total Transport", { formula: `ROUND(L${transUsdRow},0)`, result: totalTransportUSD }, sRow);
         sRow++;
-        consolidatedRow("Total Extras", totalExtrasUSD, sRow);
+        const totalExtrasRow = sRow;
+        consolidatedRow(
+            "Total Extras",
+            {
+                formula: `ROUND(${sumFormula("P", extrasDataStartRow, extrasDataEndRow)}+P${mealUsdTotalRow},0)`,
+                result: totalExtrasUSD,
+            },
+            sRow
+        );
         sRow++;
+        const otherRow = sRow;
         consolidatedRow("Other", 0, sRow);
         sRow++;
 
+        const profitPct = Number(costingSheet.profit_percentage ?? 15);
         const groupSubtotal = groupTotalAccom + totalTransportUSD + totalExtrasUSD;
-        const groupProfit = Math.round(groupSubtotal * 0.10);
-        consolidatedRow("10% For Total", groupProfit, sRow);
+        const groupProfit = Math.round(groupSubtotal * (profitPct / 100));
+        const profitRow = sRow;
+        consolidatedRow(
+            `${profitPct}% For Total`,
+            {
+                formula: `ROUND((F${totalAccommodationRow}+F${totalTransportRow}+F${totalExtrasRow}+F${otherRow})*${profitPct}%,0)`,
+                result: groupProfit,
+            },
+            sRow
+        );
         sRow++;
 
         const groupTotalCost = groupSubtotal + groupProfit;
-        consolidatedRow("Total Cost", groupTotalCost, sRow, undefined, colors.headerGreen);
+        const totalCostRow = sRow;
+        consolidatedRow(
+            "Total Cost",
+            {
+                formula: `F${totalAccommodationRow}+F${totalTransportRow}+F${totalExtrasRow}+F${otherRow}+F${profitRow}`,
+                result: groupTotalCost,
+            },
+            sRow,
+            undefined,
+            colors.headerGreen
+        );
         sRow++;
 
         // Final Per-Person price for the group
-        const groupPPValue = Math.round(groupTotalCost / (no_of_pax || 1));
+        const groupPPValue = Math.round(groupTotalCost / paxCount);
 
         worksheet.getCell(`A${sRow}`).value = "P/P Value";
         worksheet.getCell(`A${sRow}`).font = { bold: true, size: 9, color: { argb: "FFEF4444" } };
         worksheet.getCell(`B${sRow}`).value = "Sale price";
         applyMetaStyle(worksheet.getCell(`A${sRow}`), true);
         applyMetaStyle(worksheet.getCell(`B${sRow}`), true);
-        consolidatedRow("", groupPPValue, sRow, undefined, colors.salePriceYellow);
+        consolidatedRow(
+            "",
+            {
+                formula: `ROUND(F${totalCostRow}/$B$5,0)`,
+                result: groupPPValue,
+            },
+            sRow,
+            undefined,
+            colors.salePriceYellow
+        );
 
         // Final Vertical Separators application based on last row
         const finalLastRow = Math.max(sRow, mRow, transUsdRow);
@@ -374,7 +458,7 @@ export async function GET(
         return new Response(buffer as any, {
             headers: {
                 "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "Content-Disposition": `attachment; filename="CostingSheet-${agent_name || "TraveX"}.xlsx"`,
+                "Content-Disposition": `attachment; filename="CostingSheet-${agent_name || "TravX"}.xlsx"`,
             },
         });
     } catch (err) {

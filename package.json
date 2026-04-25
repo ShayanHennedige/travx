@@ -1,5 +1,5 @@
 {
-  "name": "travex-inquiry-module",
+  "name": "serendia-inquiry-module",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,9 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.5.0",
-    "@react-three/postprocessing": "^3.0.4",
     "@sparticuz/chromium-min": "^143.0.4",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
@@ -19,8 +16,9 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "exceljs": "^4.4.0",
+    "graphify": "^1.0.0",
     "ioredis": "^5.9.2",
-    "next": "16.1.6",
+    "next": "16.1.2",
     "puppeteer": "^24.34.0",
     "puppeteer-core": "^24.34.0",
     "react": "19.2.3",
@@ -29,7 +27,6 @@
     "react-hot-toast": "^2.6.0",
     "recharts": "^3.7.0",
     "resend": "^6.8.0",
-    "three": "^0.183.1",
     "zod": "^4.3.5"
   },
   "devDependencies": {
@@ -37,9 +34,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/three": "^0.183.1",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.1.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

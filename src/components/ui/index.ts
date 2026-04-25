@@ -5,3 +5,4 @@ export { Textarea } from "./Textarea";
 export { Badge, StatusBadge } from "./Badge";
 export { RoomQuantitySelector } from "./RoomQuantitySelector";
 export { Card } from "./Card";
+export { LoadingScreen, LoadingSkeleton } from "./LoadingScreen";

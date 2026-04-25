@@ -236,8 +236,8 @@ export function ItineraryGenerator({ inquiryId, existingItinerary }: ItineraryGe
         )}
 
         {error && (
-          <div className="mt-4 p-4 bg-accent-500/10 border border-accent-500/30 rounded-lg">
-            <p className="text-sm text-accent-500">{error}</p>
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-600">{error}</p>
           </div>
         )}
       </div>

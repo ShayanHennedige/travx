@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui";
 import { useRouter } from "next/navigation";
 import { format, addDays } from "date-fns";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import type { CostingSheet, AccommodationRow, TransportRow, ExtrasRow } from "@/lib/validations/costingSheet";
+import { AdminPinModal } from "@/components/AdminPinModal";
 
 interface CostingSheetFormProps {
     itineraryId: string;
@@ -16,6 +17,9 @@ interface CostingSheetFormProps {
         date: string;
         overnight_location: string;
         hotel_suggestion: string;
+        hotel_tier?: string;
+        room_category?: string;
+        meal_plan?: string;
     }>;
     noOfNights?: number;
     totalDistance?: string | number;
@@ -60,6 +64,21 @@ export function CostingSheetForm({
 }: CostingSheetFormProps) {
     const router = useRouter();
     const [isSaving, setIsSaving] = useState(false);
+    const [isUnlocked, setIsUnlocked] = useState(false);
+    const [showPinModal, setShowPinModal] = useState(false);
+    const [rateSourceMap, setRateSourceMap] = useState<Record<number, 'database' | 'manual' | 'not_found'>>({}); 
+    const [isLookingUpRates, setIsLookingUpRates] = useState(false);
+    const [rateLookupDone, setRateLookupDone] = useState(false);
+    
+    const normalizeTransportDescription = (description?: string) => (description || "").trim().toLowerCase();
+    const calculateTransportRowTotal = (row: Pick<TransportRow, "mileage" | "rate">) => (Number(row.mileage) || 0) * (Number(row.rate) || 0);
+    const getRoomMultiplier = (roomCount?: number) => ((roomCount ?? 0) > 0 ? Number(roomCount) : 1);
+    const calculateAccommodationRowUSD = (row: AccommodationRow) =>
+        ((Number(row.sgl) || 0) * getRoomMultiplier(roomsSgl))
+        + ((Number(row.dbl) || 0) * getRoomMultiplier(roomsDbl))
+        + ((Number(row.tri) || 0) * getRoomMultiplier(roomsTpl))
+        + ((Number(row.quad) || 0) * getRoomMultiplier(roomsQtpl))
+        + ((Number(row.quad_triple) || 0) * getRoomMultiplier(roomsQtpl));
     const [formData, setFormData] = useState<Partial<CostingSheet>>({
         itinerary_id: itineraryId,
         agent_name: initialData?.agent_name || agentName || "",
@@ -87,6 +106,8 @@ export function CostingSheetForm({
         status: initialData?.status || "draft",
         profit_percentage: initialData?.profit_percentage || 15,
     });
+
+    const isFinalized = formData?.status === "finalized" && !isUnlocked;
 
     // Sync form data when initialData or itineraryId changes (important for late-loading data or component reuse)
     useEffect(() => {
@@ -120,6 +141,89 @@ export function CostingSheetForm({
     }, [initialData?.id, itineraryId]);
 
 
+    // Fetch hotel rates from the database for the given accommodation rows
+    const fetchHotelRates = useCallback(async (accomData: AccommodationRow[]) => {
+        if (accomData.length === 0) return;
+
+        // Build lookup requests for rows that have a hotel name
+        const lookups = accomData.map((row, idx) => {
+            // Find the matching itinerary day to get the date for validity check
+            const matchingDay = itineraryDays.find(d => {
+                if (!d.date) return false;
+                const fd = new Date(d.date);
+                if (isNaN(fd.getTime())) return false;
+                const formatted = format(fd, "MMM d (EEE)");
+                return formatted === row.day;
+            });
+
+            return {
+                hotel_name: row.hotel || "",
+                room_category: row.room_category || undefined,
+                meal_plan: row.basis || undefined,
+                check_date: matchingDay?.date || arrivalDate || undefined,
+            };
+        });
+
+        // Filter out lookups with empty hotel names
+        const validLookups = lookups.filter(l => l.hotel_name.trim().length > 0);
+        if (validLookups.length === 0) return;
+
+        setIsLookingUpRates(true);
+        try {
+            const response = await fetch("/api/hotel-rates/batch-lookup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ lookups }),
+            });
+
+            if (!response.ok) {
+                console.error("Rate lookup failed:", await response.text());
+                return;
+            }
+
+            const { results } = await response.json();
+            const newSourceMap: Record<number, 'database' | 'manual' | 'not_found'> = {};
+            let updatedAccomData = [...accomData];
+
+            for (const result of results) {
+                const idx = result.index;
+                if (idx < 0 || idx >= updatedAccomData.length) continue;
+
+                const currentRow = updatedAccomData[idx];
+                // Only auto-populate if rates are still at their defaults (all zeros)
+                const allZero = (currentRow.sgl || 0) === 0
+                    && (currentRow.dbl || 0) === 0
+                    && (currentRow.tri || 0) === 0
+                    && (currentRow.quad || 0) === 0;
+
+                if (result.found && result.rate && allZero) {
+                    updatedAccomData[idx] = {
+                        ...currentRow,
+                        sgl: result.rate.rate_sgl || 0,
+                        dbl: result.rate.rate_dbl || 0,
+                        tri: result.rate.rate_tpl || 0,
+                        quad: result.rate.rate_extra_adult || 0,
+                        quad_triple: 0,
+                    };
+                    newSourceMap[idx] = 'database';
+                } else if (result.found && result.rate && !allZero) {
+                    // Rates already entered manually, keep them but mark as manual
+                    newSourceMap[idx] = 'manual';
+                } else {
+                    newSourceMap[idx] = 'not_found';
+                }
+            }
+
+            setFormData(prev => ({ ...prev, accommodation_data: updatedAccomData }));
+            setRateSourceMap(newSourceMap);
+        } catch (err) {
+            console.error("Error fetching hotel rates:", err);
+        } finally {
+            setIsLookingUpRates(false);
+            setRateLookupDone(true);
+        }
+    }, [itineraryDays, arrivalDate]);
+
     // Pre-populate accommodation from itinerary
     useEffect(() => {
         if (initialData || itineraryDays.length === 0) return;
@@ -128,7 +232,11 @@ export function CostingSheetForm({
 
         // If we don't have data, or if we have it but roomCategory changed, we re-sync
         if (!hasAccomData || roomCategory) {
-            const accomData = itineraryDays.slice(0, -1).map((day) => {
+            const accommodationDays = itineraryDays.filter((day, idx) =>
+                idx < itineraryDays.length - 1 || Boolean(day.hotel_suggestion?.trim())
+            );
+
+            const accomData = accommodationDays.map((day) => {
                 let formattedDay = `Day ${day.day}`;
                 if (day.date) {
                     const d = new Date(day.date);
@@ -140,12 +248,19 @@ export function CostingSheetForm({
                 // Find existing row to preserve prices
                 const existingRow = formData.accommodation_data?.find(r => r.day === formattedDay);
 
+                // Get hotel name without the stars if possible, or append our tier if available
+                let cleanHotelName = (day.hotel_suggestion || "").replace(/\s*\(?\d+\s*Star\)?/gi, "").trim();
+                // If it doesn't already end with a star rating, optionally show it if they selected it
+                if (day.hotel_tier && !cleanHotelName.toLowerCase().includes(day.hotel_tier.toLowerCase())) {
+                    cleanHotelName = `${cleanHotelName} (${day.hotel_tier})`;
+                }
+
                 return {
                     day: formattedDay,
                     location: day.overnight_location || "",
-                    hotel: (day.hotel_suggestion || "").replace(/\s*\(?\d+\s*Star\)?/gi, "").trim(),
-                    room_category: roomCategory || existingRow?.room_category || "Standard",
-                    basis: formData.meal_plan || existingRow?.basis || "BB",
+                    hotel: cleanHotelName,
+                    room_category: day.room_category || roomCategory || existingRow?.room_category || "Standard",
+                    basis: day.meal_plan || formData.meal_plan || existingRow?.basis || "BB",
                     sgl: existingRow?.sgl || 0,
                     dbl: existingRow?.dbl || 0,
                     tri: existingRow?.tri || 0,
@@ -162,6 +277,21 @@ export function CostingSheetForm({
             }
         }
     }, [initialData, itineraryDays.length, roomCategory, formData.meal_plan]);
+
+    // Auto-trigger rate lookup when accommodation data is first populated (new costing sheet)
+    useEffect(() => {
+        if (initialData || rateLookupDone || isLookingUpRates) return;
+        const accomData = formData.accommodation_data || [];
+        if (accomData.length === 0) return;
+        // Only auto-lookup if at least one row has a hotel name and all rates are zero
+        const hasHotelsWithNoRates = accomData.some(row =>
+            row.hotel && row.hotel.trim().length > 0
+            && (row.sgl || 0) === 0 && (row.dbl || 0) === 0 && (row.tri || 0) === 0 && (row.quad || 0) === 0
+        );
+        if (hasHotelsWithNoRates) {
+            fetchHotelRates(accomData);
+        }
+    }, [formData.accommodation_data, initialData, rateLookupDone, isLookingUpRates, fetchHotelRates]);
 
     // Synchronize other metadata props for new costing sheets
     useEffect(() => {
@@ -197,12 +327,12 @@ export function CostingSheetForm({
                 : totalDistance;
 
             const transportRows = [
-                { description: "Transport", mileage: mileage || 0, rate: 100, total: (mileage || 0) * 100 },
-                { description: "Additional KM", mileage: 0, rate: 100, total: 0 },
-                { description: "Batta", mileage: noOfNights, rate: 3000, total: noOfNights * 3000 },
-                { description: "Paging", mileage: 1, rate: 5000, total: 5000 },
-                { description: "Guide Acc", mileage: 0, rate: 0, total: 0 },
-                { description: "Gude Fee", mileage: 0, rate: 0, total: 0 },
+                { description: "Transport", mileage: mileage || 0, rate: 100, total: calculateTransportRowTotal({ mileage: mileage || 0, rate: 100 }) },
+                { description: "Additional KM", mileage: 0, rate: 100, total: calculateTransportRowTotal({ mileage: 0, rate: 100 }) },
+                { description: "Batta", mileage: noOfNights, rate: 3000, total: calculateTransportRowTotal({ mileage: noOfNights, rate: 3000 }) },
+                { description: "Paging", mileage: 1, rate: 5000, total: calculateTransportRowTotal({ mileage: 1, rate: 5000 }) },
+                { description: "Guide Acc", mileage: 0, rate: 0, total: calculateTransportRowTotal({ mileage: 0, rate: 0 }) },
+                { description: "Gude Fee", mileage: 0, rate: 0, total: calculateTransportRowTotal({ mileage: 0, rate: 0 }) },
             ];
             setFormData(prev => ({ ...prev, transport_data: transportRows }));
         }
@@ -210,10 +340,10 @@ export function CostingSheetForm({
 
     const calculateTotals = () => {
         // Accommodation in USD (Summing SGL + DBL + TRI + QUAD + QUAD_TRIPLE)
-        const accomTotalUSD = (formData.accommodation_data || []).reduce((sum, row) => sum + (row.sgl || 0) + (row.dbl || 0) + (row.tri || 0) + (row.quad || 0) + (row.quad_triple || 0), 0);
+        const accomTotalUSD = (formData.accommodation_data || []).reduce((sum, row) => sum + calculateAccommodationRowUSD(row), 0);
 
         // Transport in LKR
-        const transportTotalLKR = (formData.transport_data || []).reduce((sum, row) => sum + (row.total || 0), 0);
+        const transportTotalLKR = (formData.transport_data || []).reduce((sum, row) => sum + calculateTransportRowTotal({ mileage: row.mileage, rate: row.rate }), 0);
         const transportTotalUSD = transportTotalLKR / (formData.exchange_rate || 1);
 
         // Extras in USD
@@ -275,6 +405,11 @@ export function CostingSheetForm({
                 i === index ? { ...row, [field]: value } : row
             ),
         }));
+        // If a rate field was manually changed, switch source to 'manual'
+        const rateFields: (keyof AccommodationRow)[] = ['sgl', 'dbl', 'tri', 'quad', 'quad_triple'];
+        if (rateFields.includes(field)) {
+            setRateSourceMap(prev => ({ ...prev, [index]: 'manual' }));
+        }
     };
 
     const removeAccommodationRow = (index: number) => {
@@ -289,7 +424,7 @@ export function CostingSheetForm({
             ...prev,
             transport_data: [
                 ...(prev.transport_data || []),
-                { description: "", mileage: 0, rate: 100, total: 0 },
+                { description: "", mileage: 0, rate: 100, total: calculateTransportRowTotal({ mileage: 0, rate: 100 }) },
             ],
         }));
     };
@@ -298,11 +433,14 @@ export function CostingSheetForm({
         setFormData(prev => {
             const newData = prev.transport_data?.map((row, i) => {
                 if (i === index) {
-                    const updated = { ...row, [field]: value };
-                    // Auto-calculate total
-                    if (field === "mileage" || field === "rate") {
-                        updated.total = (updated.mileage || 0) * (updated.rate || 0);
-                    }
+                    const normalizedValue = field === "mileage" || field === "rate"
+                        ? (Number(value) || 0)
+                        : value;
+                    const updated = {
+                        ...row,
+                        [field]: normalizedValue,
+                    };
+                    updated.total = calculateTransportRowTotal(updated);
                     return updated;
                 }
                 return row;
@@ -347,7 +485,16 @@ export function CostingSheetForm({
     const handleSave = async (status: "draft" | "finalized") => {
         setIsSaving(true);
         try {
-            const dataToSave = { ...formData, status };
+            const dataToSave = {
+                ...formData,
+                status,
+                transport_data: (formData.transport_data || []).map((row) => ({
+                    ...row,
+                    mileage: Number(row.mileage) || 0,
+                    rate: Number(row.rate) || 0,
+                    total: calculateTransportRowTotal({ mileage: row.mileage, rate: row.rate }),
+                })),
+            };
 
             const url = "/api/costing-sheet";
             const method = initialData?.id ? "PUT" : "POST";
@@ -377,24 +524,61 @@ export function CostingSheetForm({
 
     // Calculate total mileage for transport
     const totalMileage = (formData.transport_data || [])
-        .filter(row => row.description === "Transport" || row.description === "Additional KM")
+        .filter(row => {
+            const description = normalizeTransportDescription(row.description);
+            return description === "transport"
+                || description === "additional km"
+                || description === "extra km"
+                || description === "extra kms";
+        })
         .reduce((sum, row) => sum + (row.mileage || 0), 0);
+
+    const visibleAccommodationRoomCols = [roomsSgl, roomsDbl, roomsTpl, roomsQtpl].filter((roomCount) => (roomCount ?? 0) > 0).length;
+    const accommodationTotalUSD = (formData.accommodation_data || []).reduce((sum, row) => sum + calculateAccommodationRowUSD(row), 0);
+    const accommodationTotalLKR = accommodationTotalUSD * (formData.exchange_rate || 0);
+    const accommodationPerPersonUSD = accommodationTotalUSD / (formData.no_of_pax || 1);
+    const accommodationPerPersonLKR = accommodationTotalLKR / (formData.no_of_pax || 1);
 
     // Calculate Accommodation Summary from Itinerary Days
     const accommodationSummary = (() => {
         const summary = new Map<string, { nights: number; location: string }>();
-        itineraryDays.slice(0, -1).forEach(day => {
+        itineraryDays
+            .filter((day, idx) => idx < itineraryDays.length - 1 || Boolean(day.hotel_suggestion?.trim()))
+            .forEach(day => {
             if (day.hotel_suggestion) {
                 const key = day.hotel_suggestion.replace(/\s*\(?\d+\s*Star\)?/gi, "").trim();
                 const current = summary.get(key) || { nights: 0, location: day.overnight_location };
                 summary.set(key, { ...current, nights: current.nights + 1 });
             }
-        });
+            });
         return Array.from(summary.entries());
     })();
 
+    // Transport Totals & P/P
+    const transportTotalLKR = (formData.transport_data || []).reduce((sum, row) => sum + calculateTransportRowTotal({ mileage: row.mileage, rate: row.rate }), 0);
+    const transportTotalUSD = transportTotalLKR / (formData.exchange_rate || 1);
+    const transportPerPersonLKR = transportTotalLKR / (formData.no_of_pax || 1);
+    const transportPerPersonUSD = transportTotalUSD / (formData.no_of_pax || 1);
+
+    // Extras Totals & P/P 
+    const extrasTotalUSD = (formData.extras_data || []).reduce((sum, row) => sum + ((row.count || 0) * (row.unit_price || 0)), 0);
+    const extrasTotalLKR = extrasTotalUSD * (formData.exchange_rate || 0);
+    const extrasPerPersonUSD = extrasTotalUSD / (formData.no_of_pax || 1);
+    const extrasPerPersonLKR = extrasTotalLKR / (formData.no_of_pax || 1);
+
     return (
-        <div className="card p-6 space-y-6">
+        <div className={`card p-6 space-y-6 ${isFinalized ? 'opacity-95' : ''}`}>
+            {showPinModal && (
+                <AdminPinModal
+                    isOpen={showPinModal}
+                    onAuthorized={() => {
+                        setIsUnlocked(true);
+                        setShowPinModal(false);
+                    }}
+                    onClose={() => setShowPinModal(false)}
+                    title="Unlock Costing Sheet"
+                />
+            )}
             <style jsx global>{`
                 input::-webkit-outer-spin-button,
                 input::-webkit-inner-spin-button {
@@ -408,27 +592,40 @@ export function CostingSheetForm({
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-surface-900">Tour Costing Sheet</h3>
                 <div className="flex gap-2">
-                    <Button
-                        variant="secondary"
-                        onClick={() => handleSave("draft")}
-                        loading={isSaving}
-                        disabled={isSaving}
-                    >
-                        Save Draft
-                    </Button>
-                    <Button
-                        onClick={() => handleSave("finalized")}
-                        loading={isSaving}
-                        disabled={isSaving}
-                        className="bg-accent-600 hover:bg-accent-700"
-                    >
-                        Finalize
-                    </Button>
+                    {isFinalized ? (
+                        <Button
+                            onClick={() => setShowPinModal(true)}
+                            variant="secondary"
+                            className="bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100"
+                        >
+                            Edit (Requires PIN)
+                        </Button>
+                    ) : (
+                        <>
+                            <Button
+                                variant="secondary"
+                                onClick={() => handleSave("draft")}
+                                loading={isSaving}
+                                disabled={isSaving}
+                            >
+                                Save Draft
+                            </Button>
+                            <Button
+                                onClick={() => handleSave("finalized")}
+                                loading={isSaving}
+                                disabled={isSaving}
+                                className="bg-red-600 hover:bg-red-700"
+                            >
+                                Finalize
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 
-            {/* Metadata Section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-surface-50 rounded-lg">
+            <fieldset disabled={isFinalized} className="space-y-6">
+                {/* Metadata Section */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-surface-50 rounded-lg">
                 <div>
                     <label className="block text-xs font-medium text-surface-700 mb-1">Agent Name</label>
                     <input
@@ -505,13 +702,14 @@ export function CostingSheetForm({
                                 "Large Coach": 350
                             };
                             const newRate = rates[selectedType] || 130;
-                            // Update transport data first row with new rate
-                            const updatedTransportData = (formData.transport_data || []).map((row, idx) => {
-                                if (idx === 0 && row.description === "Transport") {
-                                    return { ...row, rate: newRate, total: (row.mileage || 0) * newRate };
-                                }
-                                if (idx === 1 && row.description === "Additional KM") {
-                                    return { ...row, rate: newRate, total: (row.mileage || 0) * newRate };
+                            const updatedTransportData = (formData.transport_data || []).map((row) => {
+                                const description = normalizeTransportDescription(row.description);
+                                if (description === "transport" || description === "additional km") {
+                                    return {
+                                        ...row,
+                                        rate: newRate,
+                                        total: calculateTransportRowTotal({ mileage: row.mileage, rate: newRate }),
+                                    };
                                 }
                                 return row;
                             });
@@ -536,7 +734,24 @@ export function CostingSheetForm({
                     <input
                         type="number"
                         value={formData.vehicle_rate || 130}
-                        onChange={(e) => setFormData(prev => ({ ...prev, vehicle_rate: parseFloat(e.target.value) || 0 }))}
+                        onChange={(e) => {
+                            const newRate = parseFloat(e.target.value) || 0;
+                            setFormData(prev => ({
+                                ...prev,
+                                vehicle_rate: newRate,
+                                transport_data: (prev.transport_data || []).map((row) => {
+                                    const description = normalizeTransportDescription(row.description);
+                                    if (description === "transport" || description === "additional km") {
+                                        return {
+                                            ...row,
+                                            rate: newRate,
+                                            total: calculateTransportRowTotal({ mileage: row.mileage, rate: newRate }),
+                                        };
+                                    }
+                                    return row;
+                                }),
+                            }));
+                        }}
                         className="w-full px-3 py-2 border border-surface-300 rounded-lg text-sm"
                         placeholder="e.g. 130"
                     />
@@ -640,10 +855,55 @@ export function CostingSheetForm({
             {/* Accommodation Section */}
             <div>
                 <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-surface-900">Accommodation</h4>
-                    <Button variant="secondary" size="sm" onClick={addAccommodationRow}>
-                        + Add Row
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <h4 className="text-sm font-semibold text-surface-900">Accommodation</h4>
+                        {/* Rate source legend */}
+                        {Object.keys(rateSourceMap).length > 0 && (
+                            <div className="flex items-center gap-2 text-[10px]">
+                                <span className="flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-green-400"></span>
+                                    <span className="text-surface-500">DB Rate</span>
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                                    <span className="text-surface-500">Manual</span>
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-red-300"></span>
+                                    <span className="text-surface-500">Not Found</span>
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => fetchHotelRates(formData.accommodation_data || [])}
+                            disabled={isLookingUpRates || isFinalized}
+                            className="text-xs gap-1.5"
+                        >
+                            {isLookingUpRates ? (
+                                <>
+                                    <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    Looking up…
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Refresh Rates
+                                </>
+                            )}
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={addAccommodationRow}>
+                            + Add Row
+                        </Button>
+                    </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -669,16 +929,16 @@ export function CostingSheetForm({
                                         <input
                                             type="text"
                                             value={row.day}
-                                            readOnly
-                                            className="w-full px-2 py-1 bg-surface-50 border border-surface-300 rounded text-xs"
+                                            onChange={(e) => updateAccommodationRow(index, "day", e.target.value)}
+                                            className="w-full px-2 py-1 border border-surface-300 rounded text-xs"
                                         />
                                     </td>
                                     <td className="px-2 py-2">
                                         <input
                                             type="text"
                                             value={row.location}
-                                            readOnly
-                                            className="w-full px-2 py-1 bg-surface-50 border border-surface-300 rounded text-xs"
+                                            onChange={(e) => updateAccommodationRow(index, "location", e.target.value)}
+                                            className="w-full px-2 py-1 border border-surface-300 rounded text-xs"
                                         />
                                     </td>
                                     <td className="px-2 py-2">
@@ -713,7 +973,13 @@ export function CostingSheetForm({
                                                 onFocus={(e) => e.target.value === "0" && (e.target.value = "")}
                                                 onBlur={(e) => e.target.value === "" && (e.target.value = "0")}
                                                 onChange={(e) => updateAccommodationRow(index, "sgl", parseFloat(e.target.value) || 0)}
-                                                className="w-20 px-2 py-1 border border-surface-300 rounded text-xs text-right"
+                                                className={`w-20 px-2 py-1 border rounded text-xs text-right ${
+                                                    rateSourceMap[index] === 'database'
+                                                        ? 'bg-green-50 border-green-300 text-green-800'
+                                                        : rateSourceMap[index] === 'not_found'
+                                                            ? 'bg-red-50 border-red-200 text-red-700'
+                                                            : 'border-surface-300'
+                                                }`}
                                             />
                                         </td>
                                     )}
@@ -725,7 +991,13 @@ export function CostingSheetForm({
                                                 onFocus={(e) => e.target.value === "0" && (e.target.value = "")}
                                                 onBlur={(e) => e.target.value === "" && (e.target.value = "0")}
                                                 onChange={(e) => updateAccommodationRow(index, "dbl", parseFloat(e.target.value) || 0)}
-                                                className="w-20 px-2 py-1 border border-surface-300 rounded text-xs text-right"
+                                                className={`w-20 px-2 py-1 border rounded text-xs text-right ${
+                                                    rateSourceMap[index] === 'database'
+                                                        ? 'bg-green-50 border-green-300 text-green-800'
+                                                        : rateSourceMap[index] === 'not_found'
+                                                            ? 'bg-red-50 border-red-200 text-red-700'
+                                                            : 'border-surface-300'
+                                                }`}
                                             />
                                         </td>
                                     )}
@@ -737,7 +1009,13 @@ export function CostingSheetForm({
                                                 onFocus={(e) => e.target.value === "0" && (e.target.value = "")}
                                                 onBlur={(e) => e.target.value === "" && (e.target.value = "0")}
                                                 onChange={(e) => updateAccommodationRow(index, "tri", parseFloat(e.target.value) || 0)}
-                                                className="w-20 px-2 py-1 border border-surface-300 rounded text-xs text-right"
+                                                className={`w-20 px-2 py-1 border rounded text-xs text-right ${
+                                                    rateSourceMap[index] === 'database'
+                                                        ? 'bg-green-50 border-green-300 text-green-800'
+                                                        : rateSourceMap[index] === 'not_found'
+                                                            ? 'bg-red-50 border-red-200 text-red-700'
+                                                            : 'border-surface-300'
+                                                }`}
                                             />
                                         </td>
                                     )}
@@ -749,19 +1027,20 @@ export function CostingSheetForm({
                                                 onFocus={(e) => e.target.value === "0" && (e.target.value = "")}
                                                 onBlur={(e) => e.target.value === "" && (e.target.value = "0")}
                                                 onChange={(e) => updateAccommodationRow(index, "quad", parseFloat(e.target.value) || 0)}
-                                                className="w-20 px-2 py-1 border border-surface-300 rounded text-xs text-right"
+                                                className={`w-20 px-2 py-1 border rounded text-xs text-right ${
+                                                    rateSourceMap[index] === 'database'
+                                                        ? 'bg-green-50 border-green-300 text-green-800'
+                                                        : rateSourceMap[index] === 'not_found'
+                                                            ? 'bg-red-50 border-red-200 text-red-700'
+                                                            : 'border-surface-300'
+                                                }`}
                                             />
                                         </td>
                                     )}
                                     <td className="px-2 py-2">
                                         <input
                                             type="number"
-                                            value={((
-                                                ((roomsSgl ?? 0) > 0 ? (row.sgl || 0) : 0) +
-                                                ((roomsDbl ?? 0) > 0 ? (row.dbl || 0) : 0) +
-                                                ((roomsTpl ?? 0) > 0 ? (row.tri || 0) : 0) +
-                                                ((roomsQtpl ?? 0) > 0 ? (row.quad || 0) : 0)
-                                            ) * (formData.exchange_rate || 0)).toFixed(0)}
+                                            value={(calculateAccommodationRowUSD(row) * (formData.exchange_rate || 0)).toFixed(0)}
                                             readOnly
                                             className="w-24 px-2 py-1 bg-surface-100 border border-surface-300 rounded text-xs text-right"
                                         />
@@ -769,15 +1048,35 @@ export function CostingSheetForm({
                                     <td className="px-2 py-2">
                                         <button
                                             onClick={() => removeAccommodationRow(index)}
-                                            className="text-accent-500 hover:text-accent-700 text-xs"
+                                            className="text-red-600 hover:text-red-700 text-xs"
                                         >
                                             Remove
                                         </button>
                                     </td>
                                 </tr>
                             ))}
+                            <tr className="bg-green-100 font-semibold">
+                                <td className="px-2 py-2 text-xs text-right" colSpan={5 + visibleAccommodationRoomCols}>
+                                    Accommodation Total (USD)
+                                    <span className="ml-2 text-sm">{accommodationTotalUSD.toFixed(2)}</span>
+                                </td>
+                                <td className="px-2 py-2 text-right text-sm">
+                                    {accommodationTotalLKR.toFixed(0)}
+                                </td>
+                                <td className="px-2 py-2"></td>
+                            </tr>
                         </tbody>
                     </table>
+                </div>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-4 py-3">
+                        <div className="text-xs font-medium text-surface-500 uppercase tracking-wider">Accommodation Per Person (USD)</div>
+                        <div className="mt-1 text-lg font-bold text-surface-900">{accommodationPerPersonUSD.toFixed(2)}</div>
+                    </div>
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-4 py-3">
+                        <div className="text-xs font-medium text-surface-500 uppercase tracking-wider">Accommodation Per Person (LKR)</div>
+                        <div className="mt-1 text-lg font-bold text-surface-900">{accommodationPerPersonLKR.toFixed(0)}</div>
+                    </div>
                 </div>
             </div>
 
@@ -811,8 +1110,7 @@ export function CostingSheetForm({
                                             type="text"
                                             value={row.description}
                                             onChange={(e) => updateTransportRow(index, "description", e.target.value)}
-                                            readOnly={index < 5}
-                                            className={`w-full px-2 py-1 border border-surface-300 rounded text-xs ${index < 5 ? "bg-surface-50" : ""}`}
+                                            className="w-full px-2 py-1 border border-surface-300 rounded text-xs"
                                         />
                                     </td>
                                     <td className="px-2 py-2">
@@ -822,8 +1120,7 @@ export function CostingSheetForm({
                                             onFocus={(e) => e.target.value === "0" && (e.target.value = "")}
                                             onBlur={(e) => e.target.value === "" && (e.target.value = "0")}
                                             onChange={(e) => updateTransportRow(index, "mileage", parseFloat(e.target.value) || 0)}
-                                            readOnly={index === 0 || (index > 1 && index < 6)}
-                                            className={`w-24 px-2 py-1 border border-surface-300 rounded text-xs text-right ${(index === 0 || (index > 1 && index < 6)) ? "bg-surface-50" : ""}`}
+                                            className="w-24 px-2 py-1 border border-surface-300 rounded text-xs text-right"
                                         />
                                     </td>
                                     <td className="px-2 py-2">
@@ -839,7 +1136,7 @@ export function CostingSheetForm({
                                     <td className="px-2 py-2">
                                         <input
                                             type="number"
-                                            value={row.total || 0}
+                                            value={calculateTransportRowTotal({ mileage: row.mileage, rate: row.rate })}
                                             readOnly
                                             className="w-28 px-2 py-1 bg-surface-100 border border-surface-300 rounded text-xs text-right font-semibold"
                                         />
@@ -847,7 +1144,7 @@ export function CostingSheetForm({
                                     <td className="px-2 py-2">
                                         <button
                                             onClick={() => removeTransportRow(index)}
-                                            className="text-accent-500 hover:text-accent-700 text-xs"
+                                            className="text-red-600 hover:text-red-700 text-xs"
                                         >
                                             Remove
                                         </button>
@@ -859,12 +1156,22 @@ export function CostingSheetForm({
                                 <td className="px-2 py-2"></td>
                                 <td className="px-2 py-2"></td>
                                 <td className="px-2 py-2 text-right text-sm">
-                                    {(formData.transport_data || []).reduce((sum, row) => sum + (row.total || 0), 0).toFixed(0)}
+                                    {(formData.transport_data || []).reduce((sum, row) => sum + calculateTransportRowTotal({ mileage: row.mileage, rate: row.rate }), 0).toFixed(0)}
                                 </td>
                                 <td className="px-2 py-2"></td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-4 py-3">
+                        <div className="text-xs font-medium text-surface-500 uppercase tracking-wider">Transport Per Person (USD)</div>
+                        <div className="mt-1 text-lg font-bold text-surface-900">{transportPerPersonUSD.toFixed(2)}</div>
+                    </div>
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-4 py-3">
+                        <div className="text-xs font-medium text-surface-500 uppercase tracking-wider">Transport Per Person (LKR)</div>
+                        <div className="mt-1 text-lg font-bold text-surface-900">{transportPerPersonLKR.toFixed(0)}</div>
+                    </div>
                 </div>
             </div>
 
@@ -930,7 +1237,7 @@ export function CostingSheetForm({
                                     <td className="px-2 py-2">
                                         <button
                                             onClick={() => removeExtrasRow(index)}
-                                            className="text-accent-500 hover:text-accent-700 text-xs"
+                                            className="text-red-600 hover:text-red-700 text-xs"
                                         >
                                             Remove
                                         </button>
@@ -983,6 +1290,16 @@ export function CostingSheetForm({
                         />
                     </div>
                 </div>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-4 py-3">
+                        <div className="text-xs font-medium text-surface-500 uppercase tracking-wider">Extras Per Person (USD)</div>
+                        <div className="mt-1 text-lg font-bold text-surface-900">{extrasPerPersonUSD.toFixed(2)}</div>
+                    </div>
+                    <div className="rounded-lg border border-surface-200 bg-surface-50 px-4 py-3">
+                        <div className="text-xs font-medium text-surface-500 uppercase tracking-wider">Extras Per Person (LKR)</div>
+                        <div className="mt-1 text-lg font-bold text-surface-900">{extrasPerPersonLKR.toFixed(0)}</div>
+                    </div>
+                </div>
             </div>
 
             {/* Totals & Profit Section */}
@@ -1016,6 +1333,7 @@ export function CostingSheetForm({
                     </div>
                 </div>
             </div>
+            </fieldset>
         </div>
     );
 }

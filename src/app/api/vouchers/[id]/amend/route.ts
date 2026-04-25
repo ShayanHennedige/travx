@@ -22,6 +22,25 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Original voucher not found" }, { status: 404 });
   }
 
+  let resolvedGuestName = originalVoucher.guest_name || "Guest";
+  if (originalVoucher.inquiry_id) {
+    const { data: inquiry } = await supabase
+      .from("inquiries")
+      .select("first_name, last_name")
+      .eq("id", originalVoucher.inquiry_id)
+      .maybeSingle();
+    const inquiryName = `${inquiry?.first_name || ""} ${inquiry?.last_name || ""}`.trim();
+    if (inquiryName) resolvedGuestName = inquiryName;
+  } else if (originalVoucher.group_inquiry_id) {
+    const { data: groupInquiry } = await supabase
+      .from("group_inquiries")
+      .select("head_first_name, head_last_name")
+      .eq("id", originalVoucher.group_inquiry_id)
+      .maybeSingle();
+    const headName = `${groupInquiry?.head_first_name || ""} ${groupInquiry?.head_last_name || ""}`.trim();
+    if (headName) resolvedGuestName = headName;
+  }
+
   // Calculate next amendment number
   const { data: amendments } = await supabase
     .from("hotel_vouchers")
@@ -44,6 +63,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     amendment_number: nextAmendmentNumber,
     amendment_confirmed_by: body.amendment_confirmed_by || null,
     status: "amended",
+    guest_name: body.guest_name || resolvedGuestName,
     created_at: undefined,
     updated_at: undefined,
     // Override with new values from request

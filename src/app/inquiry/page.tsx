@@ -18,7 +18,7 @@ export default function PublicInquiryPage() {
           <div className="relative w-40 h-14">
             <Image
               src="/Serendia.png"
-              alt="TraveX"
+              alt="TravX"
               fill
               className="object-contain object-left"
               priority
@@ -96,11 +96,11 @@ export default function PublicInquiryPage() {
         {/* Footer */}
         <footer className="mt-12 text-center border-t border-slate-200 pt-8 pb-4">
           <p className="text-sm text-slate-500 mb-2">Need assistance?</p>
-          <a href="mailto:info@Travex.com" className="text-primary-600 font-semibold hover:text-primary-700 transition-colors">
-            info@Travex.com
+          <a href="mailto:info@serendiaholidays.com" className="text-primary-600 font-semibold hover:text-primary-700 transition-colors">
+            info@serendiaholidays.com
           </a>
           <p className="text-xs text-slate-400 mt-8">
-            &copy; {new Date().getFullYear()} TraveX. All rights reserved.
+            &copy; {new Date().getFullYear()} TravX Travel Management. All rights reserved.
           </p>
         </footer>
       </main>

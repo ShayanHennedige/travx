@@ -2,6 +2,121 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureTourExists } from "@/lib/operations-utils";
 
+type ItineraryHotelInput = {
+  hotel_name: string;
+  check_in_date?: string;
+  check_out_date?: string;
+  no_of_nights?: number;
+  room_type?: string;
+  room_category?: string;
+  no_of_rooms?: number;
+  meal_plan?: string;
+};
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function normalizeHotelName(name: string | undefined | null): string {
+  return (name || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function parseIsoDate(dateStr: string | undefined): Date | null {
+  if (!dateStr) return null;
+  const parsed = new Date(`${dateStr}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function calculateNights(checkIn: string | undefined, checkOut: string | undefined, fallback: number | undefined): number {
+  const inDate = parseIsoDate(checkIn);
+  const outDate = parseIsoDate(checkOut);
+  if (inDate && outDate) {
+    const diff = Math.round((outDate.getTime() - inDate.getTime()) / MS_PER_DAY);
+    if (diff > 0) return diff;
+  }
+  return fallback && fallback > 0 ? fallback : 1;
+}
+
+function maxDate(a: string | undefined, b: string | undefined): string | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const aDate = parseIsoDate(a);
+  const bDate = parseIsoDate(b);
+  if (!aDate || !bDate) return b;
+  return aDate.getTime() >= bDate.getTime() ? a : b;
+}
+
+function groupHotelsByContinuousStay(hotels: ItineraryHotelInput[]): ItineraryHotelInput[] {
+  if (!Array.isArray(hotels) || hotels.length === 0) return [];
+
+  const sorted = hotels
+    .map((hotel, originalIndex) => ({ hotel, originalIndex }))
+    .sort((a, b) => {
+      const aDate = parseIsoDate(a.hotel.check_in_date);
+      const bDate = parseIsoDate(b.hotel.check_in_date);
+      if (aDate && bDate) return aDate.getTime() - bDate.getTime();
+      if (aDate) return -1;
+      if (bDate) return 1;
+      return a.originalIndex - b.originalIndex;
+    });
+
+  const grouped: ItineraryHotelInput[] = [];
+
+  for (const { hotel } of sorted) {
+    const current: ItineraryHotelInput = {
+      ...hotel,
+      no_of_nights: calculateNights(hotel.check_in_date, hotel.check_out_date, hotel.no_of_nights),
+    };
+
+    const previous = grouped[grouped.length - 1];
+    const sameHotel = previous && normalizeHotelName(previous.hotel_name) === normalizeHotelName(current.hotel_name);
+    const continuousStay =
+      sameHotel &&
+      previous.check_out_date &&
+      current.check_in_date &&
+      previous.check_out_date === current.check_in_date;
+
+    if (continuousStay) {
+      previous.check_out_date = maxDate(previous.check_out_date, current.check_out_date);
+      previous.no_of_nights = calculateNights(previous.check_in_date, previous.check_out_date, (previous.no_of_nights || 0) + (current.no_of_nights || 0));
+      continue;
+    }
+
+    grouped.push(current);
+  }
+
+  return grouped;
+}
+
+async function resolveGuestNameFromInquiry(
+  supabase: any,
+  inquiryId?: string | null,
+  groupInquiryId?: string | null,
+  fallback?: string
+): Promise<string> {
+  if (inquiryId) {
+    const { data: inquiry } = await supabase
+      .from("inquiries")
+      .select("first_name, last_name")
+      .eq("id", inquiryId)
+      .maybeSingle();
+
+    const inquiryName = `${inquiry?.first_name || ""} ${inquiry?.last_name || ""}`.trim();
+    if (inquiryName) return inquiryName;
+  }
+
+  if (groupInquiryId) {
+    const { data: groupInquiry } = await supabase
+      .from("group_inquiries")
+      .select("head_first_name, head_last_name")
+      .eq("id", groupInquiryId)
+      .maybeSingle();
+
+    const headName = `${groupInquiry?.head_first_name || ""} ${groupInquiry?.head_last_name || ""}`.trim();
+    if (headName) return headName;
+  }
+
+  return (fallback || "Guest").trim() || "Guest";
+}
+
 // GET - List all vouchers
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -58,6 +173,15 @@ export async function POST(request: Request) {
   if (body.generate_from_itinerary) {
     const { itinerary_id, inquiry_id, group_inquiry_id, guest_name, nationality, pax_adults, pax_children, hotels } = body;
 
+    // Filter out hotels with no valid name (e.g. "N/A" placeholders) before grouping
+    const validHotels = ((hotels || []) as ItineraryHotelInput[]).filter(h => {
+      const name = h.hotel_name?.trim().toLowerCase();
+      return name && name !== "n/a" && name !== "tbd" && name !== "na";
+    });
+
+    const groupedHotels = groupHotelsByContinuousStay(validHotels);
+    const resolvedGuestName = await resolveGuestNameFromInquiry(supabase, inquiry_id, group_inquiry_id, guest_name);
+
     // Fetch the inquiry/group inquiry number to use as base for voucher numbers
     let baseNumber = "V";
     if (inquiry_id) {
@@ -85,7 +209,39 @@ export async function POST(request: Request) {
 
     const costingHotels = (costingSheet?.accommodation_data as any[]) || [];
 
-    const vouchersToCreate = hotels.map((hotel: any, index: number) => {
+    // Fetch room counts from the linked inquiry so each voucher shows all room types
+    let inquiryRooms = { rooms_sgl: 0, rooms_dbl: 0, rooms_tpl: 0, rooms_qtpl: 0 };
+    if (inquiry_id) {
+      const { data: inq } = await supabase
+        .from("inquiries")
+        .select("rooms_sgl, rooms_dbl, rooms_tpl, rooms_qtpl")
+        .eq("id", inquiry_id)
+        .maybeSingle();
+      if (inq) {
+        inquiryRooms = {
+          rooms_sgl: inq.rooms_sgl || 0,
+          rooms_dbl: inq.rooms_dbl || 0,
+          rooms_tpl: inq.rooms_tpl || 0,
+          rooms_qtpl: inq.rooms_qtpl || 0,
+        };
+      }
+    } else if (group_inquiry_id) {
+      const { data: ginq } = await supabase
+        .from("group_inquiries")
+        .select("rooms_sgl, rooms_dbl, rooms_tpl, rooms_qtpl")
+        .eq("id", group_inquiry_id)
+        .maybeSingle();
+      if (ginq) {
+        inquiryRooms = {
+          rooms_sgl: ginq.rooms_sgl || 0,
+          rooms_dbl: ginq.rooms_dbl || 0,
+          rooms_tpl: ginq.rooms_tpl || 0,
+          rooms_qtpl: ginq.rooms_qtpl || 0,
+        };
+      }
+    }
+
+    const vouchersToCreate = groupedHotels.map((hotel: any, index: number) => {
       // Find matching hotel in costing sheet to get rates
       // Try exact match first, then partial
       const costingMatch = costingHotels.find(ch =>
@@ -99,7 +255,7 @@ export async function POST(request: Request) {
         inquiry_id: inquiry_id || null,
         group_inquiry_id: group_inquiry_id || null,
         hotel_name: hotel.hotel_name,
-        guest_name,
+        guest_name: resolvedGuestName,
         nationality,
         pax_adults,
         pax_children,
@@ -115,6 +271,11 @@ export async function POST(request: Request) {
         room_rate_sgl: costingMatch?.sgl || 0,
         room_rate_dbl: costingMatch?.dbl || 0,
         room_rate_tpl: costingMatch?.tri || 0,
+        room_rate_qtpl: costingMatch?.qtpl || 0,
+        rooms_sgl: inquiryRooms.rooms_sgl,
+        rooms_dbl: inquiryRooms.rooms_dbl,
+        rooms_tpl: inquiryRooms.rooms_tpl,
+        rooms_qtpl: inquiryRooms.rooms_qtpl,
         status: "draft", // Changed from 'completed' to 'draft' as per user request (manual remarks/confirmation needed)
         voucher_number: `${baseNumber}-V${(startCount + index).toString().padStart(2, '0')}`,
       };
@@ -166,6 +327,13 @@ export async function POST(request: Request) {
 
     body.voucher_number = `${baseRef}-V${((count || 0) + 1).toString().padStart(2, '0')}`;
   }
+
+  body.guest_name = await resolveGuestNameFromInquiry(
+    supabase,
+    body.inquiry_id || null,
+    body.group_inquiry_id || null,
+    body.guest_name
+  );
 
   const { data: voucher, error } = await supabase
     .from("hotel_vouchers")

@@ -7,9 +7,9 @@ import { Header } from "@/components/layout";
 import { Button, Input } from "@/components/ui";
 
 export default function ProfilePage() {
-  const [companyName, setCompanyName] = useState("TraveX");
+  const [companyName, setCompanyName] = useState("TravX");
   const [logoUrl, setLogoUrl] = useState("/Serendia.png");
-  const [tempCompanyName, setTempCompanyName] = useState("TraveX");
+  const [tempCompanyName, setTempCompanyName] = useState("TravX");
   const [tempLogoUrl, setTempLogoUrl] = useState("/Serendia.png");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);

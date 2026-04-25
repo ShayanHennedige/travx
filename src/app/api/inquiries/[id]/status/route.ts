@@ -22,6 +22,30 @@ export async function PUT(request: Request, { params }: RouteContext) {
       );
     }
 
+    // Fetch current status to validate transition
+    const { data: current } = await supabase
+      .from("inquiries")
+      .select("status")
+      .eq("id", id)
+      .single();
+
+    const allowedTransitions: Record<string, string[]> = {
+      new:         ["in_progress", "quoted", "cancelled"],
+      in_progress: ["new", "quoted", "confirmed", "cancelled"],
+      quoted:      ["in_progress", "confirmed", "cancelled"],
+      confirmed:   ["completed", "cancelled"],
+      completed:   [],
+      cancelled:   [],
+    };
+
+    const currentStatus = current?.status || "new";
+    if (!allowedTransitions[currentStatus]?.includes(status)) {
+      return NextResponse.json(
+        { error: `Cannot transition from '${currentStatus}' to '${status}'` },
+        { status: 422 }
+      );
+    }
+
     const { data: inquiry, error } = await supabase
       .from("inquiries")
       .update({ status, updated_at: new Date().toISOString() })

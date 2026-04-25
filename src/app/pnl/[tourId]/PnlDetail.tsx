@@ -70,6 +70,8 @@ const EXPENSE_COLORS = {
     misc: "#f59e0b",
 };
 
+const ISSUED_INVOICE_STATUSES = new Set(["confirmed", "sent", "paid", "overdue"]);
+
 export function PnlDetail({ tourId }: { tourId: string }) {
     const [pnl, setPnl] = useState<PnlData | null>(null);
     const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -79,6 +81,10 @@ export function PnlDetail({ tourId }: { tourId: string }) {
     const [costingExtras, setCostingExtras] = useState<CostingExtras[]>([]);
     const [uploading, setUploading] = useState(false);
     const [actualKm, setActualKm] = useState<string>("");
+    const [showMiscForm, setShowMiscForm] = useState(false);
+    const [miscDescription, setMiscDescription] = useState("");
+    const [miscAmount, setMiscAmount] = useState("");
+    const [savingMisc, setSavingMisc] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -220,7 +226,7 @@ export function PnlDetail({ tourId }: { tourId: string }) {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="card p-5 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                <div className="card p-5 bg-linear-to-br from-blue-50 to-blue-100 border-blue-200">
                     <p className="text-[10px] uppercase font-bold text-blue-600 tracking-wider mb-1">
                         Total Income
                     </p>
@@ -228,24 +234,27 @@ export function PnlDetail({ tourId }: { tourId: string }) {
                         ${(pnl.total_income || 0).toLocaleString()}
                     </p>
                     <p className="text-xs text-blue-500 mt-1">
-                        From {invoices.filter((i) => i.status === "paid").length} paid invoice(s)
+                        From {invoices.filter((i) => ISSUED_INVOICE_STATUSES.has(i.status)).length} issued invoice(s)
+                    </p>
+                    <p className="text-[11px] text-blue-400 mt-1">
+                        {invoices.filter((i) => i.status === "paid").length} paid invoice(s)
                     </p>
                 </div>
-                <div className="card p-5 bg-gradient-to-br from-accent-900/30 to-surface-800 border-accent-700/30">
-                    <p className="text-[10px] uppercase font-bold text-accent-500 tracking-wider mb-1">
+                <div className="card p-5 bg-linear-to-br from-red-50 to-red-100 border-red-200">
+                    <p className="text-[10px] uppercase font-bold text-red-600 tracking-wider mb-1">
                         Total Expenses
                     </p>
-                    <p className="text-2xl font-black text-accent-400">
+                    <p className="text-2xl font-black text-red-700">
                         ${(pnl.total_expenses || 0).toLocaleString()}
                     </p>
-                    <p className="text-xs text-accent-400 mt-1">
+                    <p className="text-xs text-red-500 mt-1">
                         From {vouchers.filter((v) => v.status === "paid").length} paid voucher(s)
                     </p>
                 </div>
                 <div
                     className={`card p-5 ${pnl.net_profit >= 0
-                        ? "bg-gradient-to-br from-green-50 to-green-100 border-green-200"
-                        : "bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200"
+                        ? "bg-linear-to-br from-green-50 to-green-100 border-green-200"
+                        : "bg-linear-to-br from-orange-50 to-orange-100 border-orange-200"
                         }`}
                 >
                     <p
@@ -261,7 +270,7 @@ export function PnlDetail({ tourId }: { tourId: string }) {
                         ${(pnl.net_profit || 0).toLocaleString()}
                     </p>
                 </div>
-                <div className="card p-5 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <div className="card p-5 bg-linear-to-br from-purple-50 to-purple-100 border-purple-200">
                     <p className="text-[10px] uppercase font-bold text-purple-600 tracking-wider mb-1">
                         Profit Margin
                     </p>
@@ -296,7 +305,7 @@ export function PnlDetail({ tourId }: { tourId: string }) {
                                                 entry.name === "Income"
                                                     ? "#3b82f6"
                                                     : entry.name === "Expenses"
-                                                        ? "#e0c16c"
+                                                        ? "#ef4444"
                                                         : entry.value >= 0
                                                             ? "#22c55e"
                                                             : "#f59e0b"
@@ -421,9 +430,92 @@ export function PnlDetail({ tourId }: { tourId: string }) {
                                 %
                             </td>
                         </tr>
+                        {/* Add Miscellaneous Expense */}
+                        <tr>
+                            <td colSpan={3} className="px-4 py-2">
+                                {!showMiscForm ? (
+                                    <button
+                                        onClick={() => setShowMiscForm(true)}
+                                        className="flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-700 transition-colors"
+                                    >
+                                        <span className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-sm font-bold">+</span>
+                                        Add Miscellaneous Expense
+                                    </button>
+                                ) : (
+                                    <div className="flex items-end gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                        <div className="flex-1">
+                                            <label className="block text-[10px] font-bold text-surface-500 uppercase tracking-wider mb-1">Description</label>
+                                            <input
+                                                type="text"
+                                                value={miscDescription}
+                                                onChange={(e) => setMiscDescription(e.target.value)}
+                                                placeholder="e.g. Airport transfers, Tips..."
+                                                className="w-full px-3 py-1.5 text-sm border border-surface-200 rounded-lg focus:border-primary-500 outline-none"
+                                            />
+                                        </div>
+                                        <div className="w-36">
+                                            <label className="block text-[10px] font-bold text-surface-500 uppercase tracking-wider mb-1">Amount (USD)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={miscAmount}
+                                                onChange={(e) => setMiscAmount(e.target.value)}
+                                                placeholder="0.00"
+                                                className="w-full px-3 py-1.5 text-sm border border-surface-200 rounded-lg focus:border-primary-500 outline-none"
+                                            />
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            disabled={savingMisc || !miscDescription.trim() || !miscAmount}
+                                            onClick={async () => {
+                                                setSavingMisc(true);
+                                                try {
+                                                    const res = await fetch("/api/payment-vouchers", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({
+                                                            tour_id: tourId,
+                                                            tour_reference: pnl?.tour_reference || "",
+                                                            payee_type: "Miscellaneous",
+                                                            payee_name: miscDescription.trim(),
+                                                            description: miscDescription.trim(),
+                                                            total_usd: parseFloat(miscAmount) || 0,
+                                                            total_lkr: (parseFloat(miscAmount) || 0) * 300,
+                                                            exchange_rate: 300,
+                                                            voucher_category: "extras",
+                                                            status: "draft",
+                                                        }),
+                                                    });
+                                                    if (!res.ok) throw new Error("Failed to create");
+                                                    setMiscDescription("");
+                                                    setMiscAmount("");
+                                                    setShowMiscForm(false);
+                                                    fetchData();
+                                                } catch (err) {
+                                                    console.error(err);
+                                                    alert("Failed to add miscellaneous expense");
+                                                } finally {
+                                                    setSavingMisc(false);
+                                                }
+                                            }}
+                                            className="bg-amber-600 hover:bg-amber-700 text-white"
+                                        >
+                                            {savingMisc ? "Saving..." : "Add"}
+                                        </Button>
+                                        <button
+                                            onClick={() => { setShowMiscForm(false); setMiscDescription(""); setMiscAmount(""); }}
+                                            className="text-surface-400 hover:text-surface-600 text-xs font-bold"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                )}
+                            </td>
+                        </tr>
                         <tr className="bg-surface-100 font-bold">
                             <td className="px-4 py-3 text-sm">Total Expenses</td>
-                            <td className="px-4 py-3 text-sm text-right text-accent-500">
+                            <td className="px-4 py-3 text-sm text-right text-red-600">
                                 ${(pnl.total_expenses || 0).toLocaleString()}
                             </td>
                             <td className="px-4 py-3 text-sm text-right">100%</td>
@@ -432,68 +524,7 @@ export function PnlDetail({ tourId }: { tourId: string }) {
                 </table>
             </div>
 
-            {/* Driver Log Sheet & Actual KM Section */}
-            <div className="card overflow-hidden border-amber-200">
-                <div className="px-4 py-3 border-b border-amber-100 bg-amber-50/50 flex items-center justify-between">
-                    <div>
-                        <h3 className="text-sm font-bold text-surface-900">Driver Log Sheet</h3>
-                        <p className="text-xs text-surface-500 mt-0.5">Upload completed log sheet for actual KM tracking</p>
-                    </div>
-                    {tourDetails?.log_sheet_uploaded_at && (
-                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-lg">
-                            Uploaded
-                        </span>
-                    )}
-                </div>
-                <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-surface-600 mb-1.5">
-                                Actual Kilometers Logged
-                            </label>
-                            <input
-                                type="number"
-                                value={actualKm}
-                                onChange={(e) => setActualKm(e.target.value)}
-                                placeholder="Enter actual KM from log sheet"
-                                className="w-full px-3 py-2 text-sm border border-surface-200 rounded-lg focus:border-primary-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-surface-600 mb-1.5">
-                                Upload Completed Log Sheet
-                            </label>
-                            <div className="flex items-center gap-2">
-                                <label className="flex-1 cursor-pointer">
-                                    <input
-                                        type="file"
-                                        accept=".xlsx,.xls,.pdf"
-                                        onChange={handleLogSheetUpload}
-                                        disabled={uploading}
-                                        className="hidden"
-                                    />
-                                    <div className={`px-4 py-2 text-sm border-2 border-dashed rounded-lg text-center transition-colors ${uploading ? "bg-surface-100 border-surface-300" : "border-amber-300 hover:border-amber-400 hover:bg-amber-50"}`}>
-                                        {uploading ? (
-                                            <span className="text-surface-500">Uploading...</span>
-                                        ) : tourDetails?.driver_log_sheet_url ? (
-                                            <span className="text-green-600 font-medium">✓ Re-upload log sheet</span>
-                                        ) : (
-                                            <span className="text-amber-600 font-medium">Click to upload log sheet</span>
-                                        )}
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    {tourDetails?.actual_km_logged && tourDetails.actual_km_logged > 0 && (
-                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                            <p className="text-sm text-blue-700">
-                                <span className="font-bold">{tourDetails.actual_km_logged.toLocaleString()} km</span> recorded from driver log sheet
-                            </p>
-                        </div>
-                    )}
-                </div>
-            </div>
+
 
             {/* Costing Sheet Extras (Miscellaneous) */}
             {costingExtras.length > 0 && (
@@ -533,108 +564,7 @@ export function PnlDetail({ tourId }: { tourId: string }) {
                 </div>
             )}
 
-            {/* Income Details */}
-            <div className="card overflow-hidden">
-                <div className="px-4 py-3 border-b border-surface-200 bg-surface-50">
-                    <h3 className="text-sm font-bold text-surface-900">Income Details (Invoices)</h3>
-                </div>
-                <table className="w-full">
-                    <thead className="bg-surface-50 border-b border-surface-200">
-                        <tr>
-                            <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500">
-                                Invoice No
-                            </th>
-                            <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500">
-                                Customer
-                            </th>
-                            <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500">
-                                Status
-                            </th>
-                            <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500">
-                                Amount
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-surface-100">
-                        {invoices.length === 0 ? (
-                            <tr>
-                                <td colSpan={4} className="px-4 py-8 text-center text-surface-400">
-                                    No invoices found
-                                </td>
-                            </tr>
-                        ) : (
-                            invoices.map((inv) => (
-                                <tr key={inv.id}>
-                                    <td className="px-4 py-3 text-sm font-medium">{inv.invoice_no}</td>
-                                    <td className="px-4 py-3 text-sm">{inv.customer_name}</td>
-                                    <td className="px-4 py-3 text-center">
-                                        <span
-                                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${inv.status === "paid"
-                                                ? "bg-green-100 text-green-700"
-                                                : "bg-slate-100 text-slate-700"
-                                                }`}
-                                        >
-                                            {inv.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-right font-medium text-blue-600">
-                                        ${(inv.total_amount || 0).toLocaleString()}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
 
-            {/* Payment Vouchers */}
-            <div className="card overflow-hidden">
-                <div className="px-4 py-3 border-b border-surface-200 bg-surface-50">
-                    <h3 className="text-sm font-bold text-surface-900">Expense Details (Payment Vouchers)</h3>
-                </div>
-                <table className="w-full">
-                    <thead className="bg-surface-50 border-b border-surface-200">
-                        <tr>
-                            <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500">
-                                Voucher No
-                            </th>
-                            <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500">
-                                Payee
-                            </th>
-                            <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500">
-                                Type
-                            </th>
-                            <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500">
-                                Amount (USD)
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-surface-100">
-                        {vouchers.length === 0 ? (
-                            <tr>
-                                <td colSpan={4} className="px-4 py-8 text-center text-surface-400">
-                                    No payment vouchers found
-                                </td>
-                            </tr>
-                        ) : (
-                            vouchers.map((v) => (
-                                <tr key={v.id}>
-                                    <td className="px-4 py-3 text-sm font-medium">{v.voucher_no}</td>
-                                    <td className="px-4 py-3 text-sm">{v.payee_name}</td>
-                                    <td className="px-4 py-3 text-center">
-                                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-surface-100 text-surface-700">
-                                            {v.payee_type}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-right font-medium text-accent-500">
-                                        ${(v.total_usd || 0).toLocaleString()}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
         </div>
     );
 }

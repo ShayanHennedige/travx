@@ -11,33 +11,7 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-interface ItineraryContent {
-  title: string;
-  summary: string;
-  days: {
-    day: number;
-    date: string;
-    title: string;
-    overnight_location: string;
-    hotel_suggestion: string;
-    activities: {
-      time: string;
-      activity: string;
-      location: string;
-      duration: string;
-      driving_time?: string;
-    }[];
-    meals: {
-      breakfast: string;
-      lunch: string;
-      dinner: string;
-    };
-    notes?: string;
-  }[];
-  practical_notes: string[];
-  total_driving_hours: string;
-  total_distance_km?: string;
-}
+import { ItineraryContent } from "@/lib/itinerary-utils";
 
 export default async function ItineraryDetailPage({ params }: PageProps) {
   const { id } = await params;
@@ -53,7 +27,8 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
       updated_at,
       inquiry_id,
       group_inquiry_id,
-      status
+      status,
+      proposal_id
     `)
     .eq("id", id)
     .single();
@@ -89,7 +64,11 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
           rooms_sgl,
           rooms_tpl,
           rooms_qtpl,
-          activities
+          activities,
+          arrival_flight_no,
+          arrival_time,
+          departure_flight_no,
+          departure_time
         `)
       .eq("id", itinerary.inquiry_id)
       .single()
@@ -122,7 +101,11 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
           rooms_sgl,
           rooms_tpl,
           rooms_qtpl,
-          activities
+          activities,
+          arrival_flight_no,
+          arrival_time,
+          departure_flight_no,
+          departure_time
         `)
       .eq("id", itinerary.group_inquiry_id)
       .single()
@@ -159,16 +142,12 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
   const isGroup = !!groupInquiry;
   const inquiry = groupInquiry || individualInquiry;
 
-  // Prioritize Agent details for Main Contact display
-  const guestName = groupInquiry?.agent_name
-    ? groupInquiry.agent_name
-    : groupInquiry?.agent_company
-      ? groupInquiry.agent_company
-      : individualInquiry
-        ? `${individualInquiry.first_name} ${individualInquiry.last_name}`
-        : groupInquiry?.head_first_name
-          ? `${groupInquiry.head_first_name} ${groupInquiry.head_last_name}`
-          : "Guest";
+  // Always use traveler name for guest/main contact; keep agent details separate.
+  const guestName = individualInquiry
+    ? `${individualInquiry.first_name} ${individualInquiry.last_name}`.trim()
+    : groupInquiry?.head_first_name
+      ? `${groupInquiry.head_first_name} ${groupInquiry.head_last_name}`.trim()
+      : "Guest";
 
   const contactEmail = groupInquiry?.agent_email || inquiry?.client_email;
   const paxAdults = (isGroup ? groupInquiry?.no_of_adults : individualInquiry?.no_of_pax) || 1;
@@ -199,23 +178,25 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
   const getCountry = () => groupInquiry?.country || individualInquiry?.country || "Not specified";
   const getActivities = () => groupInquiry?.activities || individualInquiry?.activities || [];
 
-  // Extract hotels from itinerary with dates
-  // Exclude last day (departure day) as there's no overnight stay
+  // Extract hotels from itinerary with dates.
+  // The departure day (last day) is always excluded — no overnight stay occurs there.
   const extractHotelsFromItinerary = () => {
     if (!content?.days) return [];
 
     const hotelsMap: { [key: string]: { hotel_name: string; location: string; nights: number; firstDay: number } } = {};
 
-    // Exclude the last day (departure day) - no overnight stay
-    const daysWithOvernight = content.days.slice(0, -1);
+    const daysWithOvernight = content.days.filter((_day, idx) =>
+      idx < content.days.length - 1
+    );
 
     daysWithOvernight.forEach((day) => {
-      if (day.hotel_suggestion && day.overnight_location) {
-        const key = day.hotel_suggestion;
+      const hotelName = day.hotel_suggestion?.trim();
+      if (hotelName) {
+        const key = hotelName;
         if (!hotelsMap[key]) {
           hotelsMap[key] = {
-            hotel_name: day.hotel_suggestion,
-            location: day.overnight_location,
+            hotel_name: hotelName,
+            location: day.overnight_location?.trim() || "Not specified",
             nights: 1,
             firstDay: day.day,
           };
@@ -259,9 +240,25 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
               costingSheetStatus={costingSheet?.status || null}
             />
 
+            {/* Web View Button */}
+            {itinerary.proposal_id && (
+              <a
+                href={`/quote/${itinerary.proposal_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="secondary" size="sm" className="hidden sm:flex rounded-xl gap-2 font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 border-0">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  Client Web Portal
+                </Button>
+              </a>
+            )}
+
             {/* Link to Back */}
             <Link href="/itineraries">
-              <Button variant="secondary" size="sm">Back to List</Button>
+              <Button variant="secondary" size="sm" className="rounded-xl">Back to List</Button>
             </Link>
           </div>
         }
@@ -276,6 +273,13 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
             <ItineraryEditor
               itineraryId={itinerary.id}
               initialContent={content}
+              itineraryStatus={itinerary.status}
+              flightDetails={{
+                arrival_flight_no: inquiry?.arrival_flight_no,
+                arrival_time: inquiry?.arrival_time,
+                departure_flight_no: inquiry?.departure_flight_no,
+                departure_time: inquiry?.departure_time,
+              }}
             />
           ) : (
             <div className="card p-12 text-center">
@@ -462,7 +466,7 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
           )}
 
           {/* Operations Link */}
-          <div className="card p-4 border border-surface-200 bg-gradient-to-br from-primary-50 to-surface-50">
+          <div className="card p-4 border border-surface-200 bg-linear-to-br from-primary-50 to-surface-50">
             <Link href="/operations" className="flex items-center gap-3 group">
               <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center group-hover:bg-primary-200 transition-colors">
                 <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

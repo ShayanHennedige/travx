@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { Button, Badge } from "@/components/ui";
+import { getEffectiveStatus } from "@/lib/utils/status";
 
 interface ItineraryDay {
   day: number;
@@ -67,13 +68,11 @@ interface TourTrackerProps {
   drivers: Driver[];
 }
 
-type TourStatusTab = "upcoming" | "ongoing" | "completed";
-
 const statusColors = {
   upcoming: "bg-blue-100 text-blue-700 border-blue-300",
   ongoing: "bg-green-100 text-green-700 border-green-300",
   completed: "bg-surface-100 text-surface-700 border-surface-300",
-  cancelled: "bg-accent-500/15 text-accent-700 border-accent-500/40",
+  cancelled: "bg-red-100 text-red-700 border-red-300",
 };
 
 const statusLabels = {
@@ -86,42 +85,13 @@ const statusLabels = {
 export function TourTracker({ tours, drivers }: TourTrackerProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
-  const [activeStatus, setActiveStatus] = useState<TourStatusTab>("upcoming");
+  const [activeTab, setActiveTab] = useState<"upcoming" | "ongoing" | "completed">("upcoming");
 
-  const toursByStatus = useMemo<Record<TourStatusTab, Tour[]>>(() => {
-    const sortByStartDate = (items: Tour[]) =>
-      items.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
-
-    return {
-      upcoming: sortByStartDate(tours.filter((tour) => tour.status === "upcoming")),
-      ongoing: sortByStartDate(tours.filter((tour) => tour.status === "ongoing")),
-      completed: sortByStartDate(tours.filter((tour) => tour.status === "completed")),
-    };
-  }, [tours]);
-
-  const statusTabs: { key: TourStatusTab; label: string; pill: string; card: string }[] = [
-    {
-      key: "upcoming",
-      label: "Upcoming",
-      pill: "bg-blue-100 text-blue-700 border-blue-200",
-      card: "bg-blue-50 text-blue-700",
-    },
-    {
-      key: "ongoing",
-      label: "Ongoing",
-      pill: "bg-green-100 text-green-700 border-green-200",
-      card: "bg-green-50 text-green-700",
-    },
-    {
-      key: "completed",
-      label: "Completed",
-      pill: "bg-emerald-100 text-emerald-700 border-emerald-200",
-      card: "bg-emerald-50 text-emerald-700",
-    },
-  ];
-
-  const activeTours = toursByStatus[activeStatus];
-  const activeTab = statusTabs.find((tab) => tab.key === activeStatus)!;
+  // Helper to get effective status based on dates
+  // Local wrapper to format arguments for shared utility
+  const getTourEffectiveStatus = (tour: Tour): "upcoming" | "ongoing" | "completed" | "cancelled" => {
+    return getEffectiveStatus(tour.status, tour.start_date, tour.end_date) as "upcoming" | "ongoing" | "completed" | "cancelled";
+  };
 
   // Generate days for current month view
   const monthDays = useMemo(() => {
@@ -181,19 +151,34 @@ export function TourTracker({ tours, drivers }: TourTrackerProps) {
     return null;
   };
 
-  // Get color for tour bar
-  const getTourColor = (index: number) => {
-    const colors = [
-      "bg-blue-500",
-      "bg-green-500",
-      "bg-purple-500",
-      "bg-orange-500",
-      "bg-pink-500",
-      "bg-teal-500",
-      "bg-indigo-500",
-      "bg-amber-500",
-    ];
-    return colors[index % colors.length];
+  // Get color for tour bar based on status and the specific day being rendered
+  const getTourColor = (tour: Tour, renderDay?: Date) => {
+    const status = getTourEffectiveStatus(tour);
+    
+    // Special granular logic for ongoing tours displayed in the calendar
+    if (status === "ongoing" && renderDay) {
+      const today = new Date();
+      const current = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const render = new Date(renderDay.getFullYear(), renderDay.getMonth(), renderDay.getDate());
+      
+      // If the rendered day of this ongoing tour is in the past, mark it green (completed)
+      if (render < current) {
+        return "bg-green-500";
+      }
+    }
+
+    switch (status) {
+      case "completed":
+        return "bg-green-500";
+      case "ongoing":
+        return "bg-purple-500";
+      case "upcoming":
+        return "bg-blue-500";
+      case "cancelled":
+        return "bg-red-400";
+      default:
+        return "bg-blue-500";
+    }
   };
 
   // Weekday headers
@@ -239,16 +224,16 @@ export function TourTracker({ tours, drivers }: TourTrackerProps) {
         {/* Legend */}
         <div className="hidden sm:flex items-center gap-4 text-xs">
           <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-green-500"></div>
+            <span className="text-surface-600">Completed</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-purple-500"></div>
+            <span className="text-surface-600">Ongoing</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded bg-blue-500"></div>
-            <span className="text-surface-600">Tour Active</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-white border-2 border-green-500"></div>
-            <span className="text-surface-600">Arrival</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-white border-2 border-accent-500"></div>
-            <span className="text-surface-600">Departure</span>
+            <span className="text-surface-600">Upcoming</span>
           </div>
         </div>
       </div>
@@ -307,7 +292,8 @@ export function TourTracker({ tours, drivers }: TourTrackerProps) {
                         <button
                           onClick={() => setSelectedTour(tour)}
                           className={`w-full text-left px-2 py-1 text-xs font-medium text-white truncate transition-all hover:opacity-90 ${getTourColor(
-                            tours.indexOf(tour)
+                            tour,
+                            day
                           )} ${isStart ? hasDayInfo ? "rounded-tl-md" : "rounded-l-full" : ""} ${isEnd ? hasDayInfo ? "rounded-tr-md" : "rounded-r-full" : ""}`}
                           title={`${tour.client_name} - ${format(parseISO(tour.start_date), "MMM d")} to ${format(parseISO(tour.end_date), "MMM d")}`}
                         >
@@ -362,99 +348,110 @@ export function TourTracker({ tours, drivers }: TourTrackerProps) {
         </div>
       </div>
 
-      {/* Tour Monitoring Tabs */}
-      <div className="card overflow-hidden">
-        <div className="border-b border-surface-200 px-4 sm:px-6 pt-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h3 className="text-xl font-semibold text-surface-900">Tour Monitoring</h3>
-              <p className="text-sm text-surface-500">
-                {activeTours.length} {activeTab.label.toLowerCase()} tours
-              </p>
-            </div>
-            <Badge variant={activeStatus === "ongoing" ? "green" : activeStatus === "completed" ? "secondary" : "blue"}>
-              {statusLabels[activeStatus]}
-            </Badge>
-          </div>
-
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-            {statusTabs.map((tab) => {
-              const isActive = activeStatus === tab.key;
-              const tabCount = toursByStatus[tab.key].length;
-
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveStatus(tab.key)}
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap ${isActive
-                    ? `${tab.pill} shadow-sm`
-                    : "border-surface-200 bg-white text-surface-500 hover:border-surface-300 hover:text-surface-700"
-                    }`}
-                >
-                  <span>{tab.label}</span>
-                  <span className={`min-w-6 rounded-full px-2 py-0.5 text-xs font-bold ${isActive ? tab.card : "bg-surface-100 text-surface-500"}`}>
-                    {tabCount}
-                  </span>
-                </button>
-              );
-            })}
+      {/* Tabbed Tours Section */}
+      <div className="card">
+        <div className="border-b border-surface-200">
+          <div className="flex gap-6 px-6">
+            <button
+              onClick={() => setActiveTab("upcoming")}
+              className={`py-4 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === "upcoming"
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300"
+              }`}
+            >
+              Upcoming tours
+            </button>
+            <button
+              onClick={() => setActiveTab("ongoing")}
+              className={`py-4 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === "ongoing"
+                  ? "border-purple-600 text-purple-600"
+                  : "border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300"
+              }`}
+            >
+              Ongoing tours
+            </button>
+            <button
+              onClick={() => setActiveTab("completed")}
+              className={`py-4 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === "completed"
+                  ? "border-green-600 text-green-600"
+                  : "border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300"
+              }`}
+            >
+              Completed tours
+            </button>
           </div>
         </div>
 
         <div className="divide-y divide-surface-100">
-          {activeTours.length > 0 ? (
-            activeTours.map((tour) => (
-              <div
-                key={tour.id}
-                className="p-4 sm:p-5 hover:bg-surface-50 transition-colors cursor-pointer"
-                onClick={() => setSelectedTour(tour)}
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div
-                      className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold flex-shrink-0 ${tour.status === "ongoing"
-                        ? "bg-green-100 text-green-700"
-                        : tour.status === "completed"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-primary-100 text-primary-700"
-                        }`}
-                    >
-                      {format(parseISO(tour.start_date), "dd")}
-                      <span className="text-xs ml-0.5">{format(parseISO(tour.start_date), "MMM")}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="font-medium text-surface-900 truncate">{tour.client_name}</h4>
-                      <p className="text-sm text-surface-500 truncate">
-                        {format(parseISO(tour.start_date), "MMM d")} - {format(parseISO(tour.end_date), "MMM d, yyyy")}
-                        <span className="mx-2">•</span>
-                        {tour.pax_adults + tour.pax_children} pax
-                      </p>
-                    </div>
-                  </div>
+          {(() => {
+            const displayTours = tours
+              .filter((t) => getTourEffectiveStatus(t) === activeTab)
+              .sort((a, b) => {
+                if (activeTab === "completed") {
+                  return new Date(b.end_date).getTime() - new Date(a.end_date).getTime();
+                }
+                return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+              });
 
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {tour.driver ? (
-                      <div className="text-right hidden sm:block">
-                        <p className="text-sm font-medium text-surface-900">{tour.driver.name}</p>
-                        <p className="text-xs text-surface-500">{tour.driver.vehicle_number}</p>
+            if (displayTours.length === 0) {
+              return (
+                <div className="p-8 text-center text-surface-500">
+                  No {activeTab} tours found.
+                </div>
+              );
+            }
+
+            return displayTours.map((tour) => {
+              const status = getTourEffectiveStatus(tour);
+              const badgeVariant = status === 'completed' ? 'green' : status === 'ongoing' ? 'purple' : 'blue';
+              
+              return (
+                <div
+                  key={tour.id}
+                  className="p-4 hover:bg-surface-50 transition-colors cursor-pointer"
+                  onClick={() => setSelectedTour(tour)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center font-bold ${
+                        status === 'completed' ? 'bg-green-100 text-green-700' :
+                        status === 'ongoing' ? 'bg-purple-100 text-purple-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {format(parseISO(tour.start_date), "dd")}
+                        <span className="text-xs ml-0.5">{format(parseISO(tour.start_date), "MMM")}</span>
                       </div>
-                    ) : (
-                      <Badge variant="yellow">No Driver</Badge>
-                    )}
-
-                    <Badge variant={tour.status === "ongoing" ? "green" : tour.status === "completed" ? "secondary" : "blue"}>
-                      {statusLabels[tour.status]}
-                    </Badge>
+                      <div>
+                        <h4 className="font-medium text-surface-900">{tour.client_name}</h4>
+                        <p className="text-sm text-surface-500">
+                          {format(parseISO(tour.start_date), "MMM d")} - {format(parseISO(tour.end_date), "MMM d, yyyy")}
+                          <span className="mx-2">•</span>
+                          {tour.pax_adults + tour.pax_children} pax
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+                      {tour.driver ? (
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-surface-900">{tour.driver.name}</p>
+                          <p className="text-xs text-surface-500">{tour.driver.vehicle_number || "No Vehicle"}</p>
+                        </div>
+                      ) : (
+                        <Badge variant="yellow">No Driver</Badge>
+                      )}
+                      {/* Only show badge if NOT completed to keep UI clean, or show customized badge */}
+                      <Badge variant={badgeVariant as any} className="uppercase ml-0 sm:ml-2">
+                        {statusLabels[status]}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
-          ) : (
-            <div className="p-8 text-center text-surface-500">
-              No {activeStatus} tours available
-            </div>
-          )}
+              );
+            });
+          })()}
         </div>
       </div>
 
@@ -488,9 +485,14 @@ export function TourTracker({ tours, drivers }: TourTrackerProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-surface-500 uppercase tracking-wider mb-1">Status</p>
-                  <Badge variant={selectedTour.status === "ongoing" ? "green" : selectedTour.status === "upcoming" ? "blue" : "secondary"}>
-                    {statusLabels[selectedTour.status]}
-                  </Badge>
+                  {(() => {
+                    const status = getTourEffectiveStatus(selectedTour);
+                    return (
+                      <Badge variant={status === "completed" ? "green" : status === "ongoing" ? "purple" : "blue"}>
+                        {statusLabels[status]}
+                      </Badge>
+                    );
+                  })()}
                 </div>
                 <div>
                   <p className="text-xs text-surface-500 uppercase tracking-wider mb-1">Passengers</p>

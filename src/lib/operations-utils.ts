@@ -42,7 +42,7 @@ export async function ensureTourExists(params: {
     if (inquiry_id) {
         const { data: inquiry } = await supabase
             .from("inquiries")
-            .select("first_name, last_name, arriving_date, departure_date, no_of_pax, no_of_children")
+            .select("first_name, last_name, arriving_date, departure_date, no_of_pax, no_of_children, arrival_flight_no, arrival_time, departure_flight_no, departure_time")
             .eq("id", inquiry_id)
             .single();
 
@@ -52,6 +52,12 @@ export async function ensureTourExists(params: {
             tourData.end_date = inquiry.departure_date;
             tourData.pax_adults = inquiry.no_of_pax || 0;
             tourData.pax_children = inquiry.no_of_children || 0;
+            
+            // Add flight details
+            tourData.arrival_flight_no = inquiry.arrival_flight_no;
+            tourData.arrival_time = inquiry.arrival_time;
+            tourData.departure_flight_no = inquiry.departure_flight_no;
+            tourData.departure_time = inquiry.departure_time;
         }
 
         // Update inquiry status to confirmed
@@ -59,7 +65,7 @@ export async function ensureTourExists(params: {
     } else if (group_inquiry_id) {
         const { data: groupInquiry } = await supabase
             .from("group_inquiries")
-            .select("head_first_name, head_last_name, arriving_date, departure_date, no_of_adults, no_of_children")
+            .select("head_first_name, head_last_name, arriving_date, departure_date, no_of_adults, no_of_children, arrival_flight_no, arrival_time, departure_flight_no, departure_time")
             .eq("id", group_inquiry_id)
             .single();
 
@@ -69,6 +75,12 @@ export async function ensureTourExists(params: {
             tourData.end_date = groupInquiry.departure_date;
             tourData.pax_adults = groupInquiry.no_of_adults || 0;
             tourData.pax_children = groupInquiry.no_of_children || 0;
+            
+            // Add flight details
+            tourData.arrival_flight_no = groupInquiry.arrival_flight_no;
+            tourData.arrival_time = groupInquiry.arrival_time;
+            tourData.departure_flight_no = groupInquiry.departure_flight_no;
+            tourData.departure_time = groupInquiry.departure_time;
         }
 
         // Update group_inquiry status to confirmed

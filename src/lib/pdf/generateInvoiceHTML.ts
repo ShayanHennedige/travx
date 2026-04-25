@@ -1,12 +1,13 @@
 import { CustomerInvoice } from "@/lib/validations/invoice";
 import { format } from "date-fns";
-import { formatUSDAmountInWords } from "@/lib/utils/numberToWords";
+import { numberToWords } from "@/lib/utils/numberToWords";
 
 export function generateInvoiceHTML(invoice: CustomerInvoice & { id: string }, logoBase64?: string): string {
     const {
         invoice_no,
         invoice_date,
         customer_name,
+        customer_company,
         tour_reference,
         qty_dbl,
         qty_sgl,
@@ -22,8 +23,10 @@ export function generateInvoiceHTML(invoice: CustomerInvoice & { id: string }, l
         package_description
     } = invoice;
 
+    const isExtraInvoice = (invoice as any).payment_terms === "extra_invoice";
+    const invoiceTitle = isExtraInvoice ? "Extra Invoice" : "Invoice";
     const totalPax = no_of_pax || ((qty_dbl ?? 0) * 2) + (qty_sgl ?? 0) + ((qty_tpl ?? 0) * 3) + ((qty_qud ?? 0) * 4);
-    const amountInWords = formatUSDAmountInWords(total_amount ?? 0);
+    const amountInWords = numberToWords(total_amount ?? 0);
 
     const formattedDate = invoice_date
         ? (() => {
@@ -37,15 +40,15 @@ export function generateInvoiceHTML(invoice: CustomerInvoice & { id: string }, l
         : format(new Date(), "do MMMM yyyy");
 
     const logoHtml = logoBase64
-        ? `<img src="${logoBase64}" alt="TraveX" style="height: 110px; width: auto;">` 
-        : `<div style="font-size: 13px; font-weight: bold; color: #2c2c2c; letter-spacing: 2px; text-transform: uppercase;">TRAVEX</div>`;
+        ? `<img src="${logoBase64}" alt="TravX" style="height: 42px; width: auto;">`
+        : `<div style="font-size: 13px; font-weight: bold; color: #2c2c2c; letter-spacing: 2px; text-transform: uppercase;">TRAVX</div>`;
 
     return `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Invoice - ${invoice_no}</title>
+    <title>${invoiceTitle} - ${invoice_no}</title>
     <style>
         @page { size: A4; margin: 14mm 16mm 16mm 16mm; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -61,29 +64,29 @@ export function generateInvoiceHTML(invoice: CustomerInvoice & { id: string }, l
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 14px 0 16px;
-            border-bottom: 2px solid #2c2c2c;
-            margin-bottom: 24px;
+            align-items: flex-end;
+            padding-bottom: 10px;
+            border-bottom: 1.5px solid #2c2c2c;
+            margin-bottom: 20px;
         }
         .company-info {
             text-align: right;
-            font-size: 12px;
-            color: #444;
-            line-height: 1.65;
+            font-size: 9px;
+            color: #555;
+            line-height: 1.45;
         }
         .company-name {
-            font-size: 17px;
+            font-size: 13px;
             font-weight: bold;
             color: #2c2c2c;
-            letter-spacing: 3px;
+            letter-spacing: 2px;
             text-transform: uppercase;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         /* Title */
         .title {
-            text-align: center;
+            text-align: left;
             margin-bottom: 18px;
         }
         .title h1 {
@@ -97,7 +100,7 @@ export function generateInvoiceHTML(invoice: CustomerInvoice & { id: string }, l
             width: 50px;
             height: 1.5px;
             background: #c09853;
-            margin: 6px auto;
+            margin: 6px 0;
         }
 
         /* Meta */
@@ -149,7 +152,7 @@ export function generateInvoiceHTML(invoice: CustomerInvoice & { id: string }, l
             vertical-align: middle;
         }
         .items-table .desc {
-            text-align: center;
+            text-align: left;
             line-height: 1.6;
         }
 
@@ -278,15 +281,15 @@ export function generateInvoiceHTML(invoice: CustomerInvoice & { id: string }, l
     <div class="header">
         <div>${logoHtml}</div>
         <div class="company-info">
-            <div class="company-name">TraveX</div>
+            <div class="company-name">TravX</div>
             63A, Old Road, Pannipitiya, Sri Lanka<br>
-            +94 77 346 9998 &nbsp;·&nbsp; info@Travex.com
+            +94 77 346 9998 &nbsp;·&nbsp; info@serendiaholidays.com
         </div>
     </div>
 
     <!-- Title -->
     <div class="title">
-        <h1>Invoice</h1>
+        <h1>${invoiceTitle}</h1>
         <div class="title-line"></div>
     </div>
 
@@ -301,8 +304,12 @@ export function generateInvoiceHTML(invoice: CustomerInvoice & { id: string }, l
             <div class="meta-value">${invoice_no}</div>
         </div>
         <div class="meta-cell">
-            <div class="meta-label">Travel Agent</div>
+            <div class="meta-label">Name of Travel Agent</div>
             <div class="meta-value">${customer_name || ''}</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">Name of Agent Company</div>
+            <div class="meta-value">${customer_company || ''}</div>
         </div>
         <div class="meta-cell">
             <div class="meta-label">Tour Reference</div>
@@ -355,27 +362,26 @@ export function generateInvoiceHTML(invoice: CustomerInvoice & { id: string }, l
         <tr><td class="blbl">Bank Branch</td><td class="bval">Maharagama Super</td></tr>
         <tr><td class="blbl">Bank Address</td><td class="bval">200, High Level Road, Maharagama, Sri Lanka</td></tr>
         <tr><td class="blbl">Branch Code</td><td class="bval">092</td></tr>
-        <tr><td class="blbl">Account Name</td><td class="bval">TraveX (Pvt) Ltd.</td></tr>
+        <tr><td class="blbl">Account Name</td><td class="bval">TravX Travel Management</td></tr>
         <tr><td class="blbl">F E F A Account No.</td><td class="bval">5092 3100 0143</td></tr>
         <tr><td class="blbl">SWIFT Code</td><td class="bval">BSAMLKLX</td></tr>
     </table>
 
     <!-- Signature -->
-    <div class="signature">
-        <div class="sig-name">Dharshan Hennedige</div>
-        <div class="sig-line">Authorized Signatory</div>
+    <div class="signature" style="page-break-after: always;">
+        <img src="https://axcfwwdahunzxsdeohkv.supabase.co/storage/v1/object/public/signature/WhatsApp%20Image%202026-04-08%20at%2011.16.09.jpeg" alt="Authorized Signature" style="height: 70px; width: auto; margin-left: -40px; display: block;">
     </div>
 
-    <!-- Policies -->
+    <!-- Policies (Page 2) -->
     <div class="policies">
         <h4>Important Instructions</h4>
         <ul>
-            <li>50% deposit at the time of booking. Balance payment before 2 months prior to departure.</li>
+            <li>50% deposit at the time of booking. Balance payment before 1 month prior to departure.</li>
             <li>Prices subject to change due to exchange fluctuations. Payment deadlines must be strictly adhered to.</li>
             <li>Any government LEVIES, TAXES and VAT introduced in the future will be applicable to the Tour Package.</li>
         </ul>
         <h4>Cancellation Policy</h4>
-        <p>In the event you cancel your tour voluntarily, the following percentages of the package price will be refunded by TraveX (Pvt) Ltd.:</p>
+        <p>In the event you cancel your tour voluntarily, the following percentages of the package price will be refunded by TravX Travel Management:</p>
         <ul>
             <li>More than 91 days prior to departure – 100% Refundable</li>
             <li>61 – 90 days prior to departure – 75% Refundable</li>
@@ -387,7 +393,7 @@ export function generateInvoiceHTML(invoice: CustomerInvoice & { id: string }, l
     <!-- Footer -->
     <div class="footer">
         <div class="footer-line"></div>
-        TraveX (Pvt) Ltd.
+        TravX
     </div>
 </body>
 </html>

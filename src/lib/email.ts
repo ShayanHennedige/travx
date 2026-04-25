@@ -1,18 +1,22 @@
 import { Resend } from "resend";
 
+if (!process.env.RESEND_API_KEY) {
+  console.warn("WARNING: RESEND_API_KEY is not defined in environment variables!");
+}
+
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
 export async function sendInquiryNotification(inquiry: any) {
-  if (!process.env.RESEND_API_KEY) {
-    console.warn("WARNING: RESEND_API_KEY is not defined — skipping email notification.");
-    return;
-  }
-
-  const resend = new Resend(process.env.RESEND_API_KEY);
-
   try {
     console.log("Attempting to send email notification for inquiry:", inquiry.inquiry_number);
 
+    if (!resend) {
+      console.warn("Skipping email notification: RESEND_API_KEY is missing");
+      return { success: false, error: "Missing RESEND_API_KEY" };
+    }
+
     const { data, error } = await resend.emails.send({
-      from: "TraveX Notifications <onboarding@resend.dev>",
+      from: "TravX Notifications <onboarding@resend.dev>",
       to: ["dharshan@venomholidays.com"],
 
       subject: `New Inquiry Received: ${inquiry.inquiry_number}`,
@@ -89,7 +93,7 @@ export async function sendInquiryNotification(inquiry: any) {
           </div>
           
           <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 12px; color: #94a3b8;">
-            © ${new Date().getFullYear()} TraveX Management System
+            © ${new Date().getFullYear()} TravX Travel Management System
           </div>
         </div>
       `,

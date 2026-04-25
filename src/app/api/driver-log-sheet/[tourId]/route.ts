@@ -3,6 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import * as ExcelJS from "exceljs";
 import { format, parseISO, eachDayOfInterval } from "date-fns";
 
+interface CostingSheetItem {
+    description?: string;
+    vehicle_type?: string;
+    mileage?: number;
+    total?: number;
+    rate?: number;
+}
+
 interface RouteParams {
     params: Promise<{ tourId: string }>;
 }
@@ -36,18 +44,18 @@ interface ItineraryContent {
     total_distance_km?: string;
 }
 
-// TraveX Company Details
+// TravX Company Details
 const COMPANY = {
-    name: "TraveX",
+    name: "TravX Travel Management",
     address: "63A, Old Road, Pannipitiya, Sri Lanka",
-    email: "info@Travex.com",
+    email: "info@serendiaholidays.com",
     phone: "+94 77 346 9998",
     website: "www.serendiaholidays.com",
 };
 
-// Theme colors - TraveX Red/Black Branding
+// Theme colors - TravX Branding
 const COLORS = {
-    primary600: "E04344", // TraveX Red
+    primary600: "E04344", // TravX primary
     primary100: "FDE8E8", // Light red
     primary50: "FEF2F2", // Very light red
     accent500: "1A1A1A", // Black
@@ -115,16 +123,34 @@ function extractMileageFromDay(day: ItineraryDay): number {
 // GET - Generate and download driver log sheet Excel file
 export async function GET(request: Request, { params }: RouteParams) {
     const { tourId } = await params;
+    const url = new URL(request.url);
+    const formatQuery = url.searchParams.get("format");
     const supabase = await createClient();
 
     console.log("=== Driver Log Sheet API Called ===");
     console.log("Tour ID:", tourId);
 
     try {
-        // Fetch tour
+        // Fetch tour with related data
         const { data: tour, error: tourError } = await supabase
             .from("tours")
-            .select("*")
+            .select(`
+        *,
+        itinerary_id,
+        drivers (
+          id,
+          name,
+          vehicle_type,
+          vehicle_number,
+          contact_number
+        ),
+        itineraries (
+          id,
+          content,
+          inquiry_id,
+          group_inquiry_id
+        )
+      `)
             .eq("id", tourId)
             .single();
 
@@ -138,28 +164,16 @@ export async function GET(request: Request, { params }: RouteParams) {
             );
         }
 
-        console.log("Tour data:", {
-            id: tour.id,
-            client_name: tour.client_name,
-            start_date: tour.start_date,
-            end_date: tour.end_date,
-            itinerary_id: tour.itinerary_id,
-            driver_id: tour.driver_id,
-        });
-
-        // Fetch driver if assigned
-        let driver = null;
-        if (tour.driver_id) {
-            const { data: driverData } = await supabase
-                .from("drivers")
-                .select("id, name, vehicle_type, vehicle_number, contact_number")
-                .eq("id", tour.driver_id)
-                .single();
-            driver = driverData;
-        }
-
         // Fetch costing sheet via itinerary_id (costing sheets link to itineraries, not tours)
         let extraKm = 0;
+        let battaLimit = 0;
+        let totalMileageLimit = 0;
+        let parkingLimit = 0;
+        let pagingLimit = 0;
+        let highwayLimit = 0;
+        let mileageRate = 0;
+        let baseTransportCost = 0;
+        
         if (tour.itinerary_id) {
             const { data: costingSheet, error: costingError } = await supabase
                 .from("tour_costing_sheets")
@@ -173,14 +187,14 @@ export async function GET(request: Request, { params }: RouteParams) {
             // Look for row with "extra" in description (e.g., "Extra KM", "Extra Kms")
             if (costingSheet?.transport_data && Array.isArray(costingSheet.transport_data)) {
                 // Try exact match first
-                let extraKmItem = costingSheet.transport_data.find((item: any) =>
+                let extraKmItem = costingSheet.transport_data.find((item: CostingSheetItem) =>
                     item.description?.toLowerCase() === 'extra km' ||
                     item.description?.toLowerCase() === 'extra kms'
                 );
 
                 // Fallback: search for any row containing "extra"
                 if (!extraKmItem) {
-                    extraKmItem = costingSheet.transport_data.find((item: any) =>
+                    extraKmItem = costingSheet.transport_data.find((item: CostingSheetItem) =>
                         item.description?.toLowerCase().includes('extra')
                     );
                 }
@@ -188,6 +202,51 @@ export async function GET(request: Request, { params }: RouteParams) {
                 if (extraKmItem && extraKmItem.mileage) {
                     extraKm = extraKmItem.mileage;
                     console.log("Extra KM found:", extraKm, "from row:", extraKmItem.description);
+                }
+
+                // Find Batta
+                const battaItem = costingSheet.transport_data.find((item: CostingSheetItem) => 
+                   item.description?.toLowerCase().includes('batta')
+                );
+                if (battaItem) {
+                   battaLimit = battaItem.total || 0;
+                }
+                
+                // Find Parking
+                const parkingItem = costingSheet.transport_data.find((item: CostingSheetItem) => 
+                   item.description?.toLowerCase().includes('parking')
+                );
+                if (parkingItem) {
+                   parkingLimit = parkingItem.total || 0;
+                }
+
+                // Find Paging Fee
+                const pagingItem = costingSheet.transport_data.find((item: CostingSheetItem) => 
+                   item.description?.toLowerCase().includes('paging')
+                );
+                if (pagingItem) {
+                   pagingLimit = pagingItem.total || 0;
+                }
+
+                // Find Highway
+                const highwayItem = costingSheet.transport_data.find((item: CostingSheetItem) => 
+                   item.description?.toLowerCase().includes('highway')
+                );
+                if (highwayItem) {
+                   highwayLimit = highwayItem.total || 0;
+                }
+
+                // Calculate Total Mileage Limit (Sum of mileage column in costing or specific item)
+                // Assuming the costing sheet has a breakdown, but usually we just want the total
+                // transport limit. Let's look for a "Transport" item or sum up.
+                // For now, let's sum up items that look like mileage charges (excluding extra km)
+                const mainTransport = costingSheet.transport_data.find((item: CostingSheetItem) => 
+                     item.description?.toLowerCase().includes('transport') || item.vehicle_type
+                );
+                if (mainTransport) {
+                    totalMileageLimit = mainTransport.mileage || 0;
+                    mileageRate = mainTransport.rate || 0;
+                    baseTransportCost = mainTransport.total || 0;
                 }
             }
         }
@@ -201,51 +260,62 @@ export async function GET(request: Request, { params }: RouteParams) {
             );
         }
 
-        // Fetch itinerary content
+        // Parse itinerary content
         let itineraryContent: ItineraryContent | null = null;
-        let itinerary = null;
-        if (tour.itinerary_id) {
-            const { data: itineraryData, error: itineraryError } = await supabase
+        let resolvedInquiryId: string | null = (tour.inquiry_id as string | null) || (tour.itineraries?.inquiry_id as string | null) || null;
+        let resolvedGroupInquiryId: string | null = (tour.group_inquiry_id as string | null) || (tour.itineraries?.group_inquiry_id as string | null) || null;
+        if (tour.itineraries?.content) {
+            try {
+                itineraryContent = typeof tour.itineraries.content === "string"
+                    ? JSON.parse(tour.itineraries.content)
+                    : tour.itineraries.content;
+            } catch (e) {
+                console.error("Error parsing nested itinerary content:", e);
+            }
+        }
+
+        // Fallback: fetch itinerary directly if nested query didn't work
+        if (!itineraryContent && tour.itinerary_id) {
+            const { data: directItinerary, error: itineraryError } = await supabase
                 .from("itineraries")
                 .select("id, content, inquiry_id, group_inquiry_id")
                 .eq("id", tour.itinerary_id)
                 .single();
 
-            itinerary = itineraryData;
-
-            if (!itineraryError && itineraryData?.content) {
+            if (!itineraryError && directItinerary?.content) {
+                resolvedInquiryId = resolvedInquiryId || directItinerary.inquiry_id || null;
+                resolvedGroupInquiryId = resolvedGroupInquiryId || directItinerary.group_inquiry_id || null;
                 try {
-                    itineraryContent = typeof itineraryData.content === "string"
-                        ? JSON.parse(itineraryData.content)
-                        : itineraryData.content;
+                    itineraryContent = typeof directItinerary.content === "string"
+                        ? JSON.parse(directItinerary.content)
+                        : directItinerary.content;
                     console.log("Fetched itinerary directly using itinerary_id:", tour.itinerary_id);
-                    console.log("Itinerary days:", itineraryContent?.days?.map(d => ({ day: d.day, date: d.date, title: d.title })));
                 } catch (e) {
-                    console.error("Error parsing itinerary content:", e);
+                    console.error("Error parsing direct itinerary content:", e);
                 }
             } else {
-                console.error("Error fetching itinerary:", itineraryError);
+                console.error("Error fetching itinerary directly:", itineraryError);
             }
         }
 
-        // Fetch inquiry data if available (from itinerary, not tour)
+        // Fetch inquiry data if available
         let inquiry = null;
-        if (itinerary?.inquiry_id) {
+        if (resolvedInquiryId) {
             const { data: inquiryData } = await supabase
                 .from("inquiries")
-                .select("first_name, last_name, country, no_of_pax, no_of_children")
-                .eq("id", itinerary.inquiry_id)
+                .select("first_name, last_name, country, no_of_pax, no_of_children, agent_name, agent_company, arrival_flight_no, arrival_time, departure_flight_no, departure_time")
+                .eq("id", resolvedInquiryId)
                 .single();
             inquiry = inquiryData;
         }
 
-        // Fetch group inquiry data if available (from itinerary, not tour)
+        // Fetch group inquiry data if available
         let groupInquiry = null;
-        if (itinerary?.group_inquiry_id) {
+        if (resolvedGroupInquiryId) {
             const { data: groupInquiryData } = await supabase
                 .from("group_inquiries")
-                .select("group_name, travel_agent, country, no_of_pax, no_of_children")
-                .eq("id", itinerary.group_inquiry_id)
+                .select("head_first_name, head_last_name, country, no_of_adults, no_of_children, agent_name, agent_company, arrival_flight_no, arrival_time, departure_flight_no, departure_time")
+                .eq("id", resolvedGroupInquiryId)
                 .single();
             groupInquiry = groupInquiryData;
         }
@@ -259,7 +329,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         // Create workbook
         const workbook = new ExcelJS.Workbook();
-        workbook.creator = "TraveX";
+        workbook.creator = "TravX";
         workbook.created = new Date();
 
         const worksheet = workbook.addWorksheet("Log Sheet", {
@@ -289,7 +359,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         // ===== DEFINE STYLES =====
 
-        const tableHeaderStyle: any = {
+        const tableHeaderStyle: Partial<ExcelJS.Style> = {
             font: { bold: true, size: 11, color: { argb: "FFFFFFFF" } },
             alignment: { horizontal: "center", vertical: "middle" },
             fill: {
@@ -416,22 +486,50 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         let guestName = tour.client_name || "";
         let travelAgent = "";
-        let paxInfo = `${tour.pax_adults || 0} Adults`;
-        if (tour.pax_children > 0) {
-            paxInfo += `, ${tour.pax_children} Children`;
+        let paxAdults = tour.pax_adults || 0;
+        let paxChildren = tour.pax_children || 0;
+
+        if (inquiry) {
+            paxAdults = inquiry.no_of_pax || paxAdults;
+            paxChildren = inquiry.no_of_children || paxChildren;
+        } else if (groupInquiry) {
+            paxAdults = groupInquiry.no_of_adults || paxAdults;
+            paxChildren = groupInquiry.no_of_children || paxChildren;
+        }
+
+        let paxInfo = `${paxAdults} Adults`;
+        if (paxChildren > 0) {
+            paxInfo += `, ${paxChildren} Children`;
         }
 
         if (inquiry) {
             guestName = `${inquiry.first_name || ""} ${inquiry.last_name || ""}`.trim() || tour.client_name;
-            travelAgent = inquiry.country ? `Direct-${inquiry.country}` : "Direct";
+            travelAgent = inquiry.agent_company
+                ? `${inquiry.agent_company}${inquiry.agent_name ? ` (${inquiry.agent_name})` : ""}`
+                : (inquiry.country ? `Direct-${inquiry.country}` : "Direct");
         } else if (groupInquiry) {
-            guestName = groupInquiry.group_name || tour.client_name;
-            travelAgent = groupInquiry.travel_agent || groupInquiry.country || "Direct";
+            const headName = `${groupInquiry.head_first_name || ""} ${groupInquiry.head_last_name || ""}`.trim();
+            guestName = headName || tour.client_name;
+            travelAgent = groupInquiry.agent_company
+                ? `${groupInquiry.agent_company}${groupInquiry.agent_name ? ` (${groupInquiry.agent_name})` : ""}`
+                : (groupInquiry.country ? `Direct-${groupInquiry.country}` : "Direct");
         }
 
-        const driverName = driver?.name || "Not Assigned";
-        const driverVehicle = driver?.vehicle_type
-            ? `${driver.vehicle_type}${driver.vehicle_number ? ` (${driver.vehicle_number})` : ""}`
+        const arrivalFlightNo = tour.arrival_flight_no || inquiry?.arrival_flight_no || groupInquiry?.arrival_flight_no || "";
+        const arrivalTime = tour.arrival_time || inquiry?.arrival_time || groupInquiry?.arrival_time || "";
+        const departureFlightNo = tour.departure_flight_no || inquiry?.departure_flight_no || groupInquiry?.departure_flight_no || "";
+        const departureTime = tour.departure_time || inquiry?.departure_time || groupInquiry?.departure_time || "";
+
+        const arrivalFlight = arrivalFlightNo
+            ? `${arrivalFlightNo}${arrivalTime ? ` (${arrivalTime})` : ""}`
+            : "N/A";
+        const departureFlight = departureFlightNo
+            ? `${departureFlightNo}${departureTime ? ` (${departureTime})` : ""}`
+            : "N/A";
+
+        const driverName = tour.drivers?.name || "Not Assigned";
+        const driverVehicle = tour.drivers?.vehicle_type
+            ? `${tour.drivers.vehicle_type}${tour.drivers.vehicle_number ? ` (${tour.drivers.vehicle_number})` : ""}`
             : "";
 
         // Row: Guest Name
@@ -466,22 +564,8 @@ export async function GET(request: Request, { params }: RouteParams) {
         currentRow++;
 
         // Row: Arrival Date | Departure Date
-        let arrivalDate = "";
-        let departureDate = "";
-        
-        try {
-            arrivalDate = tour.start_date ? format(parseISO(tour.start_date), "dd MMM yyyy") : "";
-        } catch (e) {
-            console.error("Error parsing start_date:", tour.start_date, e);
-            arrivalDate = tour.start_date || "";
-        }
-        
-        try {
-            departureDate = tour.end_date ? format(parseISO(tour.end_date), "dd MMM yyyy") : "";
-        } catch (e) {
-            console.error("Error parsing end_date:", tour.end_date, e);
-            departureDate = tour.end_date || "";
-        }
+        const arrivalDate = tour.start_date ? format(parseISO(tour.start_date), "dd MMM yyyy") : "";
+        const departureDate = tour.end_date ? format(parseISO(tour.end_date), "dd MMM yyyy") : "";
 
         worksheet.getCell(`A${currentRow}`).value = "Arrival Date";
         Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
@@ -496,13 +580,30 @@ export async function GET(request: Request, { params }: RouteParams) {
         // Row: Arrival Flight | Departure Flight
         worksheet.getCell(`A${currentRow}`).value = "Arrival Flight";
         Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
-        worksheet.getCell(`B${currentRow}`).value = "";
+        worksheet.getCell(`B${currentRow}`).value = arrivalFlight;
         Object.assign(worksheet.getCell(`B${currentRow}`), cellStyle);
         worksheet.getCell(`C${currentRow}`).value = "Dep. Flight";
         Object.assign(worksheet.getCell(`C${currentRow}`), labelStyle);
-        worksheet.getCell(`D${currentRow}`).value = "";
+        worksheet.getCell(`D${currentRow}`).value = departureFlight;
         Object.assign(worksheet.getCell(`D${currentRow}`), cellStyle);
         currentRow++;
+
+        // Row: Total Package Mileage Limit
+        if (totalMileageLimit > 0) {
+            worksheet.getCell(`A${currentRow}`).value = "Package KM";
+            Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
+            worksheet.getCell(`B${currentRow}`).value = `${totalMileageLimit} KM`;
+            Object.assign(worksheet.getCell(`B${currentRow}`), cellStyle);
+            worksheet.getCell(`B${currentRow}`).font = { bold: true };
+            
+            worksheet.getCell(`C${currentRow}`).value = "Batta Total";
+            Object.assign(worksheet.getCell(`C${currentRow}`), labelStyle);
+            worksheet.getCell(`D${currentRow}`).value = battaLimit > 0 ? battaLimit : "N/A";
+            Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
+            worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
+            
+            currentRow++;
+        }
 
         // Empty row
         worksheet.getRow(currentRow).height = 10;
@@ -526,7 +627,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         let tourDays: Array<{ date: Date; location: string; mileage: number }> = [];
 
         if (itineraryContent?.days && itineraryContent.days.length > 0) {
-            tourDays = itineraryContent.days.map((day, index) => {
+            tourDays = itineraryContent.days.map((day) => {
                 let itineraryDescription = day.title || "";
                 if (day.overnight_location && day.title !== day.overnight_location) {
                     itineraryDescription = `${day.title || day.overnight_location} - ${day.overnight_location}`;
@@ -534,69 +635,114 @@ export async function GET(request: Request, { params }: RouteParams) {
                     itineraryDescription = day.overnight_location;
                 }
 
-                // Parse date safely
-                let dayDate: Date;
-                try {
-                    if (day.date) {
-                        dayDate = parseISO(day.date);
-                    } else if (tour.start_date) {
-                        // Fallback: use tour start date + index days
-                        const startDate = parseISO(tour.start_date);
-                        dayDate = new Date(startDate);
-                        dayDate.setDate(startDate.getDate() + index);
-                    } else {
-                        dayDate = new Date();
-                    }
-                } catch (e) {
-                    console.error(`Error parsing date for day ${day.day}:`, day.date, e);
-                    dayDate = new Date();
-                }
-
                 return {
-                    date: dayDate,
+                    date: day.date ? parseISO(day.date) : parseISO(tour.start_date),
                     location: itineraryDescription || day.overnight_location || "",
                     mileage: extractMileageFromDay(day),
                 };
             });
+            
+            // Add Garage -> Airport (Fixed)
+            if (tourDays.length > 0) {
+                 tourDays.unshift({
+                    date: tourDays[0].date,
+                    location: "Garage to Airport (Fixed)",
+                    mileage: 0
+                 });
+            }
+
+            // Modify Last Day to include Departure info and append Airport -> Garage
+            if (tourDays.length > 0) {
+                 const lastDayIndex = tourDays.length - 1;
+                 const lastDate = tourDays[lastDayIndex].date;
+                 
+                 // If the last day description is vague, clarify it
+                 if (tourDays[lastDayIndex].location === "Departure") {
+                     tourDays[lastDayIndex].location = "Hotel to Airport";
+                 }
+
+                 tourDays.push({
+                    date: lastDate,
+                    location: "Airport to Garage",
+                    mileage: 0
+                 });
+            }
+
         } else if (tour.start_date && tour.end_date) {
-            try {
-                const dates = eachDayOfInterval({
-                    start: parseISO(tour.start_date),
-                    end: parseISO(tour.end_date),
-                });
-                tourDays = dates.map((date, index) => ({
-                    date,
-                    location: index === 0 ? "Airport / Hotel" : index === dates.length - 1 ? "Hotel / Airport" : "",
-                    mileage: 0,
-                }));
-            } catch (e) {
-                console.error("Error generating date interval:", e);
-                // Fallback: create at least one day
-                tourDays = [{
-                    date: new Date(),
-                    location: "Tour",
-                    mileage: 0,
-                }];
+            const dates = eachDayOfInterval({
+                start: parseISO(tour.start_date),
+                end: parseISO(tour.end_date),
+            });
+            tourDays = dates.map((date, index) => ({
+                date,
+                location: index === 0 ? "Airport / Hotel" : index === dates.length - 1 ? "Hotel / Airport" : "",
+                mileage: 0,
+            }));
+            
+            // Add fixed runs for fallback itinerary too
+            if (tourDays.length > 0) {
+                 tourDays.unshift({
+                    date: tourDays[0].date,
+                    location: "Garage to Airport (Fixed)",
+                    mileage: 0
+                 });
+                 
+                 tourDays.push({
+                    date: tourDays[tourDays.length - 1].date,
+                    location: "Airport to Garage",
+                    mileage: 0
+                 });
             }
         }
-
+        
+        // Remove duplicates if any (e.g. if extractMileageFromDay returns first day as Garage) - unlikely but good to be safe if logic changes
+        
+        // If JSON format is requested, return the structured data
+        if (formatQuery === "json") {
+            return NextResponse.json({
+                company: COMPANY,
+                tour: {
+                    guestName,
+                    travelAgent,
+                    driverName,
+                    paxInfo,
+                    driverVehicle,
+                    arrivalDate,
+                    departureDate,
+                    arrivalFlight,
+                    departureFlight,
+                },
+                limits: {
+                    totalMileageLimit,
+                    battaLimit,
+                    parkingLimit,
+                    pagingLimit,
+                    highwayLimit,
+                    mileageRate,
+                    baseTransportCost,
+                },
+                days: tourDays.map((td, index) => ({
+                    day: index + 1,
+                    date: td.date.toISOString(),
+                    route: td.location,
+                    estimatedKm: td.mileage,
+                    actualKm: 0,
+                    parking: 0,
+                    highway: 0,
+                    batta: 0,
+                    otherExpenses: 0,
+                }))
+            });
+        }
+        
         // Add daily entries
         tourDays.forEach((day, index) => {
             const isEvenRow = index % 2 === 0;
-            const rowFill: any = isEvenRow
+            const rowFill: ExcelJS.Fill = isEvenRow
                 ? { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFFFF" } }
                 : { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + COLORS.primary50 } };
 
-            // Format date safely
-            let dateStr = "";
-            try {
-                dateStr = format(day.date, "dd-MMM");
-            } catch (e) {
-                console.error("Error formatting date:", day.date, e);
-                dateStr = "N/A";
-            }
-
-            worksheet.getCell(`A${currentRow}`).value = dateStr;
+            worksheet.getCell(`A${currentRow}`).value = format(day.date, "dd-MMM");
             Object.assign(worksheet.getCell(`A${currentRow}`), cellStyle);
             worksheet.getCell(`A${currentRow}`).alignment = { horizontal: "center", vertical: "middle" };
             worksheet.getCell(`A${currentRow}`).fill = rowFill;
@@ -628,7 +774,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         Object.assign(worksheet.getCell(`A${currentRow}`), totalRowStyle);
         worksheet.getCell(`A${currentRow}`).protection = { locked: true };
 
-        worksheet.getCell(`B${currentRow}`).value = "Total";
+        worksheet.getCell(`B${currentRow}`).value = "Total KM (Driver vs Actual)";
         Object.assign(worksheet.getCell(`B${currentRow}`), totalRowStyle);
         worksheet.getCell(`B${currentRow}`).alignment = { horizontal: "right", vertical: "middle" };
         worksheet.getCell(`B${currentRow}`).protection = { locked: true };
@@ -638,6 +784,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         };
         Object.assign(worksheet.getCell(`C${currentRow}`), totalRowStyle);
         worksheet.getCell(`C${currentRow}`).alignment = { horizontal: "center", vertical: "middle" };
+        worksheet.getCell(`C${currentRow}`).numFmt = "#,##0";
         worksheet.getCell(`C${currentRow}`).protection = { locked: true };
 
         worksheet.getCell(`D${currentRow}`).value = {
@@ -645,23 +792,25 @@ export async function GET(request: Request, { params }: RouteParams) {
         };
         Object.assign(worksheet.getCell(`D${currentRow}`), totalRowStyle);
         worksheet.getCell(`D${currentRow}`).alignment = { horizontal: "center", vertical: "middle" };
+        worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
         worksheet.getCell(`D${currentRow}`).protection = { locked: true };
 
         const totalMileageRow = currentRow;
         currentRow++;
 
-        // Extra KM row (from costing sheet)
+        // Extra KM Rate Display
         worksheet.getCell(`A${currentRow}`).value = "";
         Object.assign(worksheet.getCell(`A${currentRow}`), cellStyle);
         worksheet.getCell(`A${currentRow}`).protection = { locked: true };
 
-        worksheet.getCell(`B${currentRow}`).value = "Extra KM";
+        worksheet.getCell(`B${currentRow}`).value = "Excess Rate / KM";
         Object.assign(worksheet.getCell(`B${currentRow}`), labelStyle);
         worksheet.getCell(`B${currentRow}`).alignment = { horizontal: "right", vertical: "middle" };
         worksheet.getCell(`B${currentRow}`).protection = { locked: true };
 
-        worksheet.getCell(`C${currentRow}`).value = extraKm;
+        worksheet.getCell(`C${currentRow}`).value = mileageRate;
         Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
+        worksheet.getCell(`C${currentRow}`).numFmt = "#,##0.00"; 
         worksheet.getCell(`C${currentRow}`).protection = { locked: true };
 
         worksheet.getCell(`D${currentRow}`).value = "";
@@ -682,32 +831,41 @@ export async function GET(request: Request, { params }: RouteParams) {
         Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
         worksheet.getCell(`A${currentRow}`).protection = { locked: true };
 
-        worksheet.getCell(`C${currentRow}`).value = 0;
+        // Col C: Budgeted/Base Cost (from costing sheet)
+        worksheet.getCell(`C${currentRow}`).value = baseTransportCost;
         Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
+        worksheet.getCell(`C${currentRow}`).numFmt = "#,##0";
         worksheet.getCell(`C${currentRow}`).protection = { locked: true };
 
-        worksheet.getCell(`D${currentRow}`).value = 0;
+        // Col D: Calculated Cost (Base + Excess)
+        // Formula: IF(ActualKM > Limit, Base + (Actual - Limit)*Rate, Base)
+        // Note: Using MAX(0, ...) helps avoid negative if Actual < Limit 
+        const mileageCostFormula = `IF(D${totalMileageRow} > ${totalMileageLimit}, ${baseTransportCost} + (D${totalMileageRow} - ${totalMileageLimit}) * ${mileageRate}, ${baseTransportCost})`;
+        
+        worksheet.getCell(`D${currentRow}`).value = { formula: mileageCostFormula };
         Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
         worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
-        worksheet.getCell(`D${currentRow}`).protection = { locked: false };
+        worksheet.getCell(`D${currentRow}`).protection = { locked: true }; // Calculated, so locked
         const mileageCostRow = currentRow;
         currentRow++;
 
-        // Row: Parking Fee
+
+        // Row: Paging Fee
         worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
-        worksheet.getCell(`A${currentRow}`).value = "Parking Fee";
+        worksheet.getCell(`A${currentRow}`).value = "Paging Fee";
         Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
         worksheet.getCell(`A${currentRow}`).protection = { locked: true };
 
-        worksheet.getCell(`C${currentRow}`).value = "";
-        Object.assign(worksheet.getCell(`C${currentRow}`), cellStyle);
+        worksheet.getCell(`C${currentRow}`).value = pagingLimit;
+        Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
+        worksheet.getCell(`C${currentRow}`).numFmt = "#,##0";
         worksheet.getCell(`C${currentRow}`).protection = { locked: true };
 
-        worksheet.getCell(`D${currentRow}`).value = 0;
+        worksheet.getCell(`D${currentRow}`).value = "";
         Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
         worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
         worksheet.getCell(`D${currentRow}`).protection = { locked: false };
-        const parkingRow = currentRow;
+        const pagingRow = currentRow;
         currentRow++;
 
         // Row: Highway Cost
@@ -716,30 +874,117 @@ export async function GET(request: Request, { params }: RouteParams) {
         Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
         worksheet.getCell(`A${currentRow}`).protection = { locked: true };
 
-        worksheet.getCell(`C${currentRow}`).value = "";
-        Object.assign(worksheet.getCell(`C${currentRow}`), cellStyle);
+        worksheet.getCell(`C${currentRow}`).value = highwayLimit;
+        Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
+        worksheet.getCell(`C${currentRow}`).numFmt = "#,##0";
         worksheet.getCell(`C${currentRow}`).protection = { locked: true };
 
-        worksheet.getCell(`D${currentRow}`).value = 0;
+        worksheet.getCell(`D${currentRow}`).value = "";
         Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
         worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
         worksheet.getCell(`D${currentRow}`).protection = { locked: false };
         const highwayRow = currentRow;
         currentRow++;
 
+        // Row: Batta
+        worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+        worksheet.getCell(`A${currentRow}`).value = "Batta";
+        Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`C${currentRow}`).value = battaLimit;
+        Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
+        worksheet.getCell(`C${currentRow}`).numFmt = "#,##0";
+        worksheet.getCell(`C${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`D${currentRow}`).value = "";
+        Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
+        worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
+        worksheet.getCell(`D${currentRow}`).protection = { locked: false };
+        const battaRow = currentRow;
+        currentRow++;
+        
+        // Row: Tickets / Entry Fees (New)
+        worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+        worksheet.getCell(`A${currentRow}`).value = "Tickets / Entry Fees";
+        Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`C${currentRow}`).value = ""; // No budget usually
+        Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
+        worksheet.getCell(`C${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`D${currentRow}`).value = "";
+        Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
+        worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
+        worksheet.getCell(`D${currentRow}`).protection = { locked: false }; // Editable
+        const ticketsRow = currentRow;
+        currentRow++;
+
+        // Row: Other Expenses (New)
+        worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+        worksheet.getCell(`A${currentRow}`).value = "Other Expenses";
+        Object.assign(worksheet.getCell(`A${currentRow}`), labelStyle);
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`C${currentRow}`).value = ""; 
+        Object.assign(worksheet.getCell(`C${currentRow}`), numberCellStyle);
+        worksheet.getCell(`C${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`D${currentRow}`).value = "";
+        Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
+        worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
+        worksheet.getCell(`D${currentRow}`).protection = { locked: false }; // Editable
+        const otherRow = currentRow;
+        currentRow++;
+
         // Row: Total
         worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
-        worksheet.getCell(`A${currentRow}`).value = "Total";
+        worksheet.getCell(`A${currentRow}`).value = "TOTAL PRICE";
         Object.assign(worksheet.getCell(`A${currentRow}`), totalRowStyle);
         worksheet.getCell(`A${currentRow}`).protection = { locked: true };
 
+        // Sum all costs in Col D
         worksheet.getCell(`D${currentRow}`).value = {
-            formula: `SUM(D${mileageCostRow}:D${highwayRow})`,
+            formula: `SUM(D${mileageCostRow}, D${pagingRow}, D${highwayRow}, D${battaRow}, D${ticketsRow}, D${otherRow})`,
         };
         Object.assign(worksheet.getCell(`D${currentRow}`), totalRowStyle);
         worksheet.getCell(`D${currentRow}`).alignment = { horizontal: "center", vertical: "middle" };
         worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
         worksheet.getCell(`D${currentRow}`).protection = { locked: true };
+        const totalRow = currentRow;
+        currentRow++;
+
+        // Row: Tour Advance
+        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+        worksheet.getCell(`A${currentRow}`).value = "Tour Advance";
+        Object.assign(worksheet.getCell(`A${currentRow}`), {
+            ...labelStyle,
+            alignment: { horizontal: "right", vertical: "middle" }
+        });
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`D${currentRow}`).value = ""; // editable
+        Object.assign(worksheet.getCell(`D${currentRow}`), numberCellStyle);
+        worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
+        worksheet.getCell(`D${currentRow}`).protection = { locked: false };
+        const advanceRow = currentRow;
+        currentRow++;
+
+        // Row: Balance Due
+        worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+        worksheet.getCell(`A${currentRow}`).value = "Balance Due";
+        Object.assign(worksheet.getCell(`A${currentRow}`), totalRowStyle);
+        worksheet.getCell(`A${currentRow}`).protection = { locked: true };
+
+        worksheet.getCell(`D${currentRow}`).value = {
+            formula: `D${totalRow}-D${advanceRow}`,
+        };
+        Object.assign(worksheet.getCell(`D${currentRow}`), totalRowStyle);
+        worksheet.getCell(`D${currentRow}`).alignment = { horizontal: "center", vertical: "middle" };
+        worksheet.getCell(`D${currentRow}`).numFmt = "#,##0";
+        worksheet.getCell(`D${currentRow}`).protection = { locked: true };
+        currentRow++;
 
         // Enable worksheet protection - only Actual column cells are editable
         await worksheet.protect("", {
@@ -770,13 +1015,10 @@ export async function GET(request: Request, { params }: RouteParams) {
                 "Content-Disposition": `attachment; filename="${filename}"`,
             },
         });
-    } catch (err: any) {
-        console.error("=== Error generating log sheet ===");
-        console.error("Error message:", err?.message);
-        console.error("Error stack:", err?.stack);
-        console.error("Full error:", err);
+    } catch (err) {
+        console.error("Error generating log sheet:", err);
         return NextResponse.json(
-            { error: err?.message || "Failed to generate log sheet", details: err?.toString() },
+            { error: "Failed to generate log sheet" },
             { status: 500 }
         );
     }

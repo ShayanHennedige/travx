@@ -94,7 +94,7 @@ export function AnalyticsDashboard() {
         if (score >= 90) return "text-green-600 bg-green-50 border-green-100";
         if (score >= 70) return "text-blue-600 bg-blue-50 border-blue-100";
         if (score >= 50) return "text-orange-600 bg-orange-50 border-orange-100";
-        return "text-accent-500 bg-accent-500/10 border-accent-500/20";
+        return "text-red-600 bg-red-50 border-red-100";
     };
 
     const ProgressRing = ({ score, label }: { score: number; label: string }) => {
@@ -139,7 +139,7 @@ export function AnalyticsDashboard() {
 
     if (loading) {
         return (
-            <div className="min-h-100 flex items-center justify-center">
+            <div className="min-h-[400px] flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-600 rounded-full animate-spin" />
                     <p className="text-surface-500 font-medium animate-pulse">Analyzing feedback data...</p>
@@ -168,7 +168,7 @@ export function AnalyticsDashboard() {
     return (
         <div className="space-y-8 pb-20 animate-fade-in">
             {/* Header & Controls */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 p-6 rounded-3xl border border-surface-200 shadow-sm sticky top-20 z-10 backdrop-blur-md bg-white/80">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white p-6 rounded-3xl border border-surface-200 shadow-sm sticky top-20 z-10 backdrop-blur-md bg-white/80">
                 <div className="flex flex-wrap gap-2 p-1 bg-surface-100 rounded-2xl w-fit">
                     <button
                         onClick={() => setActiveTab("overall")}
@@ -268,12 +268,12 @@ export function AnalyticsDashboard() {
                             <p className="text-xs text-surface-500 mt-2">Drivers & Hotels above 90%</p>
                         </div>
 
-                        <div className="bg-accent-500/10 p-8 rounded-[2.5rem] border border-accent-500/20 shadow-sm flex flex-col justify-between">
+                        <div className="bg-red-50 p-8 rounded-[2.5rem] border border-red-100 shadow-sm flex flex-col justify-between">
                             <div>
-                                <p className="text-xs font-bold uppercase tracking-widest text-accent-400 mb-1">Attention Required</p>
-                                <p className="text-4xl font-black text-accent-500">{data.lowScores.length}</p>
+                                <p className="text-xs font-bold uppercase tracking-widest text-red-400 mb-1">Attention Required</p>
+                                <p className="text-4xl font-black text-red-600">{data.lowScores.length}</p>
                             </div>
-                            <p className="text-xs text-accent-400 mt-2">Feedback entries below 50%</p>
+                            <p className="text-xs text-red-500 mt-2">Feedback entries below 50%</p>
                         </div>
                     </div>
 

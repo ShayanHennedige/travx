@@ -63,10 +63,14 @@ export async function GET(
         await browser.close();
 
         // Return PDF
+        const { searchParams } = new URL(request.url);
+        const isView = searchParams.get("view") === "true";
+        const disposition = isView ? "inline" : `attachment; filename="invoice-${invoice.invoice_no}.pdf"`;
+
         return new Response(pdfBuffer as any, {
             headers: {
                 "Content-Type": "application/pdf",
-                "Content-Disposition": `attachment; filename="invoice-${invoice.invoice_no}.pdf"`,
+                "Content-Disposition": disposition,
             },
         });
     } catch (err) {

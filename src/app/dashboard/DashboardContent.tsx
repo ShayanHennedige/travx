@@ -99,16 +99,16 @@ export function DashboardContent({ stats, recentInquiries, tours, drivers, statu
         />
 
         {/* Animated Toggle Switch */}
-        <div className="relative bg-surface-800 light:bg-surface-100 rounded-full p-1 flex items-center border border-surface-700 light:border-surface-200">
+        <div className="relative bg-surface-100 rounded-full p-1 flex items-center">
           {/* Sliding Background */}
           <div
-            className={`absolute top-1 bottom-1 w-1/2 bg-surface-700 light:bg-white rounded-full shadow-md transition-all duration-300 ease-out ${viewMode === "tracker" ? "left-1/2 -translate-x-1" : "left-1"
+            className={`absolute top-1 bottom-1 w-1/2 bg-white rounded-full shadow-md transition-all duration-300 ease-out ${viewMode === "tracker" ? "left-1/2 -translate-x-1" : "left-1"
               }`}
           />
 
           <button
             onClick={() => setViewMode("dashboard")}
-            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${viewMode === "dashboard" ? "text-surface-100 light:text-surface-900" : "text-surface-500 hover:text-surface-300 light:hover:text-surface-700"
+            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${viewMode === "dashboard" ? "text-surface-900" : "text-surface-500 hover:text-surface-700"
               }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -119,7 +119,7 @@ export function DashboardContent({ stats, recentInquiries, tours, drivers, statu
 
           <button
             onClick={() => setViewMode("tracker")}
-            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${viewMode === "tracker" ? "text-surface-100 light:text-surface-900" : "text-surface-500 hover:text-surface-300 light:hover:text-surface-700"
+            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${viewMode === "tracker" ? "text-surface-900" : "text-surface-500 hover:text-surface-700"
               }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -144,62 +144,61 @@ export function DashboardContent({ stats, recentInquiries, tours, drivers, statu
             {/* Inquiry Overview */}
             <div className="card p-6 flex flex-col justify-between">
               <div>
-                <p className="text-sm font-medium text-surface-400 light:text-surface-500 mb-1">Total Inquiries</p>
-                <p className="text-3xl font-bold text-surface-100 light:text-surface-900">{stats.total}</p>
+                <p className="text-sm font-medium text-surface-500 mb-1">Total Inquiries</p>
+                <p className="text-3xl font-bold text-surface-900">{stats.total}</p>
               </div>
-              <div className="mt-4 flex gap-4 border-t border-surface-700 light:border-surface-100 pt-4">
+              <div className="mt-4 flex gap-4 border-t border-surface-100 pt-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-primary-400" />
-                  <span className="text-xs font-medium text-surface-400 light:text-surface-600">{stats.individual} Individual</span>
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-xs font-medium text-surface-600">{stats.individual} Individual</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-purple-400" />
-                  <span className="text-xs font-medium text-surface-400 light:text-surface-600">{stats.group} Group</span>
+                  <div className="w-2 h-2 rounded-full bg-purple-500" />
+                  <span className="text-xs font-medium text-surface-600">{stats.group} Group</span>
                 </div>
               </div>
             </div>
 
             {/* Pipeline Status */}
             <div className="card p-6">
-              <p className="text-sm font-medium text-surface-400 light:text-surface-500 mb-4">Pipeline Status</p>
+              <p className="text-sm font-medium text-surface-500 mb-4">Pipeline Status</p>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-accent-400" />
-                    <span className="text-xs font-medium text-surface-300 light:text-surface-700">New</span>
+                    <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                    <span className="text-xs font-medium text-surface-700">New</span>
                   </div>
-                  <span className="text-xs font-bold text-surface-100 light:text-surface-900">{stats.new}</span>
+                  <span className="text-xs font-bold text-surface-900">{stats.new}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-orange-400" />
-                    <span className="text-xs font-medium text-surface-300 light:text-surface-700">In Progress</span>
+                    <span className="text-xs font-medium text-surface-700">In Progress</span>
                   </div>
-                  <span className="text-xs font-bold text-surface-100 light:text-surface-900">{stats.in_progress}</span>
+                  <span className="text-xs font-bold text-surface-900">{stats.in_progress}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-400" />
-                    <span className="text-xs font-medium text-surface-300 light:text-surface-700">Confirmed</span>
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <span className="text-xs font-medium text-surface-700">Confirmed</span>
                   </div>
-                  <span className="text-xs font-bold text-surface-100 light:text-surface-900">{stats.confirmed}</span>
+                  <span className="text-xs font-bold text-surface-900">{stats.confirmed}</span>
                 </div>
               </div>
             </div>
 
             {/* Operational Focus */}
-            <div className="relative card p-6 bg-gradient-to-br from-primary-900 to-surface-900 border-primary-800/50 overflow-hidden group hover:shadow-xl hover:shadow-primary-900/30 transition-all duration-300">
-              <div className="absolute inset-0 bg-primary-600/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative flex items-center justify-between mb-4">
-                <p className="text-sm font-medium text-primary-300">Active Tours</p>
-                <div className="w-8 h-8 rounded-lg bg-primary-800/60 flex items-center justify-center text-primary-300 group-hover:bg-accent-500 group-hover:text-black transition-all duration-300">
+            <div className="card p-6 bg-surface-900 border-none group hover:shadow-xl transition-all duration-300">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-surface-400">Active Tours</p>
+                <div className="w-8 h-8 rounded-lg bg-surface-800 flex items-center justify-center text-primary-400 group-hover:bg-primary-400 group-hover:text-surface-900 transition-colors">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c-.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
                   </svg>
                 </div>
               </div>
-              <p className="relative text-4xl font-bold text-white mb-2">{stats.activeTours}</p>
-              <p className="relative text-xs text-primary-400">Ongoing and scheduled tours</p>
+              <p className="text-4xl font-bold text-white mb-2">{stats.activeTours}</p>
+              <p className="text-xs text-surface-400">Ongoing and scheduled tours</p>
             </div>
           </div>
 
@@ -239,7 +238,7 @@ function StatCard({ label, value, color, icon }: StatCardProps) {
     purple: "bg-purple-100 text-purple-700",
     green: "bg-green-100 text-green-700",
     orange: "bg-orange-100 text-orange-700",
-    teal: "bg-teal-100 text-teal-700",
+    teal: "bg-primary-100 text-primary-700",
   };
 
   return (

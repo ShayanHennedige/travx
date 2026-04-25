@@ -16,6 +16,7 @@ interface PaymentVoucher {
     total_lkr: number;
     // status field removed - not needed for payment proof documents
     payment_mode: string | null;
+    voucher_category: string;
 }
 
 interface PaymentVouchersListProps {
@@ -24,6 +25,7 @@ interface PaymentVouchersListProps {
 
 export function PaymentVouchersList({ vouchers }: PaymentVouchersListProps) {
     const [searchTerm, setSearchTerm] = useState("");    // Removed statusFilter - not needed
+    const [categoryFilter, setCategoryFilter] = useState("");
     const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
     const safeFormat = (dateStr: string | null, formatStr: string) => {
@@ -41,7 +43,9 @@ export function PaymentVouchersList({ vouchers }: PaymentVouchersListProps) {
             v.payee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             v.tour_reference?.toLowerCase().includes(searchTerm.toLowerCase());
 
-        return matchesSearch;  // Removed status filtering
+        const matchesCategory = !categoryFilter || v.voucher_category === categoryFilter;
+
+        return matchesSearch && matchesCategory;
     });
 
     // Removed getStatusBadge function - not needed
@@ -99,6 +103,17 @@ export function PaymentVouchersList({ vouchers }: PaymentVouchersListProps) {
                             className="w-full pl-10 pr-4 py-2.5 border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
                         />
                     </div>
+                    <select
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className="px-3 py-2.5 border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    >
+                        <option value="">All Categories</option>
+                        <option value="hotel">Hotel</option>
+                        <option value="transport">Transport</option>
+                        <option value="extras">Extras</option>
+                        <option value="admin">Admin</option>
+                    </select>
                 </div>
             </div>
 
@@ -112,6 +127,7 @@ export function PaymentVouchersList({ vouchers }: PaymentVouchersListProps) {
                                 <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500 whitespace-nowrap">Date</th>
                                 <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500 whitespace-nowrap">Payee</th>
                                 <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500 whitespace-nowrap">Tour Ref</th>
+                                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500 whitespace-nowrap">Category</th>
                                 <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500 whitespace-nowrap">Amount (USD)</th>
                                 <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500 whitespace-nowrap">Amount (LKR)</th>
                                 {/* Status column removed - not applicable for payment proof documents */}
@@ -136,6 +152,16 @@ export function PaymentVouchersList({ vouchers }: PaymentVouchersListProps) {
                                     <td className="px-4 py-3 text-sm text-surface-600">
                                         {voucher.tour_reference || "-"}
                                     </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                            voucher.voucher_category === "admin" ? "bg-amber-100 text-amber-700" :
+                                            voucher.voucher_category === "transport" ? "bg-blue-100 text-blue-700" :
+                                            voucher.voucher_category === "extras" ? "bg-purple-100 text-purple-700" :
+                                            "bg-green-100 text-green-700"
+                                        }`}>
+                                            {voucher.voucher_category || "hotel"}
+                                        </span>
+                                    </td>
                                     <td className="px-4 py-3 text-sm font-semibold text-surface-900 text-right">
                                         ${(voucher.total_usd || 0).toFixed(2)}
                                     </td>
@@ -145,8 +171,13 @@ export function PaymentVouchersList({ vouchers }: PaymentVouchersListProps) {
                                     {/* Status badge removed */}
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-center gap-2">
+                                            <Link href={`/api/payment-vouchers/${voucher.id}/pdf?view=true`} target="_blank">
+                                                <Button size="sm" variant="secondary" className="rounded-lg text-xs">
+                                                    View
+                                                </Button>
+                                            </Link>
                                             <Link href={`/payment-vouchers/${voucher.id}`}>
-                                                <Button size="sm" variant="secondary" className="rounded-lg">
+                                                <Button size="sm" variant="secondary" className="rounded-lg text-xs">
                                                     Edit
                                                 </Button>
                                             </Link>

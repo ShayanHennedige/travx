@@ -43,11 +43,14 @@ export async function GET(request: Request, { params }: RouteParams) {
         });
 
         const filename = `Payment_Voucher_${voucher.voucher_no}.pdf`;
+        const { searchParams } = new URL(request.url);
+        const isView = searchParams.get("view") === "true";
+        const disposition = isView ? "inline" : `attachment; filename="${filename}"`;
 
         return new NextResponse(Buffer.from(pdf) as any, {
             headers: {
                 "Content-Type": "application/pdf",
-                "Content-Disposition": `attachment; filename="${filename}"`,
+                "Content-Disposition": disposition,
             },
         });
     } catch (e) {
@@ -61,7 +64,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 }
 
 function generatePaymentVoucherHTML(voucher: any): string {
-    const logoUrl = process.env.NEXT_PUBLIC_LOGO_URL || 'https://tvxwjknpdzvuovjgqvvi.supabase.co/storage/v1/object/public/logo/Serendia.png';
+    const logoUrl = process.env.NEXT_PUBLIC_LOGO_URL || 'https://axcfwwdahunzxsdeohkv.supabase.co/storage/v1/object/public/logo/Serendia.png';
     const voucherDate = voucher.voucher_date
         ? format(new Date(voucher.voucher_date), "do MMMM yyyy")
         : format(new Date(), "do MMMM yyyy");
@@ -97,14 +100,14 @@ function generatePaymentVoucherHTML(voucher: any): string {
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 14px 0 16px;
-            border-bottom: 2px solid #2c2c2c;
-            margin-bottom: 20px;
+            align-items: flex-end;
+            padding-bottom: 10px;
+            border-bottom: 1.5px solid #2c2c2c;
+            margin-bottom: 16px;
         }
-        .logo { height: 110px; width: auto; }
-        .company-info { text-align: right; font-size: 12px; color: #444; line-height: 1.65; }
-        .company-name { font-size: 17px; font-weight: bold; color: #2c2c2c; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 4px; }
+        .logo { height: 42px; width: auto; }
+        .company-info { text-align: right; font-size: 9px; color: #555; line-height: 1.45; }
+        .company-name { font-size: 13px; font-weight: bold; color: #2c2c2c; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 2px; }
 
         /* Title */
         .title-section { text-align: center; margin-bottom: 14px; }
@@ -167,11 +170,11 @@ function generatePaymentVoucherHTML(voucher: any): string {
 <body>
     <!-- Header -->
     <div class="header">
-        <img src="${logoUrl}" alt="TraveX" class="logo">
+        <img src="${logoUrl}" alt="TravX" class="logo">
         <div class="company-info">
-            <div class="company-name">TraveX</div>
+            <div class="company-name">TravX</div>
             63A, Old Road, Pannipitiya, Sri Lanka<br>
-            +94 77 346 9998 &nbsp;·&nbsp; info@Travex.com
+            +94 77 346 9998 &nbsp;·&nbsp; info@serendiaholidays.com
         </div>
     </div>
 
@@ -237,7 +240,7 @@ function generatePaymentVoucherHTML(voucher: any): string {
     <!-- Footer -->
     <div class="footer">
         <div class="footer-line"></div>
-        TraveX (Pvt) Ltd.
+        TravX
     </div>
 </body>
 </html>

@@ -11,7 +11,7 @@ export const feedbackSchema = z.object({
   // Guest Info
   guest_name: z.string().min(1, "Name is required"),
   guest_email: z.preprocess(
-    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    (value) => (typeof value === "string" && value.trim() === "" ? null : value),
     z.string().email("Valid email is required").optional().nullable()
   ),
   country: z.string().optional().nullable(),

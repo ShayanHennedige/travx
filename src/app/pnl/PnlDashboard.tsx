@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
 import { Button } from "@/components/ui";
+
 import {
     BarChart,
     Bar,
@@ -11,7 +11,6 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
-    Legend,
     ResponsiveContainer,
     PieChart,
     Pie,
@@ -28,7 +27,10 @@ interface PnlRecord {
     misc_expenses: number;
     total_expenses: number;
     net_profit: number;
-    status: string;
+    invoice_count?: number;
+    voucher_count?: number;
+    has_detail?: boolean;
+    detail_key?: string | null;
 }
 
 interface PnlSummary {
@@ -42,14 +44,15 @@ interface PnlSummary {
         driver: number;
         misc: number;
     };
+    tourStatusBreakdown?: Record<string, number>;
 }
 
-const COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#e0c16c", "#8b5cf6"];
 
 export function PnlDashboard() {
     const [records, setRecords] = useState<PnlRecord[]>([]);
     const [summary, setSummary] = useState<PnlSummary | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [dateRange, setDateRange] = useState<"all" | "month" | "quarter" | "year">("all");
 
     useEffect(() => {
@@ -58,13 +61,30 @@ export function PnlDashboard() {
 
     const fetchData = async () => {
         setLoading(true);
+        setError(null);
         try {
             const response = await fetch(`/api/pnl/summary?range=${dateRange}`);
+            if (!response.ok) {
+                let message = `Failed to load P&L data (${response.status})`;
+                try {
+                    const errorBody = await response.json();
+                    if (errorBody?.error) {
+                        message = errorBody.error;
+                    }
+                } catch {
+                    // Ignore JSON parse issues and keep the status-based message.
+                }
+                throw new Error(message);
+            }
             const data = await response.json();
+            console.log("DEBUG: PNL data fetched:", data);
             setRecords(data.records || []);
             setSummary(data.summary || null);
         } catch (err) {
             console.error("Error fetching PNL data:", err);
+            setError(err instanceof Error ? err.message : "Failed to load P&L data");
+            setRecords([]);
+            setSummary(null);
         } finally {
             setLoading(false);
         }
@@ -94,6 +114,18 @@ export function PnlDashboard() {
         );
     }
 
+    if (error) {
+        return (
+            <div className="card p-6 border-red-200 bg-red-50">
+                <p className="text-sm font-semibold text-red-700">Unable to load P&L data</p>
+                <p className="text-sm text-red-600 mt-1">{error}</p>
+                <Button className="mt-4" variant="secondary" onClick={fetchData}>
+                    Retry
+                </Button>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             {/* Date Range Filter */}
@@ -119,7 +151,7 @@ export function PnlDashboard() {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="card p-5 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                <div className="card p-5 bg-linear-to-br from-blue-50 to-blue-100 border-blue-200">
                     <p className="text-[10px] uppercase font-bold text-blue-600 tracking-wider mb-1">
                         Total Income
                     </p>
@@ -127,15 +159,15 @@ export function PnlDashboard() {
                         ${(summary?.totalIncome || 0).toLocaleString()}
                     </p>
                 </div>
-                <div className="card p-5 bg-gradient-to-br from-accent-900/30 to-surface-800 border-accent-700/30">
-                    <p className="text-[10px] uppercase font-bold text-accent-500 tracking-wider mb-1">
+                <div className="card p-5 bg-linear-to-br from-red-50 to-red-100 border-red-200">
+                    <p className="text-[10px] uppercase font-bold text-red-600 tracking-wider mb-1">
                         Total Expenses
                     </p>
-                    <p className="text-2xl font-black text-accent-400">
+                    <p className="text-2xl font-black text-red-700">
                         ${(summary?.totalExpenses || 0).toLocaleString()}
                     </p>
                 </div>
-                <div className="card p-5 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <div className="card p-5 bg-linear-to-br from-green-50 to-green-100 border-green-200">
                     <p className="text-[10px] uppercase font-bold text-green-600 tracking-wider mb-1">
                         Net Profit
                     </p>
@@ -143,7 +175,7 @@ export function PnlDashboard() {
                         ${(summary?.netProfit || 0).toLocaleString()}
                     </p>
                 </div>
-                <div className="card p-5 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <div className="card p-5 bg-linear-to-br from-purple-50 to-purple-100 border-purple-200">
                     <p className="text-[10px] uppercase font-bold text-purple-600 tracking-wider mb-1">
                         Profit Margin
                     </p>
@@ -175,7 +207,7 @@ export function PnlDashboard() {
                                                 entry.name === "Income"
                                                     ? "#3b82f6"
                                                     : entry.name === "Expenses"
-                                                        ? "#e0c16c"
+                                                        ? "#ef4444"
                                                         : "#22c55e"
                                             }
                                         />
@@ -240,9 +272,6 @@ export function PnlDashboard() {
                                     Net Profit
                                 </th>
                                 <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500 whitespace-nowrap">
-                                    Status
-                                </th>
-                                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-surface-500 whitespace-nowrap">
                                     Actions
                                 </th>
                             </tr>
@@ -251,53 +280,68 @@ export function PnlDashboard() {
                             {records.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} className="px-4 py-12 text-center">
-                                        <p className="text-surface-500">No P&L records found</p>
-                                        <p className="text-xs text-surface-400 mt-1">
-                                            P&L records are generated from paid invoices and vouchers
-                                        </p>
+                                        <p className="text-surface-500 font-medium mb-4">No P&L records found</p>
+                                        <div className="text-left max-w-md mx-auto">
+                                            <p className="text-xs text-surface-600 mb-3">
+                                                <span className="font-semibold">Reason:</span> No tours were found for the selected period.
+                                            </p>
+                                            {summary?.tourStatusBreakdown && Object.keys(summary.tourStatusBreakdown).length > 0 ? (
+                                                <div className="bg-surface-50 p-3 rounded-lg mb-3 border border-surface-200">
+                                                    <p className="text-xs font-semibold text-surface-700 mb-2">Your tours by status:</p>
+                                                    <div className="space-y-1">
+                                                        {Object.entries(summary.tourStatusBreakdown).map(([status, count]) => (
+                                                            <p key={status} className={`text-xs ${status === "completed" ? "text-green-600 font-semibold" : "text-surface-500"}`}>
+                                                                • <span className="capitalize">{status}</span>: <span className="font-medium">{count as number}</span> tour{(count as number) !== 1 ? "s" : ""}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                            <p className="text-xs text-surface-500">
+                                                Add tours and linked invoices or vouchers in <Link href="/drivers" className="text-primary-600 hover:underline font-semibold">Tour Management</Link> to see financial details here.
+                                            </p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
                                 records.map((record) => (
                                     <tr key={record.id} className="hover:bg-surface-50 transition-colors">
                                         <td className="px-4 py-3">
-                                            <Link
-                                                href={`/pnl/${record.tour_id}`}
-                                                className="text-sm font-bold text-primary-600 hover:text-primary-700"
-                                            >
-                                                {record.tour_reference || "N/A"}
-                                            </Link>
+                                            {record.detail_key ? (
+                                                <Link
+                                                    href={`/pnl/${encodeURIComponent(record.detail_key)}`}
+                                                    className="text-sm font-bold text-primary-600 hover:text-primary-700"
+                                                >
+                                                    {record.tour_reference || "N/A"}
+                                                </Link>
+                                            ) : (
+                                                <span className="text-sm font-bold text-surface-700">
+                                                    {record.tour_reference || "N/A"}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-right text-blue-600 font-medium">
                                             ${(record.income || 0).toLocaleString()}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-right text-accent-500 font-medium">
+                                        <td className="px-4 py-3 text-sm text-right text-red-600 font-medium">
                                             ${(record.total_expenses || 0).toLocaleString()}
                                         </td>
                                         <td
-                                            className={`px-4 py-3 text-sm text-right font-bold ${(record.net_profit || 0) >= 0 ? "text-green-600" : "text-accent-500"
+                                            className={`px-4 py-3 text-sm text-right font-bold ${(record.net_profit || 0) >= 0 ? "text-green-600" : "text-red-600"
                                                 }`}
                                         >
                                             ${(record.net_profit || 0).toLocaleString()}
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            <span
-                                                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${record.status === "finalized"
-                                                    ? "bg-green-100 text-green-700"
-                                                    : record.status === "approved"
-                                                        ? "bg-blue-100 text-blue-700"
-                                                        : "bg-slate-100 text-slate-700"
-                                                    }`}
-                                            >
-                                                {record.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <Link href={`/pnl/${record.tour_id}`}>
-                                                <Button size="sm" variant="secondary" className="rounded-lg">
-                                                    View
-                                                </Button>
-                                            </Link>
+                                            {record.detail_key ? (
+                                                <Link href={`/pnl/${encodeURIComponent(record.detail_key)}`}>
+                                                    <Button size="sm" variant="secondary" className="rounded-lg">
+                                                        View
+                                                    </Button>
+                                                </Link>
+                                            ) : (
+                                                <span className="text-xs text-surface-400">N/A</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))

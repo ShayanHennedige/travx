@@ -83,8 +83,10 @@ export interface Database {
           adults: number;
           children: number;
           infants: number;
-          accommodation_type: AccommodationType;
-          meal_plan: string | null;
+          hotel_type: string[];
+          room_category: string[];
+          meal_plan: string[];
+          mixed_mode: boolean;
           special_requirements: string | null;
           interests: string[];
           budget_min: number | null;
@@ -115,8 +117,10 @@ export interface Database {
           adults?: number;
           children?: number;
           infants?: number;
-          accommodation_type?: AccommodationType;
-          meal_plan?: string | null;
+          hotel_type?: string[];
+          room_category?: string[];
+          meal_plan?: string[];
+          mixed_mode?: boolean;
           special_requirements?: string | null;
           interests?: string[];
           budget_min?: number | null;
@@ -147,8 +151,10 @@ export interface Database {
           adults?: number;
           children?: number;
           infants?: number;
-          accommodation_type?: AccommodationType;
-          meal_plan?: string | null;
+          hotel_type?: string[];
+          room_category?: string[];
+          meal_plan?: string[];
+          mixed_mode?: boolean;
           special_requirements?: string | null;
           interests?: string[];
           budget_min?: number | null;
@@ -241,6 +247,76 @@ export interface Database {
           created_at?: string;
         };
       };
+      proposals: {
+        Row: {
+          id: string;
+          inquiry_id: string | null;
+          group_inquiry_id: string | null;
+          title: string | null;
+          status: string | null;
+          sent_at: string | null;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          inquiry_id?: string | null;
+          group_inquiry_id?: string | null;
+          title?: string | null;
+          status?: string | null;
+          sent_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          created_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          inquiry_id?: string | null;
+          group_inquiry_id?: string | null;
+          title?: string | null;
+          status?: string | null;
+          sent_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          created_by?: string | null;
+        };
+      };
+      itinerary_versions: {
+        Row: {
+          id: string;
+          proposal_id: string | null;
+          version_label: string;
+          itinerary_id: string | null;
+          costing_sheet_id: string | null;
+          is_accepted: boolean | null;
+          is_locked: boolean | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          proposal_id?: string | null;
+          version_label: string;
+          itinerary_id?: string | null;
+          costing_sheet_id?: string | null;
+          is_accepted?: boolean | null;
+          is_locked?: boolean | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          proposal_id?: string | null;
+          version_label?: string;
+          itinerary_id?: string | null;
+          costing_sheet_id?: string | null;
+          is_accepted?: boolean | null;
+          is_locked?: boolean | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
   };
 }
@@ -249,3 +325,5 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Inquiry = Database["public"]["Tables"]["inquiries"]["Row"];
 export type Traveler = Database["public"]["Tables"]["travelers"]["Row"];
 export type InquiryActivity = Database["public"]["Tables"]["inquiry_activities"]["Row"];
+export type Proposal = Database["public"]["Tables"]["proposals"]["Row"];
+export type ItineraryVersion = Database["public"]["Tables"]["itinerary_versions"]["Row"];

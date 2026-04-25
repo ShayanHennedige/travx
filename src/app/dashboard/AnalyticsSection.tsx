@@ -199,7 +199,7 @@ export function AnalyticsSection() {
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-surface-500">Low Scores (&lt; 60%)</p>
           </div>
-          <p className="text-3xl font-bold text-accent-500">{analytics.lowScores.length}</p>
+          <p className="text-3xl font-bold text-red-600">{analytics.lowScores.length}</p>
         </div>
         <div className="card p-5">
           <div className="flex items-center justify-between mb-2">
@@ -230,7 +230,7 @@ export function AnalyticsSection() {
               </div>
               <div className="w-full bg-surface-200 rounded-full h-3">
                 <div
-                  className={`h-3 rounded-full transition-all ${score < 50 ? "bg-accent-500" :
+                  className={`h-3 rounded-full transition-all ${score < 50 ? "bg-red-500" :
                     score < 70 ? "bg-orange-500" :
                       score < 90 ? "bg-blue-500" :
                         "bg-green-500"
@@ -411,18 +411,18 @@ export function AnalyticsSection() {
 
       {/* Low Scores Alert */}
       {analytics.lowScores.length > 0 && (
-        <div className="card p-6 border-l-4 border-accent-500">
+        <div className="card p-6 border-l-4 border-red-500">
           <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <h3 className="text-lg font-semibold text-surface-900">Low Scores Alert (&lt; 60%)</h3>
           </div>
           <div className="space-y-2">
             {analytics.lowScores.slice(0, 10).map((item, index) => (
-              <div key={index} className="flex items-center justify-between p-2 bg-accent-500/10 rounded">
+              <div key={index} className="flex items-center justify-between p-2 bg-red-50 rounded">
                 <span className="text-sm font-medium text-surface-700">{item.category}</span>
-                <span className="text-sm font-bold text-accent-500">{item.score}%</span>
+                <span className="text-sm font-bold text-red-600">{item.score}%</span>
               </div>
             ))}
           </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { Button, Input, Badge } from "@/components/ui";
-import { feedbackSchema, getRatingLabel } from "@/lib/validations/feedback";
+import { getRatingLabel } from "@/lib/validations/feedback";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const countries = [
@@ -13,7 +13,7 @@ const countries = [
 export default function FeedbackPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
         <div className="card p-12 text-center">
           <div className="w-12 h-12 mx-auto mb-4 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
           <p className="text-surface-600">Loading...</p>
@@ -391,7 +391,7 @@ function FeedbackContent() {
     onChange: (value: number) => void;
   }) => {
     const ratingOptions = [
-      { label: "Poor", score: 25, color: "bg-accent-500/10 border-accent-500/40 text-accent-600 hover:bg-accent-500/20" },
+      { label: "Poor", score: 25, color: "bg-red-50 border-red-300 text-red-700 hover:bg-red-100" },
       { label: "Average", score: 60, color: "bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100" },
       { label: "Good", score: 80, color: "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100" },
       { label: "Excellent", score: 100, color: "bg-green-50 border-green-300 text-green-700 hover:bg-green-100" },
@@ -520,7 +520,7 @@ function FeedbackContent() {
 
   if (submitSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-xl shadow-xl p-8 text-center">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
             <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -535,18 +535,18 @@ function FeedbackContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100">
+    <div className="min-h-screen bg-linear-to-br from-primary-50 via-white to-surface-100">
       {/* Header */}
       <header className="bg-white border-b border-surface-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img
               src="/Serendia.png"
-              alt="TraveX Logo"
+              alt="TravX Logo"
               className="h-12 w-auto object-contain"
             />
             <div>
-              <h1 className="text-lg font-semibold text-surface-900">TraveX</h1>
+              <h1 className="text-lg font-semibold text-surface-900">TravX</h1>
               <p className="text-xs text-surface-500">Customer Feedback Form</p>
             </div>
           </div>
@@ -561,7 +561,7 @@ function FeedbackContent() {
             Share Your Experience
           </h2>
           <p className="text-lg text-surface-600 max-w-2xl mx-auto">
-            Your insights help us craft even better journeys. Tell us about your recent trip with <span className="text-primary-600 font-bold">TraveX</span>.
+            Your insights help us craft even better journeys. Tell us about your recent trip with <span className="text-primary-600 font-bold">TravX</span>.
           </p>
         </div>
 
@@ -585,7 +585,7 @@ function FeedbackContent() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-8 rounded-2xl border border-surface-200 shadow-sm">
                     <div>
                       <label className="block text-sm font-medium text-surface-700 mb-1">
-                        Name <span className="text-accent-500">*</span>
+                        Name <span className="text-red-500">*</span>
                       </label>
                       <Input
                         type="text"
@@ -597,6 +597,19 @@ function FeedbackContent() {
                     </div>
 
                     <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1">
+                        Email <span className="text-surface-400">(optional)</span>
+                      </label>
+                      <Input
+                        type="email"
+                        placeholder="you@example.com"
+                        value={formData.guest_email}
+                        onChange={(e) => setFormData({ ...formData, guest_email: e.target.value })}
+                        className="h-12 text-base"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-surface-700 mb-1">
                         Country
                       </label>
@@ -651,7 +664,7 @@ function FeedbackContent() {
                             <button
                               type="button"
                               onClick={() => removeHotel(hotelName)}
-                              className="text-surface-400 hover:text-accent-500 transition-colors p-2"
+                              className="text-surface-400 hover:text-red-500 transition-colors p-2"
                             >
                               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -767,7 +780,7 @@ function FeedbackContent() {
 
                     <div className="relative z-10 space-y-8">
                       <div className="text-center space-y-2">
-                        <h3 className="text-3xl font-black italic">The TraveX Experience</h3>
+                        <h3 className="text-3xl font-black italic">The TravX Experience</h3>
                         <p className="text-surface-400">How would you rate your overall journey with us?</p>
                       </div>
 
@@ -803,7 +816,7 @@ function FeedbackContent() {
 
                   {/* Error Message */}
                   {errors.submit && (
-                    <div className="p-4 bg-accent-500/10 border border-accent-500/30 rounded-2xl text-accent-600 text-sm font-medium flex items-center gap-3 animate-shake">
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm font-medium flex items-center gap-3 animate-shake">
                       <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>

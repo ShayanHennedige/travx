@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     console.log("Feedback email should be sent:", {
       to: customerEmail,
       subject: `Feedback Request - ${reference}`,
-      body: `Dear ${customerName},\n\nWe hope you enjoyed your trip! Please share your feedback by clicking the link below:\n\n${feedbackUrl}\n\nThis link will expire in 14 days.\n\nBest regards,\nTraveX Team`,
+      body: `Dear ${customerName},\n\nWe hope you enjoyed your trip! Please share your feedback by clicking the link below:\n\n${feedbackUrl}\n\nThis link will expire in 14 days.\n\nBest regards,\nTravX Team`,
     });
 
     // For now, return success with URL (admin can copy if email fails)

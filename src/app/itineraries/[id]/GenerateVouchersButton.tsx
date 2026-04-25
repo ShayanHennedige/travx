@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 
@@ -25,6 +25,33 @@ interface GenerateVouchersButtonProps {
   isDisabled?: boolean;
 }
 
+function normalizeHotelName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function groupHotelsByContinuousStay(hotels: Hotel[]): Hotel[] {
+  if (!hotels.length) return [];
+
+  const sorted = [...hotels].sort((a, b) => a.check_in_date.localeCompare(b.check_in_date));
+  const grouped: Hotel[] = [];
+
+  for (const hotel of sorted) {
+    const prev = grouped[grouped.length - 1];
+    const sameHotel = prev && normalizeHotelName(prev.hotel_name) === normalizeHotelName(hotel.hotel_name);
+    const continuousStay = sameHotel && prev.check_out_date === hotel.check_in_date;
+
+    if (continuousStay) {
+      prev.check_out_date = hotel.check_out_date;
+      prev.no_of_nights += hotel.no_of_nights;
+      continue;
+    }
+
+    grouped.push({ ...hotel });
+  }
+
+  return grouped;
+}
+
 export function GenerateVouchersButton({
   itineraryId,
   inquiryId,
@@ -40,6 +67,7 @@ export function GenerateVouchersButton({
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const groupedHotels = useMemo(() => groupHotelsByContinuousStay(hotels), [hotels]);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -56,7 +84,7 @@ export function GenerateVouchersButton({
           nationality: nationality || "",
           pax_adults: paxAdults,
           pax_children: paxChildren,
-          hotels: hotels.map((h) => ({
+          hotels: groupedHotels.map((h) => ({
             hotel_name: h.hotel_name,
             check_in_date: h.check_in_date,
             check_out_date: h.check_out_date,
@@ -117,11 +145,11 @@ export function GenerateVouchersButton({
 
             <div className="mb-6">
               <p className="text-surface-600 mb-4">
-                This will create <strong>{hotels.length} hotel voucher{hotels.length !== 1 ? "s" : ""}</strong> for:
+                This will create <strong>{groupedHotels.length} hotel voucher{groupedHotels.length !== 1 ? "s" : ""}</strong> for:
               </p>
               <div className="bg-surface-50 rounded-lg p-4 max-h-48 overflow-y-auto">
                 <ul className="space-y-2">
-                  {hotels.map((hotel, index) => (
+                  {groupedHotels.map((hotel, index) => (
                     <li key={index} className="flex items-center gap-2 text-sm">
                       <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-medium">
                         {index + 1}
@@ -153,7 +181,7 @@ export function GenerateVouchersButton({
                 Cancel
               </Button>
               <Button onClick={handleGenerate} loading={isGenerating} disabled={isGenerating}>
-                Generate {hotels.length} Voucher{hotels.length !== 1 ? "s" : ""}
+                Generate {groupedHotels.length} Voucher{groupedHotels.length !== 1 ? "s" : ""}
               </Button>
             </div>
           </div>

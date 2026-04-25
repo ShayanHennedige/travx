@@ -24,9 +24,9 @@ export const customerInvoiceSchema = z.object({
 
     // Customer Info
     customer_name: z.string().min(1, "Customer name is required"),
-    customer_company: z.string().optional(),
-    customer_email: z.string().email().optional().or(z.literal("")),
-    customer_address: z.string().optional(),
+    customer_company: z.string().optional().nullable(),
+    customer_email: z.string().email().optional().or(z.literal("")).nullable(),
+    customer_address: z.string().optional().nullable(),
 
     // Rates (absorbed from costing sheet)
     rate_sgl: z.number().min(0).optional(),
@@ -50,16 +50,16 @@ export const customerInvoiceSchema = z.object({
     currency: z.string().default("USD"),
 
     // Payment Info
-    payment_terms: z.string().optional(),
-    due_date: z.string().optional(),
+    payment_terms: z.string().optional().nullable(),
+    due_date: z.string().optional().nullable(),
     paid_amount: z.number().min(0).optional(),
 
     // Status
     status: z.enum(invoiceStatuses).default("draft"),
 
     // Notes & Description
-    notes: z.string().optional(),
-    package_description: z.string().optional(),
+    notes: z.string().optional().nullable(),
+    package_description: z.string().optional().nullable(),
 });
 
 // PNL Record schema
@@ -81,10 +81,6 @@ export const pnlRecordSchema = z.object({
     staff_payments: z.number().min(0).default(0),
     supplier_expenses: z.number().min(0).default(0),
     other_expenses: z.number().min(0).default(0),
-
-    // Status
-    status: z.enum(["draft", "finalized", "approved"]).default("draft"),
-
     // Notes
     notes: z.string().optional(),
 });

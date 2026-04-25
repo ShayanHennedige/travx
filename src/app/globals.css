@@ -1,15 +1,20 @@
 @import "tailwindcss";
 
-/* ═══════════════════════════════════════════════════════
-   TraveX Design System — Blue + Gold + Black
-   Default: Dark mode | Toggle with .light class on <html>
-   ══════════════════════════════════════════════════════ */
-
 @custom-variant light (&&:where(.light, .light *));
 
 @theme {
-  /* ── Primary (Blue) ── */
-  --color-primary-50:  #eff6ff;
+  /* TravX Brand Color Palette */
+  --color-scarlet-rush: #3b82f6;
+  --color-red: #ef4444;
+  --color-black: #000000;
+
+  /* Brand colors as HSL */
+  --color-scarlet-rush-hsl: 217, 91%, 60%;
+  --color-red-hsl: 0, 84%, 60%;
+  --color-black-hsl: 0, 0%, 0%;
+
+  /* Primary (Blue) */
+  --color-primary-50: #eff6ff;
   --color-primary-100: #dbeafe;
   --color-primary-200: #bfdbfe;
   --color-primary-300: #93c5fd;
@@ -21,8 +26,8 @@
   --color-primary-900: #1e3a8a;
   --color-primary-950: #172554;
 
-  /* ── Accent (Gold) ── */
-  --color-accent-50:  #fdf9ed;
+  /* Accent (Gold) */
+  --color-accent-50: #fdf9ed;
   --color-accent-100: #faf0d4;
   --color-accent-200: #f5e5b8;
   --color-accent-300: #edd999;
@@ -33,9 +38,9 @@
   --color-accent-800: #8d7239;
   --color-accent-900: #5c4b26;
   --color-accent-950: #3d3219;
-
-  /* ── Surface (Slate / Blue-Black) ── */
-  --color-surface-50:  #f8fafc;
+  
+  /* Neutral/Slate tones */
+  --color-surface-50: #f8fafc;
   --color-surface-100: #f1f5f9;
   --color-surface-200: #e2e8f0;
   --color-surface-300: #cbd5e1;
@@ -47,48 +52,45 @@
   --color-surface-900: #0f172a;
   --color-surface-950: #020617;
 
-  /* ── Semantic ── */
+  /* Status colors */
   --color-success: #10b981;
   --color-warning: #f59e0b;
-  --color-error:   #e0c16c;
-  --color-info:    #3b82f6;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
 
-  /* ── Typography ── */
+  /* Typography */
   --font-family-heading: var(--font-dm-sans), system-ui, sans-serif;
-  --font-family-body:    var(--font-dm-sans), system-ui, sans-serif;
+  --font-family-body: var(--font-dm-sans), system-ui, sans-serif;
 
-  /* ── Shadows ── */
-  --shadow-card:      0 1px 3px 0 rgb(0 0 0 / 0.25), 0 1px 2px -1px rgb(0 0 0 / 0.2);
-  --shadow-card-dark: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
-  --shadow-elevated:  0 4px 12px -1px rgb(0 0 0 / 0.35), 0 2px 6px -2px rgb(0 0 0 / 0.25);
-  --shadow-modal:     0 20px 40px -5px rgb(0 0 0 / 0.6), 0 8px 16px -6px rgb(0 0 0 / 0.4);
-}
-
-/* ── CSS Semantic Variables ── */
-:root {
-  /* Dark mode (default) */
-  --bg-base:              #0f172a;
-  --bg-surface:           #1e293b;
-  --bg-surface-elevated:  #334155;
-  --border-default:       #334155;
-  --border-subtle:        #1e293b;
-  --text-primary:         #f8fafc;
-  --text-secondary:       #94a3b8;
-  --text-tertiary:        #64748b;
-}
-
-.light {
-  --bg-base:              #f1f5f9;
-  --bg-surface:           #ffffff;
-  --bg-surface-elevated:  #f8fafc;
-  --border-default:       #e2e8f0;
-  --border-subtle:        #f1f5f9;
-  --text-primary:         #1e293b;
-  --text-secondary:       #64748b;
-  --text-tertiary:        #94a3b8;
+  /* Shadows */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-elevated: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
 @layer base {
+  :root {
+    --bg-base: #0f172a;
+    --bg-surface: #1e293b;
+    --bg-surface-elevated: #334155;
+    --border-default: #334155;
+    --border-subtle: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-tertiary: #64748b;
+  }
+
+  .light {
+    --bg-base: #f1f5f9;
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #f8fafc;
+    --border-default: #e2e8f0;
+    --border-subtle: #f1f5f9;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-tertiary: #94a3b8;
+  }
+
   html {
     scroll-behavior: smooth;
   }
@@ -110,103 +112,93 @@
   }
 
   ::selection {
-    background-color: #e0c16c;
-    color: #0f172a;
+    background-color: var(--color-primary-600);
+    color: #ffffff;
   }
 }
 
 @layer components {
-  /* ─── Buttons ─── */
+  /* Button styles */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-900 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 active:bg-primary-800
-           hover:shadow-lg hover:shadow-primary-600/25;
+    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-400 active:bg-primary-800;
   }
 
   .btn-secondary {
-    @apply bg-surface-700 text-surface-100 hover:bg-surface-600 focus:ring-surface-500 border border-surface-600
-           light:bg-surface-100 light:text-surface-700 light:hover:bg-surface-200 light:border-surface-200;
+    @apply bg-surface-700 text-surface-100 hover:bg-surface-600 focus:ring-surface-400 border border-surface-600 light:bg-surface-100 light:text-surface-700 light:hover:bg-surface-200 light:border-surface-300;
   }
 
   .btn-accent {
-    @apply bg-accent-500 text-black font-semibold hover:bg-accent-400 focus:ring-accent-500 active:bg-accent-600
-           hover:shadow-lg hover:shadow-accent-500/30;
+    @apply bg-accent-500 text-black hover:bg-accent-600 focus:ring-accent-400 active:bg-accent-700;
   }
 
   .btn-ghost {
-    @apply bg-transparent text-surface-400 hover:bg-surface-800 hover:text-surface-100 focus:ring-surface-600
-           light:text-surface-600 light:hover:bg-surface-100 light:hover:text-surface-900;
+    @apply bg-transparent text-surface-400 hover:bg-surface-800 focus:ring-surface-500 light:text-surface-600 light:hover:bg-surface-100;
   }
 
   .btn-danger {
-    @apply bg-accent-600 text-black hover:bg-accent-700 focus:ring-accent-500 hover:shadow-lg hover:shadow-accent-600/25;
+    @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
   }
 
-  /* ─── Inputs ─── */
+  /* Input styles */
   .input {
-    @apply w-full px-3.5 py-2.5 text-sm border rounded-lg transition-colors
-           bg-surface-800 text-surface-100 border-surface-600
-           placeholder:text-surface-500
-           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
-           light:bg-white light:text-surface-900 light:border-surface-300
-           light:placeholder:text-surface-400;
+    @apply w-full px-3.5 py-2.5 text-sm border border-surface-600 rounded-lg bg-surface-800 text-surface-100 placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors light:bg-white light:text-surface-900 light:border-surface-300;
   }
 
   .input-error {
-    @apply border-accent-500 focus:ring-accent-500 focus:border-accent-500;
+    @apply border-red-500 focus:ring-red-500 focus:border-red-500;
   }
 
   .label {
-    @apply block text-sm font-medium text-surface-300 mb-1.5
-           light:text-surface-700;
+    @apply block text-sm font-medium text-surface-300 mb-1.5 light:text-surface-700;
   }
 
   .label-required::after {
     content: " *";
-    @apply text-accent-400;
+    @apply text-red-500;
   }
 
-  /* ─── Cards ─── */
+  /* Card styles */
   .card {
-    background-color: var(--bg-surface);
-    @apply rounded-xl border transition-shadow;
-    border-color: var(--border-default);
-    box-shadow: var(--shadow-card-dark);
-  }
-  .card:hover {
-    box-shadow: var(--shadow-elevated);
+    @apply bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-elevated)];
   }
 
   .card-elevated {
-    background-color: var(--bg-surface-elevated);
-    @apply rounded-xl border;
-    border-color: var(--border-default);
-    box-shadow: var(--shadow-elevated);
+    @apply bg-[var(--bg-surface-elevated)] rounded-xl border border-[var(--border-default)] shadow-[var(--shadow-elevated)];
   }
 
-  /* ─── Status Badges ─── */
+  /* Status badges */
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full;
+    @apply inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full;
   }
 
-  /* Dark mode default */
-  .badge-new        { @apply bg-primary-900/50 text-primary-300 ring-1 ring-primary-700/50; }
-  .badge-in-progress{ @apply bg-accent-900/50  text-accent-300  ring-1 ring-accent-700/50; }
-  .badge-quoted     { @apply bg-purple-900/50  text-purple-300  ring-1 ring-purple-700/50; }
-  .badge-confirmed  { @apply bg-green-900/50   text-green-300   ring-1 ring-green-700/50; }
-  .badge-cancelled  { @apply bg-accent-900/50   text-accent-300   ring-1 ring-accent-700/50; }
-  .badge-completed  { @apply bg-surface-700    text-surface-300 ring-1 ring-surface-600; }
+  .badge-new {
+    @apply bg-primary-900/50 text-primary-300 light:bg-primary-100 light:text-primary-800;
+  }
 
-  /* Light mode overrides */
-  .light .badge-new        { @apply bg-primary-100 text-primary-800 ring-primary-200; }
-  .light .badge-in-progress{ @apply bg-accent-100  text-accent-900  ring-accent-200; }
-  .light .badge-quoted     { @apply bg-purple-100  text-purple-800  ring-purple-200; }
-  .light .badge-confirmed  { @apply bg-green-100   text-green-800   ring-green-200; }
-  .light .badge-cancelled  { @apply bg-accent-100   text-accent-800   ring-accent-200; }
-  .light .badge-completed  { @apply bg-surface-200 text-surface-700 ring-surface-300; }
+  .badge-in-progress {
+    @apply bg-accent-900/50 text-accent-300 light:bg-accent-100 light:text-accent-800;
+  }
+
+  .badge-quoted {
+    @apply bg-purple-900/50 text-purple-300 light:bg-purple-100 light:text-purple-800;
+  }
+
+  .badge-confirmed {
+    @apply bg-green-900/50 text-green-300 light:bg-green-100 light:text-green-800;
+  }
+
+  .badge-cancelled {
+    @apply bg-red-900/50 text-red-300 light:bg-red-100 light:text-red-800;
+  }
+
+  .badge-completed {
+    @apply bg-surface-700 text-surface-300 light:bg-surface-200 light:text-surface-700;
+  }
+
 }
 
 @layer utilities {

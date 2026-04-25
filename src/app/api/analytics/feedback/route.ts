@@ -48,8 +48,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const supabase = await createClient();
 
-  // Build base query (flat — no FK constraints defined in schema)
-  let query = supabase.from("feedback").select("*");
+  // Build base query - include driver info
+  let query = supabase.from("feedback").select(`
+    *,
+    drivers(id, name, vehicle_type, vehicle_number)
+  `);
 
   // Apply filters
   const dateFrom = searchParams.get("date_from");
@@ -78,14 +81,6 @@ export async function GET(request: Request) {
   }
 
   const feedback = (feedbackData || []) as any[];
-
-  // Fetch driver info separately
-  const driverIds = feedback.map(f => f.driver_id).filter(Boolean) as string[];
-  const { data: drivers } = driverIds.length > 0
-    ? await supabase.from("drivers").select("id, name, vehicle_type, vehicle_number").in("id", driverIds)
-    : { data: [] as any[] };
-
-  const driverMap = new Map((drivers || []).map((d: any) => [d.id, d]));
 
   if (feedback.length === 0) {
     return NextResponse.json({
@@ -169,8 +164,7 @@ export async function GET(request: Request) {
   // 1. Driver Performance
   const driverStats = new Map<string, { name: string; totalScore: number; count: number; vehicleType: string }>();
   feedback.forEach((f) => {
-    const driver = f.driver_id ? driverMap.get(f.driver_id) : null;
-    const key = f.driver_id || (driver?.name ? `name-${driver.name}` : null);
+    const key = f.driver_id || (f.drivers?.name ? `name-${f.drivers.name}` : null);
     if (!key) return;
 
     const scores = [
@@ -185,10 +179,10 @@ export async function GET(request: Request) {
 
     if (!driverStats.has(key)) {
       driverStats.set(key, {
-        name: driver?.name || "Unknown Driver",
+        name: f.drivers?.name || "Unknown Driver",
         totalScore: 0,
         count: 0,
-        vehicleType: driver?.vehicle_type || "N/A"
+        vehicleType: f.drivers?.vehicle_type || "N/A"
       });
     }
 
@@ -231,9 +225,8 @@ export async function GET(request: Request) {
   // 3. Vehicle Performance
   const vehicleStats = new Map<string, { type: string; number: string; totalScore: number; count: number }>();
   feedback.forEach((f) => {
-    const driver = f.driver_id ? driverMap.get(f.driver_id) : null;
-    const vehicleName = driver?.vehicle_type || "Standard Vehicle";
-    const vehicleNo = driver?.vehicle_number || "N/A";
+    const vehicleName = f.drivers?.vehicle_type || "Standard Vehicle";
+    const vehicleNo = f.drivers?.vehicle_number || "N/A";
     const key = `${vehicleName}-${vehicleNo}`;
 
     const scores = [

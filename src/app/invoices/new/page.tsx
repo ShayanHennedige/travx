@@ -17,6 +17,7 @@ interface InvoiceData {
 
     // Customer Info
     customer_name: string;  // Agent Name
+    customer_company?: string; // Agent Company
     notes: string;          // Client Names
 
     // Tour Details
@@ -51,6 +52,7 @@ function NewInvoiceContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const itineraryId = searchParams.get("itinerary_id");
+    const isExtra = searchParams.get("type") === "extra";
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
@@ -60,6 +62,15 @@ function NewInvoiceContent() {
     // Manual inputs
     const [bankCharges, setBankCharges] = useState("0");
     const [taxPercentage, setTaxPercentage] = useState("0");
+
+    // Editable rate override
+    const [isEditingRate, setIsEditingRate] = useState(false);
+    const [editPerPerson, setEditPerPerson] = useState("");
+    const [editPax, setEditPax] = useState("");
+
+    // Extra invoice: free-form description and single amount
+    const [extraDescription, setExtraDescription] = useState("");
+    const [extraAmount, setExtraAmount] = useState("0");
 
     useEffect(() => {
         const fetchData = async () => {
@@ -136,11 +147,12 @@ function NewInvoiceContent() {
                 .maybeSingle();
 
             // Extract data
-            const agentName = (inquiry.agent_name || inquiry.agent_company)
-                ? (inquiry.agent_name || inquiry.agent_company)
-                : isGroupTour
+            const agentName = inquiry.agent_name || "";
+            const agentCompany = inquiry.agent_company || "";
+
+            const displayName = agentName || agentCompany || (isGroupTour
                     ? `${inquiry.head_first_name || ""} ${inquiry.head_last_name || ""}`.trim()
-                    : "Direct Client";
+                    : "Direct Client");
 
             const clientNames = isGroupTour
                 ? `${inquiry.head_first_name || ""} ${inquiry.head_last_name || ""}`.trim()
@@ -190,20 +202,21 @@ function NewInvoiceContent() {
                 tour_id: tour?.id || null,
                 costing_sheet_id: costing.id,
                 tour_reference: inquiry.inquiry_number || "",
-                customer_name: agentName,
+                customer_name: displayName,
+                customer_company: agentCompany,
                 notes: clientNames,
                 no_of_pax: noOfPax,
                 no_of_nights: noOfNights,
                 arriving_date: inquiry.arriving_date || "",
                 departure_date: inquiry.departure_date || "",
                 package_title: packageTitle,
-                per_person_usd: perPersonUsd,
-                subtotal: subtotal,
-                package_description: packageDescription,
+                per_person_usd: isExtra ? 0 : perPersonUsd,
+                subtotal: isExtra ? 0 : subtotal,
+                package_description: isExtra ? "" : packageDescription,
                 bank_charges: 0,
                 tax_percentage: 0,
                 tax_amount: 0,
-                total_amount: subtotal,
+                total_amount: isExtra ? 0 : subtotal,
                 invoice_date: new Date().toISOString().split("T")[0],
                 currency: "USD",
                 status: "draft",
@@ -215,13 +228,19 @@ function NewInvoiceContent() {
         fetchData();
     }, [itineraryId]);
 
+    // Calculate effective values (using overrides if editing)
+    const effectivePerPerson = isEditingRate && editPerPerson !== "" ? parseFloat(editPerPerson) || 0 : invoiceData?.per_person_usd || 0;
+    const effectivePax = isEditingRate && editPax !== "" ? parseInt(editPax) || 0 : invoiceData?.no_of_pax || 0;
+    const extraAmountNum = parseFloat(extraAmount) || 0;
+    const effectiveSubtotal = isExtra ? extraAmountNum : effectivePerPerson * effectivePax;
+
     // Calculate totals when manual inputs change
     const calculateTotals = () => {
         if (!invoiceData) return { taxAmount: 0, totalAmount: 0 };
         const bc = parseFloat(bankCharges) || 0;
         const tp = parseFloat(taxPercentage) || 0;
-        const taxAmount = (invoiceData.subtotal * tp) / 100;
-        const totalAmount = invoiceData.subtotal + bc + taxAmount;
+        const taxAmount = (effectiveSubtotal * tp) / 100;
+        const totalAmount = effectiveSubtotal + bc + taxAmount;
         return { taxAmount, totalAmount };
     };
 
@@ -239,14 +258,16 @@ function NewInvoiceContent() {
                 costing_sheet_id: invoiceData.costing_sheet_id,
                 tour_reference: invoiceData.tour_reference,
                 customer_name: invoiceData.customer_name,
+                customer_company: invoiceData.customer_company,
                 notes: clientName || "Guest",
-                package_description: invoiceData.package_description,
+                package_description: isExtra ? extraDescription : invoiceData.package_description,
                 currency: invoiceData.currency,
                 invoice_date: invoiceData.invoice_date,
                 status: "draft",
-                // Rates - use per_person as the double rate for simplicity
-                rate_dbl: invoiceData.per_person_usd,
-                qty_dbl: invoiceData.no_of_pax,
+                payment_terms: isExtra ? "extra_invoice" : null,
+                // Rates
+                rate_dbl: isExtra ? extraAmountNum : effectivePerPerson,
+                qty_dbl: isExtra ? 1 : effectivePax,
                 rate_sgl: 0,
                 qty_sgl: 0,
                 rate_tpl: 0,
@@ -254,12 +275,12 @@ function NewInvoiceContent() {
                 rate_qud: 0,
                 qty_qud: 0,
                 // Calculations
-                subtotal: invoiceData.subtotal,
+                subtotal: effectiveSubtotal,
                 bank_charges: parseFloat(bankCharges) || 0,
                 tax_percentage: parseFloat(taxPercentage) || 0,
                 tax_amount: taxAmount,
                 total_amount: totalAmount,
-                no_of_pax: invoiceData.no_of_pax,
+                no_of_pax: isExtra ? invoiceData.no_of_pax : effectivePax,
             };
 
             const response = await fetch("/api/customer-invoices", {
@@ -301,7 +322,7 @@ function NewInvoiceContent() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-100">
+            <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
                     <p className="text-surface-500">Loading invoice data...</p>
@@ -326,11 +347,13 @@ function NewInvoiceContent() {
         <div className="max-w-3xl mx-auto p-6">
             <Card className="overflow-hidden">
                 {/* Header */}
-                <div className="bg-linear-to-r from-surface-800 to-surface-900 px-6 py-4">
+                <div className={`px-6 py-4 ${isExtra ? "bg-gradient-to-r from-amber-700 to-amber-800" : "bg-gradient-to-r from-surface-800 to-surface-900"}`}>
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-xl font-bold text-white">Create Invoice</h1>
-                            <p className="text-surface-300 text-sm">Review details and enter charges</p>
+                            <h1 className="text-xl font-bold text-white">{isExtra ? "Create Extra Invoice" : "Create Invoice"}</h1>
+                            <p className={`text-sm ${isExtra ? "text-amber-200" : "text-surface-300"}`}>
+                                {isExtra ? "Enter a custom description and amount for this additional invoice" : "Review details and enter charges"}
+                            </p>
                         </div>
                         <Button variant="secondary" size="sm" onClick={() => router.back()}>
                             Cancel
@@ -358,6 +381,10 @@ function NewInvoiceContent() {
                                 <p className="text-sm font-medium text-surface-900">{invoiceData.customer_name}</p>
                             </div>
                             <div>
+                                <label className="text-[10px] font-bold text-surface-400 uppercase">Name of Agent Company</label>
+                                <p className="text-sm font-medium text-surface-900">{invoiceData.customer_company || "-"}</p>
+                            </div>
+                            <div>
                                 <label className="text-[10px] font-bold text-surface-400 uppercase">No of Pax</label>
                                 <p className="text-sm font-medium text-surface-900">{invoiceData.no_of_pax.toString().padStart(2, '0')}</p>
                             </div>
@@ -380,17 +407,107 @@ function NewInvoiceContent() {
 
                     {/* Package Description */}
                     <div className="border border-surface-200 rounded-lg overflow-hidden">
-                        <div className="bg-surface-100 px-4 py-2 flex justify-between items-center">
+                        <div className={`px-4 py-2 flex justify-between items-center ${isExtra ? "bg-amber-50 border-b border-amber-200" : "bg-surface-100"}`}>
                             <span className="text-xs font-bold text-surface-700">Description</span>
-                            <span className="text-xs font-bold text-surface-700">Amount in USD</span>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-surface-700">Amount in USD</span>
+                                {!isExtra && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!isEditingRate && invoiceData) {
+                                                setEditPerPerson(invoiceData.per_person_usd.toString());
+                                                setEditPax(invoiceData.no_of_pax.toString());
+                                            }
+                                            setIsEditingRate(!isEditingRate);
+                                        }}
+                                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${isEditingRate ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-primary-50 text-primary-600 hover:bg-primary-100"}`}
+                                    >
+                                        {isEditingRate ? "✓ Using Custom" : "Edit"}
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                        <div className="p-4 flex justify-between items-start">
-                            <div className="whitespace-pre-line text-sm text-surface-700">
-                                {invoiceData.package_description}
-                            </div>
-                            <div className="text-lg font-bold text-surface-900 ml-4">
-                                {invoiceData.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
+                        <div className="p-4">
+                            {isExtra ? (
+                                /* Extra Invoice: Free-form description + single amount */
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-surface-600 mb-1.5">Invoice Description</label>
+                                        <textarea
+                                            value={extraDescription}
+                                            onChange={(e) => setExtraDescription(e.target.value)}
+                                            placeholder="Enter the description for this extra invoice (e.g., Additional excursion charges, Early check-in fees, etc.)"
+                                            className="w-full px-3 py-2.5 border border-surface-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none"
+                                            rows={4}
+                                        />
+                                    </div>
+                                    <div className="flex items-end gap-4">
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-medium text-surface-600 mb-1.5">Amount (USD)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={extraAmount}
+                                                onChange={(e) => setExtraAmount(e.target.value)}
+                                                placeholder="0.00"
+                                                className="w-full px-3 py-2.5 border border-surface-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                                            />
+                                        </div>
+                                        <div className="flex-shrink-0 pb-0.5">
+                                            <span className="text-lg font-bold text-amber-700">
+                                                {effectiveSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : isEditingRate ? (
+                                <div className="space-y-3">
+                                    <div className="whitespace-pre-line text-sm text-surface-700 mb-3">
+                                        {invoiceData.package_description}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">Per Person (USD)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={editPerPerson}
+                                                onChange={(e) => setEditPerPerson(e.target.value)}
+                                                className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-amber-700 uppercase mb-1">No. of Pax</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                step="1"
+                                                value={editPax}
+                                                onChange={(e) => setEditPax(e.target.value)}
+                                                className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-2">
+                                        <span className="text-xs text-surface-500">Auto-calculated: USD {(invoiceData.per_person_usd * invoiceData.no_of_pax).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                        <span className="text-lg font-bold text-amber-700">
+                                            {effectiveSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex justify-between items-start">
+                                    <div className="whitespace-pre-line text-sm text-surface-700">
+                                        {invoiceData.package_description}
+                                    </div>
+                                    <div className="text-lg font-bold text-surface-900 ml-4">
+                                        {effectiveSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -434,7 +551,7 @@ function NewInvoiceContent() {
 
                             <div className="flex justify-between text-sm">
                                 <span className="text-surface-600">Sub Total</span>
-                                <span className="font-medium">{invoiceData.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                <span className="font-medium">{effectiveSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-surface-600">Bank Charges</span>
@@ -488,7 +605,7 @@ function NewInvoiceContent() {
 export default function NewInvoicePage() {
     return (
         <Suspense fallback={
-            <div className="flex items-center justify-center min-h-100">
+            <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
                     <p className="text-surface-500">Loading...</p>

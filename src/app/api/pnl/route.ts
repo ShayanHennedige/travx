@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { pnlRecordSchema, calculatePnlSummary } from "@/lib/validations/invoice";
 
+const INCOME_STATUSES = ["confirmed", "sent", "paid", "overdue"] as const;
+const REF_PREFIX = "ref:";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 // GET - Get PNL records with optional filtering or calculate for a tour
 export async function GET(request: Request) {
     const supabase = await createClient();
@@ -13,26 +17,108 @@ export async function GET(request: Request) {
 
     // If calculate_for is provided, calculate PNL from linked invoices/vouchers
     if (calculateFor) {
-        // Get income from customer invoices (confirmed or paid)
-        const { data: invoices } = await supabase
+        const isReferenceLookup = calculateFor.startsWith(REF_PREFIX) || !UUID_RE.test(calculateFor);
+        const referenceValue = calculateFor.startsWith(REF_PREFIX)
+            ? decodeURIComponent(calculateFor.slice(REF_PREFIX.length))
+            : calculateFor;
+
+        // Get income from issued customer invoices
+        let invoiceQuery = supabase
             .from("customer_invoices")
-            .select("total_amount, status")
-            .eq("tour_id", calculateFor)
-            .in("status", ["confirmed", "paid"]);
+            .select("total_amount, status, tour_reference, costing_sheet_id")
+            .in("status", INCOME_STATUSES as any);
 
-        // Get expenses from payment vouchers (all linked to tour)
-        const { data: vouchers } = await supabase
+        invoiceQuery = isReferenceLookup
+            ? invoiceQuery.eq("tour_reference", referenceValue)
+            : invoiceQuery.eq("tour_id", calculateFor);
+
+        const { data: invoices } = await invoiceQuery;
+
+        // Get expenses from payment vouchers (excluding admin category)
+        let voucherQuery = supabase
             .from("payment_vouchers")
-            .select("total_usd, payee_type")
-            .eq("tour_id", calculateFor);
+            .select("total_usd, payee_type, tour_reference, voucher_category")
+            .neq("voucher_category", "admin");
 
-        const customer_invoice_total = invoices?.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0;
+        voucherQuery = isReferenceLookup
+            ? voucherQuery.eq("tour_reference", referenceValue)
+            : voucherQuery.eq("tour_id", calculateFor);
+
+        const { data: vouchers } = await voucherQuery;
+
+        let costingIncome = 0;
+        let logSheetDriverUSD = 0;
+
+        if (isReferenceLookup) {
+            const { data: inquiry } = await supabase
+                .from("inquiries")
+                .select("id")
+                .eq("inquiry_number", referenceValue)
+                .maybeSingle();
+
+            const { data: groupInquiry } = await supabase
+                .from("group_inquiries")
+                .select("id")
+                .eq("inquiry_number", referenceValue)
+                .maybeSingle();
+
+            let itineraryQuery = supabase
+                .from("itineraries")
+                .select("id")
+                .order("created_at", { ascending: false })
+                .limit(1);
+
+            if (inquiry?.id) {
+                itineraryQuery = itineraryQuery.eq("inquiry_id", inquiry.id);
+            } else if (groupInquiry?.id) {
+                itineraryQuery = itineraryQuery.eq("group_inquiry_id", groupInquiry.id);
+            }
+
+            const { data: itinerary } = await itineraryQuery.maybeSingle();
+
+            if (itinerary?.id) {
+                const { data: costing } = await supabase
+                    .from("tour_costing_sheets")
+                    .select("per_person_usd, total_usd")
+                    .eq("itinerary_id", itinerary.id)
+                    .maybeSingle();
+                costingIncome = Number(costing?.total_usd || 0) || Number(costing?.per_person_usd || 0) || 0;
+            }
+        } else {
+            const { data: tour } = await supabase
+                .from("tours")
+                .select("itinerary_id, log_sheet_finalized, log_sheet_data")
+                .eq("id", calculateFor)
+                .maybeSingle();
+
+            if (tour?.itinerary_id) {
+                const { data: costing } = await supabase
+                    .from("tour_costing_sheets")
+                    .select("per_person_usd, total_usd")
+                    .eq("itinerary_id", tour.itinerary_id)
+                    .maybeSingle();
+                costingIncome = Number(costing?.total_usd || 0) || Number(costing?.per_person_usd || 0) || 0;
+            }
+
+            // Read driver expenses from finalized log sheet (ground truth)
+            if ((tour as any).log_sheet_data?.totalExpenses) {
+                const logSheetTotalLKR = (tour as any).log_sheet_data.totalExpenses;
+                logSheetDriverUSD = Math.round((logSheetTotalLKR / 300) * 100) / 100;
+            }
+        }
+
+        const invoiceIncome = invoices?.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0;
+        const customer_invoice_total = costingIncome > 0 ? costingIncome : invoiceIncome;
 
         // Updated expense categories: Hotel, Driver, Miscellaneous
         const hotel_expenses = vouchers?.filter(v => v.payee_type === "Hotel")
             .reduce((sum, v) => sum + (v.total_usd || 0), 0) || 0;
-        const driver_expenses = vouchers?.filter(v => v.payee_type === "Driver" || v.payee_type === "Staff")
+        const driver_expenses_from_vouchers = vouchers?.filter(v => v.payee_type === "Driver" || v.payee_type === "Staff")
+            .filter(v => !(logSheetDriverUSD > 0 && v.voucher_category === "transport"))
             .reduce((sum, v) => sum + (v.total_usd || 0), 0) || 0;
+
+        // Use log sheet driver expenses if available (ground truth) + any other non-transport vouchers
+        const driver_expenses = logSheetDriverUSD + driver_expenses_from_vouchers;
         const misc_expenses = vouchers?.filter(v =>
             v.payee_type === "Miscellaneous" || v.payee_type === "Supplier" || v.payee_type === "Other"
         ).reduce((sum, v) => sum + (v.total_usd || 0), 0) || 0;
@@ -41,7 +127,8 @@ export async function GET(request: Request) {
         const net_profit = customer_invoice_total - total_expenses;
 
         const pnlData = {
-            tour_id: calculateFor,
+            tour_id: isReferenceLookup ? null : calculateFor,
+            tour_reference: isReferenceLookup ? referenceValue : invoices?.[0]?.tour_reference,
             customer_invoice_total,
             hotel_expenses,
             driver_expenses,

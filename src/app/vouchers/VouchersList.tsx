@@ -5,6 +5,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Button, Badge } from "@/components/ui";
 import { useRouter } from "next/navigation";
+import { AdminPinModal } from "@/components/AdminPinModal";
 
 interface Voucher {
   id: string;
@@ -16,6 +17,10 @@ interface Voucher {
   no_of_nights: number;
   no_of_rooms: number;
   room_type: string;
+  rooms_sgl?: number;
+  rooms_dbl?: number;
+  rooms_tpl?: number;
+  rooms_qtpl?: number;
   meal_plan: string;
   status: string;
   is_amendment: boolean;
@@ -36,6 +41,16 @@ type StatusFilter = "all" | "draft" | "confirmed" | "amended" | "cancelled";
 
 export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
   const router = useRouter();
+
+  const formatRoomTypes = (voucher: Voucher) => {
+    const parts = [];
+    if (voucher.rooms_sgl) parts.push(`${voucher.rooms_sgl} SGL`);
+    if (voucher.rooms_dbl) parts.push(`${voucher.rooms_dbl} DBL`);
+    if (voucher.rooms_tpl) parts.push(`${voucher.rooms_tpl} TPL`);
+    if (voucher.rooms_qtpl) parts.push(`${voucher.rooms_qtpl} QUAD`);
+    return parts.length > 0 ? parts.join(" ") : `${voucher.no_of_rooms} ${voucher.room_type || ""}`;
+  };
+
   const [vouchers, setVouchers] = useState(initialVouchers);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -44,6 +59,7 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
   const [completingGroupId, setCompletingGroupId] = useState<string | null>(null);
   const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
   const [downloadingRoomingList, setDownloadingRoomingList] = useState<string | null>(null);
+  const [viewingRoomingList, setViewingRoomingList] = useState<string | null>(null);
 
   const handleCompleteAll = async (groupKey: string, voucherIds: string[]) => {
     if (!confirm("Are you sure you want to mark all vouchers in this group as COMPLETED?")) {
@@ -125,6 +141,10 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
 
     Object.keys(groups).forEach((key) => {
       const group = groups[key];
+      
+      // Sort vouchers within group by check-in date (ascending)
+      group.vouchers.sort((a, b) => new Date(a.check_in_date).getTime() - new Date(b.check_in_date).getTime());
+
       const statuses = group.vouchers.map(v => v.status).filter(Boolean);
 
       if (statuses.length > 0 && statuses.every(s => s === "completed")) {
@@ -137,9 +157,18 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
     });
 
     return Object.entries(groups).sort(([, a], [, b]) => {
-      const latestA = Math.max(...a.vouchers.map((v) => new Date(v.created_at).getTime()));
-      const latestB = Math.max(...b.vouchers.map((v) => new Date(v.created_at).getTime()));
-      return latestB - latestA;
+      // Sort groups by the earliest check-in date (descending - latest/future trips first)
+      const earliestA = Math.min(...a.vouchers.map((v) => new Date(v.check_in_date).getTime()));
+      const earliestB = Math.min(...b.vouchers.map((v) => new Date(v.check_in_date).getTime()));
+      
+      // If check-in dates are equal, fallback to created_at
+      if (earliestA === earliestB) {
+         const createdA = Math.max(...a.vouchers.map((v) => new Date(v.created_at).getTime()));
+         const createdB = Math.max(...b.vouchers.map((v) => new Date(v.created_at).getTime()));
+         return createdB - createdA;
+      }
+
+      return earliestB - earliestA;
     });
   }, [filteredVouchers]);
 
@@ -212,21 +241,52 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
     }
   };
 
-  const handleDownloadRoomingList = async (groupInquiryId: string, inquiryNumber: string) => {
-    setDownloadingRoomingList(groupInquiryId);
+
+  const handleViewRoomingList = async (groupInquiryId: string, inquiryNumber: string, voucherId?: string) => {
+    setViewingRoomingList(voucherId || groupInquiryId);
     try {
-      const response = await fetch(`/api/rooming-list/${groupInquiryId}/pdf`);
+      const urlPath = voucherId 
+        ? `/api/rooming-list/${groupInquiryId}/pdf?voucher_id=${voucherId}`
+        : `/api/rooming-list/${groupInquiryId}/pdf`;
+        
+      const response = await fetch(urlPath);
+      if (!response.ok) throw new Error("Failed to generate rooming list PDF");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+
+      // We don't revoke the URL immediately because the new tab needs time to load it.
+      // A more robust app would use a dedicated PDF view route instead of object URLs, 
+      // but this works for rapid previewing.
+    } catch (error) {
+      console.error("View Rooming List error:", error);
+      alert("Failed to view rooming list. Please try again.");
+    } finally {
+      setViewingRoomingList(null);
+    }
+  };
+
+  const handleDownloadRoomingList = async (groupInquiryId: string, inquiryNumber: string, voucherId?: string) => {
+    // If voucherId is present, we use it to track loading state and pass it to API
+    setDownloadingRoomingList(voucherId || groupInquiryId);
+    try {
+      const urlPath = voucherId 
+        ? `/api/rooming-list/${groupInquiryId}/pdf?voucher_id=${voucherId}`
+        : `/api/rooming-list/${groupInquiryId}/pdf`;
+        
+      const response = await fetch(urlPath);
       if (!response.ok) throw new Error("Failed to generate rooming list PDF");
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `RoomingList-${inquiryNumber}.pdf`;
+      a.download = `RoomingList-${inquiryNumber}${voucherId ? '-Hotel' : ''}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
     } catch (error) {
       console.error("Rooming list download error:", error);
       alert("Failed to download rooming list");
@@ -234,6 +294,8 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
       setDownloadingRoomingList(null);
     }
   };
+
+
 
   if (vouchers.length === 0) {
     return (
@@ -383,33 +445,8 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 p-1 bg-white rounded-xl border border-slate-100 shadow-sm">
-                      {group.type === "group" && group.groupInquiryId && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownloadRoomingList(group.groupInquiryId!, group.inquiryNumber)
-                          }}
-                          disabled={downloadingRoomingList === group.groupInquiryId}
-                          className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Download Rooming List"
-                        >
-                          {downloadingRoomingList === group.groupInquiryId ? (
-                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                          ) : (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                          )}
-                        </button>
-                      )}
-
-                      <Link
-                        href={group.type === "group" ? `/group-inquiries/${group.groupInquiryId}` : `/inquiries/${group.inquiryId}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors" title="View Inquiry">
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                        </button>
-                      </Link>
+                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
+                      {/* Actions moved to individual vouchers */}
                     </div>
                   </div>
                 </div>
@@ -459,7 +496,7 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                               <span className="w-1 h-1 rounded-full bg-slate-300" />
                               <span>{voucher.no_of_nights} Night{voucher.no_of_nights > 1 ? "s" : ""}</span>
                               <span className="w-1 h-1 rounded-full bg-slate-300" />
-                              <span>{voucher.no_of_rooms} {voucher.room_type}</span>
+                              <span>{formatRoomTypes(voucher)}</span>
                               <span className="w-1 h-1 rounded-full bg-slate-300" />
                               <span>{voucher.meal_plan}</span>
                             </div>
@@ -467,7 +504,49 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 opacity-100 md:opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">
+                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 opacity-100 md:opacity-0 group-hover/card:opacity-100 transition-opacity duration-200">
+                          {/* Rooming List Actions for Group Vouchers */}
+                          {group.type === "group" && group.groupInquiryId && (
+                            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-1 py-1 rounded-xl mr-2">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 hidden lg:block">Rooming List</span>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Link href={`/vouchers/${voucher.id}/rooming-list`}>
+                                  <button className="flex items-center gap-1.5 px-2 py-1 text-xs font-bold text-slate-600 hover:text-amber-700 hover:bg-amber-100 rounded-lg transition-all" title="Edit Rooming List">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                    <span className="hidden sm:inline">Edit</span>
+                                  </button>
+                                </Link>
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleViewRoomingList(group.groupInquiryId!, voucher.inquiry_number, voucher.id); }}
+                                disabled={viewingRoomingList === voucher.id}
+                                className="flex items-center gap-1.5 px-2 py-1 text-xs font-bold text-slate-600 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-all"
+                                title="View Rooming List"
+                              >
+                                {viewingRoomingList === voucher.id ? (
+                                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                                ) : (
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                )}
+                                <span className="hidden sm:inline">View</span>
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDownloadRoomingList(group.groupInquiryId!, voucher.inquiry_number, voucher.id); }}
+                                disabled={downloadingRoomingList === voucher.id}
+                                className="flex items-center gap-1.5 px-2 py-1 text-xs font-bold text-slate-600 hover:text-green-700 hover:bg-green-100 rounded-lg transition-all"
+                                title="Download Rooming List PDF"
+                              >
+                                {downloadingRoomingList === voucher.id ? (
+                                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                                ) : (
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                )}
+                                <span className="hidden sm:inline">PDF</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Regular Voucher Actions */}
                           <button
                             onClick={() => handleDownloadPDF(voucher.id, voucher.voucher_number)}
                             disabled={downloadingPDF === voucher.id}
@@ -480,14 +559,19 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
                             )}
                             PDF
                           </button>
-                          <Link href={`/vouchers/${voucher.id}`}>
+                          <Link href={`/api/vouchers/${voucher.id}/pdf?view=true`} target="_blank">
                             <button className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-primary-200 hover:text-primary-700 hover:shadow-md rounded-xl transition-all">
                               View
                             </button>
                           </Link>
+                          <Link href={`/vouchers/${voucher.id}?edit=true`}>
+                            <button className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-blue-200 hover:text-blue-700 hover:shadow-md rounded-xl transition-all">
+                              Edit
+                            </button>
+                          </Link>
                           <button
                             onClick={() => setDeleteConfirm(voucher.id)}
-                            className="p-2 text-slate-400 hover:text-accent-500 hover:bg-accent-500/10 rounded-xl transition-colors"
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                           </button>
@@ -518,36 +602,13 @@ export function VouchersList({ vouchers: initialVouchers }: VouchersListProps) {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-[2rem] shadow-2xl max-w-md w-full p-8 scale-100 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-accent-500/10 flex items-center justify-center border border-accent-500/20">
-                <svg className="w-6 h-6 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">Delete Voucher</h3>
-                <p className="text-sm text-slate-500 font-medium">This action cannot be undone</p>
-              </div>
-            </div>
-            <p className="text-slate-600 mb-8 leading-relaxed">
-              Are you sure you want to delete this voucher? This will remove it from the system permanently.
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <Button variant="ghost" onClick={() => setDeleteConfirm(null)} disabled={isDeleting} className="rounded-xl hover:bg-slate-50 text-slate-600">
-                Cancel
-              </Button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                disabled={isDeleting}
-                className="px-6 py-2.5 bg-accent-600 hover:bg-accent-700 text-black rounded-xl font-bold text-sm transition-all shadow-lg shadow-accent-500/20 disabled:opacity-50 disabled:shadow-none"
-              >
-                {isDeleting ? "Deleting..." : "Delete Voucher"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminPinModal
+            isOpen={!!deleteConfirm}
+            title="Authorize Deletion"
+            description="Are you sure you want to delete this voucher? This will remove it from the system permanently."
+            onAuthorized={() => handleDelete(deleteConfirm)}
+            onClose={() => setDeleteConfirm(null)}
+        />
       )}
     </div>
   );

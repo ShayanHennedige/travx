@@ -17,21 +17,6 @@ const countryOptions = countries.map((country) => ({
   label: country,
 }));
 
-const hotelTypeOptions = hotelTypes.map((type) => ({
-  value: type,
-  label: type,
-}));
-
-const roomCategoryOptions = roomCategories.map((cat) => ({
-  value: cat,
-  label: cat,
-}));
-
-const mealPlanOptions = mealPlans.map((plan) => ({
-  value: plan,
-  label: plan,
-}));
-
 export function GroupInquiryForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -49,10 +34,9 @@ export function GroupInquiryForm() {
   // Group members state
   const [adultMembers, setAdultMembers] = useState<GroupMember[]>([{ full_name: "" }]);
   const [childMembers, setChildMembers] = useState<GroupMember[]>([]);
-  const [arrangedByAgent, setArrangedByAgent] = useState(false);
 
   const [formData, setFormData] = useState({
-    arranged_by_agent: false,
+    is_tour_agent: false,
     agent_name: "",
     agent_email: "",
     agent_company: "",
@@ -63,18 +47,16 @@ export function GroupInquiryForm() {
     client_email: "",
     country: "",
     arriving_date: "",
+    arrival_flight_no: "",
+    arrival_time: "",
     departure_date: "",
-    inbound_flight_no: "",
-    inbound_arrival_date: "",
-    inbound_arrival_time: "",
-    outbound_flight_no: "",
-    outbound_departure_date: "",
-    outbound_departure_time: "",
+    departure_flight_no: "",
+    departure_time: "",
     no_of_adults: 1,
     no_of_children: 0,
-    hotel_type: "",
-    room_category: "",
-    meal_plan: "",
+    hotel_type: [] as string[],
+    room_category: [] as string[],
+    meal_plan: [] as string[],
     client_desires: "",
   });
 
@@ -107,32 +89,29 @@ export function GroupInquiryForm() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type } = e.target as any;
+    const target = e.target as HTMLInputElement;
+    const value = target.type === "checkbox" ? target.checked : target.value;
+    const name = target.name;
+
     setFormData((prev) => {
-      const newData = { ...prev, [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value };
+      const newData = { ...prev, [name]: value };
 
       // Sync first adult member with Head of Group details if they change
       if (name === "head_first_name" || name === "head_last_name" || name === "head_passport_no") {
-        setAdultMembers(prevMembers => {
+        setAdultMembers((prevMembers) => {
           const updated = [...prevMembers];
           if (updated.length > 0) {
-            const firstName = name === "head_first_name" ? value : newData.head_first_name;
-            const lastName = name === "head_last_name" ? value : newData.head_last_name;
-            const passport = name === "head_passport_no" ? value : newData.head_passport_no;
-
+            const firstName = name === "head_first_name" ? String(value) : newData.head_first_name;
+            const lastName = name === "head_last_name" ? String(value) : newData.head_last_name;
+            const passport = name === "head_passport_no" ? String(value) : newData.head_passport_no;
             updated[0] = {
               ...updated[0],
               full_name: `${firstName} ${lastName}`.trim(),
-              passport_no: passport
+              passport_no: passport,
             };
           }
           return updated;
         });
-      }
-
-      // Update arrangedByAgent state
-      if (name === "arranged_by_agent") {
-        setArrangedByAgent(newData.arranged_by_agent as boolean);
       }
 
       return newData;
@@ -168,14 +147,25 @@ export function GroupInquiryForm() {
     setFieldErrors((prev) => ({ ...prev, activities: "" }));
   };
 
+  const toggleArrayField = (field: "hotel_type" | "room_category" | "meal_plan", value: string) => {
+    setFormData((prev) => {
+      const currentArr = prev[field];
+      const newArr = currentArr.includes(value)
+        ? currentArr.filter((v) => v !== value)
+        : [...currentArr, value];
+      return { ...prev, [field]: newArr };
+    });
+    setFieldErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
   // Calculate number of nights
   const calculateNights = () => {
     if (formData.arriving_date && formData.departure_date) {
-      const arriving = new Date(formData.arriving_date + 'T00:00:00');
-      const departure = new Date(formData.departure_date + 'T00:00:00');
+      const arriving = new Date(formData.arriving_date);
+      const departure = new Date(formData.departure_date);
       const diffTime = departure.getTime() - arriving.getTime();
-      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-      return Math.max(0, diffDays);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays > 0 ? diffDays : 0;
     }
     return 0;
   };
@@ -192,8 +182,6 @@ export function GroupInquiryForm() {
     try {
       const dataToValidate = {
         ...formData,
-        inbound_arrival_date: formData.inbound_arrival_date || formData.arriving_date || "",
-        outbound_departure_date: formData.outbound_departure_date || formData.departure_date || "",
         rooms_dbl: roomsDbl,
         rooms_sgl: roomsSgl,
         rooms_tpl: roomsTpl,
@@ -264,55 +252,43 @@ export function GroupInquiryForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="p-4 bg-accent-500/10 border border-accent-500/30 rounded-lg">
-          <p className="text-sm text-accent-600">{error}</p>
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-700">{error}</p>
         </div>
       )}
 
-      {/* Trip Arrangement Type */}
+      {/* Travel Agent Details */}
       <div className="card p-6 animate-slide-up">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-            <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+            <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
           <div>
             <h3 className="text-lg font-semibold text-surface-900">
-              Trip Arrangement
+              Travel Agent Details
             </h3>
-            <p className="text-sm text-surface-500">How is this trip being arranged?</p>
+            <p className="text-sm text-surface-500">Details about the booking source</p>
           </div>
         </div>
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            name="arranged_by_agent"
-            checked={arrangedByAgent}
-            onChange={handleChange}
-            className="w-5 h-5 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
-          />
-          <span className="text-sm font-medium text-surface-700">This trip is arranged by a travel agent</span>
-        </label>
-      </div>
 
-      {/* Travel Agent Details - Conditionally Visible */}
-      {arrangedByAgent && (
-        <div className="card p-6 animate-slide-up">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-              <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-surface-900">
-                Travel Agent Details
-              </h3>
-              <p className="text-sm text-surface-500">Agent information for this booking</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mb-4 flex items-center">
+          <input
+            id="is_tour_agent"
+            name="is_tour_agent"
+            type="checkbox"
+            checked={formData.is_tour_agent}
+            onChange={handleChange}
+            className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+          />
+          <label htmlFor="is_tour_agent" className="ml-2 block text-sm text-gray-900">
+            This trip is arranged by a tour agent
+          </label>
+        </div>
+
+        {formData.is_tour_agent && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
             <Input
               label="Agent Name"
               name="agent_name"
@@ -320,7 +296,6 @@ export function GroupInquiryForm() {
               onChange={handleChange}
               error={fieldErrors.agent_name}
               placeholder="Enter agent name"
-              required={arrangedByAgent}
             />
             <Input
               label="Agent Email"
@@ -330,7 +305,6 @@ export function GroupInquiryForm() {
               onChange={handleChange}
               error={fieldErrors.agent_email}
               placeholder="agent@example.com"
-              required={arrangedByAgent}
             />
             <Input
               label="Agent Company"
@@ -342,8 +316,8 @@ export function GroupInquiryForm() {
               className="md:col-span-2"
             />
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Head of Group Details */}
       <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.05s" }}>
@@ -396,73 +370,96 @@ export function GroupInquiryForm() {
             error={fieldErrors.country}
             placeholder="Select client country"
           />
+          <Input
+            label="Contact Number"
+            name="contact_number"
+            value={formData.contact_number}
+            onChange={handleChange}
+            error={fieldErrors.contact_number}
+            placeholder="+1 234 567 8900"
+          />
+          <Input
+            label="Client Email"
+            name="client_email"
+            type="email"
+            value={formData.client_email}
+            onChange={handleChange}
+            error={fieldErrors.client_email}
+            placeholder="client@example.com"
+          />
         </div>
       </div>
 
-
-
-      {/* Travel Dates */}
+      {/* Travel Dates & Flights */}
       <div className="card p-6 animate-slide-up" style={{ animationDelay: "0.1s" }}>
         <h3 className="text-lg font-semibold text-surface-900 mb-4">
-          Travel Dates
+          Travel Dates &amp; Flights
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Input
-            label="Arriving Date"
-            name="arriving_date"
-            type="date"
-            value={formData.arriving_date}
-            onChange={handleChange}
-            error={fieldErrors.arriving_date}
-            required
-          />
-          <Input
-            label="Arrival Flight No"
-            name="inbound_flight_no"
-            value={formData.inbound_flight_no}
-            onChange={handleChange}
-            error={fieldErrors.inbound_flight_no}
-            placeholder="e.g. UL 101"
-          />
-          <Input
-            label="Arrival Time"
-            name="inbound_arrival_time"
-            type="time"
-            value={formData.inbound_arrival_time}
-            onChange={handleChange}
-            error={fieldErrors.inbound_arrival_time}
-          />
-          <Input
-            label="Departure Date"
-            name="departure_date"
-            type="date"
-            value={formData.departure_date}
-            onChange={handleChange}
-            error={fieldErrors.departure_date}
-            required
-          />
-          <Input
-            label="Departure Flight No"
-            name="outbound_flight_no"
-            value={formData.outbound_flight_no}
-            onChange={handleChange}
-            error={fieldErrors.outbound_flight_no}
-            placeholder="e.g. UL 102"
-          />
-          <Input
-            label="Departure Time"
-            name="outbound_departure_time"
-            type="time"
-            value={formData.outbound_departure_time}
-            onChange={handleChange}
-            error={fieldErrors.outbound_departure_time}
-          />
-        </div>
 
-        <div className="mt-4 md:w-1/3">
-          <label className="label">No. of Nights</label>
-          <div className="input bg-surface-50 text-surface-700 flex items-center">
-            {calculateNights()} nights
+        <div className="space-y-4">
+          <div>
+            <h4 className="text-sm font-medium text-surface-700 mb-2">Arrival Details</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Input
+                label="Arriving Date"
+                name="arriving_date"
+                type="date"
+                value={formData.arriving_date}
+                onChange={handleChange}
+                error={fieldErrors.arriving_date}
+                required
+              />
+              <Input
+                label="Flight No"
+                name="arrival_flight_no"
+                value={formData.arrival_flight_no}
+                onChange={handleChange}
+                placeholder="e.g. UL123"
+              />
+              <Input
+                label="Arrival Time"
+                name="arrival_time"
+                type="time"
+                value={formData.arrival_time}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium text-surface-700 mb-2">Departure Details</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Input
+                label="Departure Date"
+                name="departure_date"
+                type="date"
+                value={formData.departure_date}
+                onChange={handleChange}
+                error={fieldErrors.departure_date}
+                required
+              />
+              <Input
+                label="Flight No"
+                name="departure_flight_no"
+                value={formData.departure_flight_no}
+                onChange={handleChange}
+                placeholder="e.g. UL124"
+              />
+              <Input
+                label="Departure Time"
+                name="departure_time"
+                type="time"
+                value={formData.departure_time}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="label">No. of Nights</label>
+            <div className="input bg-surface-50 text-surface-700 flex items-center w-full md:w-1/3">
+              {calculateNights()} nights
+            </div>
           </div>
         </div>
       </div>
@@ -520,14 +517,14 @@ export function GroupInquiryForm() {
         </div>
 
         {fieldErrors.adult_members && (
-          <p className="text-sm text-accent-500 mb-3">{fieldErrors.adult_members}</p>
+          <p className="text-sm text-red-600 mb-3">{fieldErrors.adult_members}</p>
         )}
 
         <div className="space-y-4">
           {adultMembers.map((member, index) => (
             <div key={index} className="p-4 border border-surface-200 rounded-xl space-y-3">
               <div className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-full bg-surface-100 flex items-center justify-center text-sm font-medium text-surface-600 shrink-0">
+                <span className="w-8 h-8 rounded-full bg-surface-100 flex items-center justify-center text-sm font-medium text-surface-600 flex-shrink-0">
                   {index + 1}
                 </span>
                 <Input
@@ -579,14 +576,14 @@ export function GroupInquiryForm() {
           </div>
 
           {fieldErrors.child_members && (
-            <p className="text-sm text-accent-500 mb-3">{fieldErrors.child_members}</p>
+            <p className="text-sm text-red-600 mb-3">{fieldErrors.child_members}</p>
           )}
 
           <div className="space-y-4">
             {childMembers.map((member, index) => (
               <div key={index} className="p-4 border border-amber-100 bg-amber-50/20 rounded-xl space-y-3">
                 <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-sm font-medium text-amber-600 shrink-0">
+                  <span className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-sm font-medium text-amber-600 flex-shrink-0">
                     {index + 1}
                   </span>
                   <Input
@@ -626,36 +623,106 @@ export function GroupInquiryForm() {
         <h3 className="text-lg font-semibold text-surface-900 mb-4">
           Accommodation Preferences
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <Select
-            label="Hotel Type"
-            name="hotel_type"
-            value={formData.hotel_type}
-            onChange={handleChange}
-            options={hotelTypeOptions}
-            error={fieldErrors.hotel_type}
-            placeholder="Select star category"
-            required
-          />
-          <Select
-            label="Room Category"
-            name="room_category"
-            value={formData.room_category}
-            onChange={handleChange}
-            options={roomCategoryOptions}
-            error={fieldErrors.room_category}
-            placeholder="Select category"
-            required
-          />
-          <Select
-            label="Meal Plan"
-            name="meal_plan"
-            value={formData.meal_plan}
-            onChange={handleChange}
-            options={mealPlanOptions}
-            error={fieldErrors.meal_plan}
-            placeholder="Select meal plan"
-          />
+        <div className="grid grid-cols-1 gap-6 mb-6">
+
+          {/* Hotel Type - Multi Select */}
+          <div>
+            <label className="label mb-2 block">Hotel Type <span className="text-red-500">*</span></label>
+            {fieldErrors.hotel_type && (
+              <p className="text-sm text-red-600 mb-2">{fieldErrors.hotel_type}</p>
+            )}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {hotelTypes.map((type) => (
+                <label
+                  key={type}
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    formData.hotel_type.includes(type)
+                      ? "border-primary-500 bg-primary-50"
+                      : "border-surface-200 hover:border-surface-300 bg-white"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.hotel_type.includes(type)}
+                    onChange={() => toggleArrayField("hotel_type", type)}
+                    className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className={`text-sm font-medium ${
+                    formData.hotel_type.includes(type) ? "text-primary-700" : "text-surface-700"
+                  }`}>
+                    {type}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Room Category - Multi Select */}
+          <div>
+            <label className="label mb-2 block">Room Category <span className="text-red-500">*</span></label>
+            {fieldErrors.room_category && (
+              <p className="text-sm text-red-600 mb-2">{fieldErrors.room_category}</p>
+            )}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {roomCategories.map((cat) => (
+                <label
+                  key={cat}
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    formData.room_category.includes(cat)
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-surface-200 hover:border-surface-300 bg-white"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.room_category.includes(cat)}
+                    onChange={() => toggleArrayField("room_category", cat)}
+                    className="w-4 h-4 rounded border-surface-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className={`text-sm font-medium ${
+                    formData.room_category.includes(cat) ? "text-blue-700" : "text-surface-700"
+                  }`}>
+                    {cat}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Meal Plan - Multi Select */}
+          <div>
+            <label className="label mb-2 block">Meal Plan <span className="text-red-500">*</span></label>
+            {fieldErrors.meal_plan && (
+              <p className="text-sm text-red-600 mb-2">{fieldErrors.meal_plan}</p>
+            )}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {mealPlans.map((plan) => (
+                <label
+                  key={plan}
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    formData.meal_plan.includes(plan)
+                      ? "border-emerald-500 bg-emerald-50"
+                      : "border-surface-200 hover:border-surface-300 bg-white"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.meal_plan.includes(plan)}
+                    onChange={() => toggleArrayField("meal_plan", plan)}
+                    className="w-4 h-4 rounded border-surface-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className={`text-sm font-medium ${
+                    formData.meal_plan.includes(plan) ? "text-emerald-700" : "text-surface-700"
+                  }`}>
+                    {plan === "BB" ? "BB (Bed & Breakfast)" :
+                      plan === "HB" ? "HB (Half Board)" :
+                        plan === "FB" ? "FB (Full Board)" :
+                          plan === "AI" ? "AI (All Inclusive)" : plan}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Room Quantities */}
@@ -673,7 +740,7 @@ export function GroupInquiryForm() {
           </div>
 
           {fieldErrors.rooms_dbl && (
-            <p className="text-sm text-accent-500 mb-3">{fieldErrors.rooms_dbl}</p>
+            <p className="text-sm text-red-600 mb-3">{fieldErrors.rooms_dbl}</p>
           )}
 
           <div className="space-y-3">
@@ -718,7 +785,7 @@ export function GroupInquiryForm() {
           Select the activities your group is interested in
         </p>
         {fieldErrors.activities && (
-          <p className="text-sm text-accent-500 mb-3">{fieldErrors.activities}</p>
+          <p className="text-sm text-red-600 mb-3">{fieldErrors.activities}</p>
         )}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {activityOptions.map((activity) => (
@@ -755,7 +822,7 @@ export function GroupInquiryForm() {
             value={formData.client_desires}
             onChange={handleChange}
             placeholder="Type client desires, places, etc. in plain English..."
-            className="input min-h-25 py-3 resize-none"
+            className="input min-h-[100px] py-3 resize-none"
           />
           <p className="text-xs text-surface-500 mt-2">
             This will help us personalize the itinerary according to client requirements.

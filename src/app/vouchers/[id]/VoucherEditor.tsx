@@ -28,20 +28,51 @@ interface VoucherEditorProps {
     room_rate_sgl?: number;
     room_rate_dbl?: number;
     room_rate_tpl?: number;
+    room_rate_qtpl?: number;
+    rooms_sgl?: number;
+    rooms_dbl?: number;
+    rooms_tpl?: number;
+    rooms_qtpl?: number;
     confirmed_by?: string;
     confirmed_date?: string;
     booked_by?: string;
     booked_date?: string;
     remarks?: string;
     status: string;
+    is_amendment?: boolean;
+    amendment_number?: number;
+    original_voucher_id?: string;
   };
+  originalVoucher?: {
+    id: string;
+    voucher_number: string;
+    hotel_name: string;
+    status: string;
+    created_at: string;
+  } | null;
 }
 
-const roomTypeOptions = [
-  { value: "SGL", label: "Single (SGL)" },
-  { value: "DBL", label: "Double (DBL)" },
-  { value: "TPL", label: "Triple (TPL)" },
-  { value: "QTPL", label: "Quadruple (QTPL)" },
+const roomCategoryOptions = [
+  { value: "Standard", label: "Standard" },
+  { value: "Deluxe", label: "Deluxe" },
+  { value: "Superior", label: "Superior" },
+  { value: "Super Deluxe", label: "Super Deluxe" },
+  { value: "Luxury", label: "Luxury" },
+  { value: "Suite", label: "Suite" },
+  { value: "Junior Suite", label: "Junior Suite" },
+  { value: "Executive", label: "Executive" },
+  { value: "Family", label: "Family" },
+  { value: "Villa", label: "Villa" },
+  { value: "Bungalow", label: "Bungalow" },
+  { value: "Cabana", label: "Cabana" },
+  { value: "Chalet", label: "Chalet" },
+  { value: "Tent", label: "Tent" },
+  { value: "Apartment", label: "Apartment" },
+  { value: "Studio", label: "Studio" },
+  { value: "Penthouse", label: "Penthouse" },
+  { value: "Connecting", label: "Connecting" },
+  { value: "Economy", label: "Economy" },
+  { value: "Budget", label: "Budget" },
 ];
 
 const mealPlanOptions = [
@@ -58,7 +89,14 @@ const statusOptions = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-export function VoucherEditor({ voucher }: VoucherEditorProps) {
+const ROOM_TYPES = [
+  { key: "sgl", label: "Single (SGL)", countField: "rooms_sgl" as const, rateField: "room_rate_sgl" as const },
+  { key: "dbl", label: "Double (DBL)", countField: "rooms_dbl" as const, rateField: "room_rate_dbl" as const },
+  { key: "tpl", label: "Triple (TPL)", countField: "rooms_tpl" as const, rateField: "room_rate_tpl" as const },
+  { key: "qtpl", label: "Quadruple (QTPL)", countField: "rooms_qtpl" as const, rateField: "room_rate_qtpl" as const },
+];
+
+export function VoucherEditor({ voucher, originalVoucher }: VoucherEditorProps) {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [isAmending, setIsAmending] = useState(false);
@@ -73,9 +111,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
     pax_adults: voucher.pax_adults,
     pax_children: voucher.pax_children,
     pax_infants: voucher.pax_infants,
-    room_type: voucher.room_type,
     room_category: voucher.room_category,
-    no_of_rooms: voucher.no_of_rooms,
     meal_plan: voucher.meal_plan,
     check_in_date: voucher.check_in_date,
     check_out_date: voucher.check_out_date,
@@ -83,9 +119,14 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
     arrival_time: voucher.arrival_time || "",
     departure_time: voucher.departure_time || "",
     room_rate_currency: voucher.room_rate_currency || "USD",
-    room_rate_sgl: voucher.room_rate_sgl || "",
-    room_rate_dbl: voucher.room_rate_dbl || "",
-    room_rate_tpl: voucher.room_rate_tpl || "",
+    rooms_sgl: voucher.rooms_sgl ?? 0,
+    rooms_dbl: voucher.rooms_dbl ?? 0,
+    rooms_tpl: voucher.rooms_tpl ?? 0,
+    rooms_qtpl: voucher.rooms_qtpl ?? 0,
+    room_rate_sgl: voucher.room_rate_sgl ?? 0,
+    room_rate_dbl: voucher.room_rate_dbl ?? 0,
+    room_rate_tpl: voucher.room_rate_tpl ?? 0,
+    room_rate_qtpl: voucher.room_rate_qtpl ?? 0,
     confirmed_by: voucher.confirmed_by || "",
     confirmed_date: voucher.confirmed_date || "",
     booked_by: voucher.booked_by || "",
@@ -99,59 +140,32 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const totalRooms =
+    Number(formData.rooms_sgl) +
+    Number(formData.rooms_dbl) +
+    Number(formData.rooms_tpl) +
+    Number(formData.rooms_qtpl);
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const toNumberOrNull = (value: unknown) => {
-        if (value === "" || value === null || value === undefined) return null;
-        const parsed = Number(value);
-        return Number.isNaN(parsed) ? null : parsed;
-      };
-
-      const normalizedPayload = {
-        ...formData,
-        pax_adults: Number(formData.pax_adults) || 0,
-        pax_children: Number(formData.pax_children) || 0,
-        pax_infants: Number(formData.pax_infants) || 0,
-        no_of_rooms: Number(formData.no_of_rooms) || 1,
-        no_of_nights: Number(formData.no_of_nights) || 0,
-        room_rate_sgl: toNumberOrNull(formData.room_rate_sgl),
-        room_rate_dbl: toNumberOrNull(formData.room_rate_dbl),
-        room_rate_tpl: toNumberOrNull(formData.room_rate_tpl),
-        arrival_time: formData.arrival_time || null,
-        departure_time: formData.departure_time || null,
-        confirmed_date: formData.confirmed_date || null,
-        booked_date: formData.booked_date || null,
-        confirmed_by: formData.confirmed_by || null,
-        booked_by: formData.booked_by || null,
-        remarks: formData.remarks || null,
-        nationality: formData.nationality || null,
-      };
-
       const response = await fetch(`/api/vouchers/${voucher.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(normalizedPayload),
+        body: JSON.stringify({
+          ...formData,
+          no_of_rooms: totalRooms || voucher.no_of_rooms,
+        }),
       });
 
-      if (!response.ok) {
-        let message = "Failed to save";
-        try {
-          const payload = await response.json();
-          message = payload?.error || message;
-        } catch {
-          // Keep fallback message if response is not JSON
-        }
-        throw new Error(message);
-      }
+      if (!response.ok) throw new Error("Failed to save");
 
       router.refresh();
       alert("Voucher saved successfully!");
-      // Redirect back to vouchers list
       router.push("/vouchers");
     } catch (error) {
       console.error("Save error:", error);
-      alert(error instanceof Error ? error.message : "Failed to save voucher");
+      alert("Failed to save voucher");
     } finally {
       setIsSaving(false);
     }
@@ -165,13 +179,35 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
 
     setIsAmending(true);
     try {
+      const toNum = (v: unknown) =>
+        v === "" || v === null || v === undefined ? null : Number(v);
+      const toInt = (v: unknown) =>
+        v === "" || v === null || v === undefined ? 0 : parseInt(String(v), 10) || 0;
+
+      const sanitised = {
+        ...formData,
+        pax_adults: toInt(formData.pax_adults),
+        pax_children: toInt(formData.pax_children),
+        pax_infants: toInt(formData.pax_infants),
+        no_of_rooms: totalRooms || voucher.no_of_rooms,
+        no_of_nights: toInt(formData.no_of_nights),
+        rooms_sgl: toInt(formData.rooms_sgl),
+        rooms_dbl: toInt(formData.rooms_dbl),
+        rooms_tpl: toInt(formData.rooms_tpl),
+        rooms_qtpl: toInt(formData.rooms_qtpl),
+        room_rate_sgl: toNum(formData.room_rate_sgl),
+        room_rate_dbl: toNum(formData.room_rate_dbl),
+        room_rate_tpl: toNum(formData.room_rate_tpl),
+        room_rate_qtpl: toNum(formData.room_rate_qtpl),
+        confirmed_date: formData.confirmed_date || null,
+        booked_date: formData.booked_date || null,
+        amendment_confirmed_by: amendConfirmedBy,
+      };
+
       const response = await fetch(`/api/vouchers/${voucher.id}/amend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          amendment_confirmed_by: amendConfirmedBy,
-        }),
+        body: JSON.stringify(sanitised),
       });
 
       if (!response.ok) throw new Error("Failed to create amendment");
@@ -198,7 +234,6 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
       const a = document.createElement("a");
       a.href = url;
 
-      // Fallback for filename if voucher_number is missing or "null"
       const safeVoucherNumber = (voucher.voucher_number && voucher.voucher_number !== "null")
         ? voucher.voucher_number
         : `V-${voucher.id.slice(0, 8).toUpperCase()}`;
@@ -218,36 +253,85 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
 
   return (
     <div className="space-y-6">
-      {/* Action Buttons */}
-      <div className="card p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={handleSave}
-            loading={isSaving}
-            disabled={isSaving}
-          >
-            Save Changes
-          </Button>
+      {/* Amendment Banner */}
+      {voucher.is_amendment && (
+        <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-orange-900">
+                This is Amendment #{voucher.amendment_number}
+                {originalVoucher ? (
+                  <> of voucher <span className="text-orange-700">{originalVoucher.voucher_number}</span></>
+                ) : null}
+              </p>
+              <p className="text-xs text-orange-600 mt-0.5">
+                The original voucher has been preserved and can be viewed from the sidebar.
+              </p>
+            </div>
+          </div>
+          {originalVoucher && (
+            <a
+              href={`/vouchers/${originalVoucher.id}`}
+              className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-700 text-xs font-bold rounded-lg transition-colors flex-shrink-0"
+            >
+              View Original →
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Action Buttons — two clearly separated operations */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-0">
+            {/* Edit operation */}
+            <div className="flex flex-col items-start pr-5">
+              <Button onClick={handleSave} loading={isSaving} disabled={isSaving}>
+                Save Changes
+              </Button>
+              <p className="text-[10px] text-surface-400 mt-1.5 leading-tight">
+                Quick edit — updates fields in-place
+              </p>
+            </div>
+
+            {/* Visual separator */}
+            <div className="self-stretch border-l border-surface-200 mx-1" />
+
+            {/* Amendment operation */}
+            <div className="flex flex-col items-start pl-5">
+              <Button
+                variant="secondary"
+                onClick={() => setShowAmendModal(true)}
+                className="border-orange-200 text-orange-700 hover:bg-orange-50"
+              >
+                Create Amendment
+              </Button>
+              <p className="text-[10px] text-surface-400 mt-1.5 leading-tight">
+                Formal change — preserves original voucher
+              </p>
+            </div>
+          </div>
+
           <Button
             variant="secondary"
-            onClick={() => setShowAmendModal(true)}
+            onClick={handleDownloadPDF}
+            loading={isDownloading}
+            disabled={isDownloading}
           >
-            Create Amendment
+            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download PDF
           </Button>
         </div>
-        <Button
-          variant="secondary"
-          onClick={handleDownloadPDF}
-          loading={isDownloading}
-          disabled={isDownloading}
-        >
-          <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Download PDF
-        </Button>
       </div>
 
+      {/* Hotel Information */}
       <div className="card p-6">
         <h3 className="text-lg font-semibold text-surface-900 mb-4">Hotel Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -257,6 +341,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
             value={formData.hotel_name}
             onChange={handleChange}
             required
+            disabled
           />
         </div>
       </div>
@@ -271,12 +356,14 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
             value={formData.guest_name}
             onChange={handleChange}
             required
+            disabled
           />
           <Input
             label="Nationality"
             name="nationality"
             value={formData.nationality}
             onChange={handleChange}
+            disabled
           />
           <Input
             label="Adults"
@@ -285,6 +372,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
             min="0"
             value={formData.pax_adults}
             onChange={handleChange}
+            disabled
           />
           <Input
             label="Children"
@@ -293,6 +381,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
             min="0"
             value={formData.pax_children}
             onChange={handleChange}
+            disabled
           />
           <Input
             label="Infants"
@@ -301,35 +390,34 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
             min="0"
             value={formData.pax_infants}
             onChange={handleChange}
+            disabled
           />
         </div>
       </div>
 
-      {/* Room Details */}
+      {/* Room Details — multi-type breakdown */}
       <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">Room Details</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-lg font-semibold text-surface-900">Room Details</h3>
+          {totalRooms > 0 && (
+            <span className="text-xs font-bold text-primary-700 bg-primary-50 px-2.5 py-1 rounded-full">
+              {totalRooms} room{totalRooms !== 1 ? "s" : ""} total
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-surface-500 mb-5">
+          Set the room count and nightly rate for each room type included in this booking.
+        </p>
+
+        {/* Category and meal plan */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Select
-            label="Room Type"
-            name="room_type"
-            value={formData.room_type}
-            onChange={handleChange}
-            options={roomTypeOptions}
-          />
-          <Input
             label="Room Category"
             name="room_category"
             value={formData.room_category}
             onChange={handleChange}
-            placeholder="e.g., Deluxe Room"
-          />
-          <Input
-            label="Number of Rooms"
-            name="no_of_rooms"
-            type="number"
-            min="1"
-            value={formData.no_of_rooms}
-            onChange={handleChange}
+            options={roomCategoryOptions}
+            placeholder="Select a category"
           />
           <Select
             label="Meal Plan"
@@ -337,6 +425,65 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
             value={formData.meal_plan}
             onChange={handleChange}
             options={mealPlanOptions}
+          />
+        </div>
+
+        {/* Per-room-type rows */}
+        <div className="space-y-3">
+          {ROOM_TYPES.map(({ key, label, countField, rateField }) => {
+            const count = Number(formData[countField]);
+            const isActive = count > 0;
+            return (
+              <div
+                key={key}
+                className={`rounded-xl border p-4 transition-colors ${
+                  isActive
+                    ? "border-primary-200 bg-primary-50"
+                    : "border-surface-200 bg-surface-50"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`text-xs font-bold uppercase tracking-wide ${isActive ? "text-primary-700" : "text-surface-500"}`}>
+                    {label}
+                  </span>
+                  {isActive && (
+                    <span className="text-[10px] font-bold text-primary-600 bg-primary-100 px-1.5 py-0.5 rounded-full">
+                      Active
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="No. of Rooms"
+                    name={countField}
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={formData[countField]}
+                    onChange={handleChange}
+                  />
+                  <Input
+                    label={`Rate (${formData.room_rate_currency}/night)`}
+                    name={rateField}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData[rateField]}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Currency */}
+        <div className="mt-4 max-w-[160px]">
+          <Input
+            label="Currency"
+            name="room_rate_currency"
+            value={formData.room_rate_currency}
+            onChange={handleChange}
           />
         </div>
       </div>
@@ -382,46 +529,6 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
             value={formData.departure_time}
             onChange={handleChange}
             placeholder="e.g., After Breakfast"
-          />
-        </div>
-      </div>
-
-      {/* Rates */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">Room Rates</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Input
-            label="Currency"
-            name="room_rate_currency"
-            value={formData.room_rate_currency}
-            onChange={handleChange}
-          />
-          <Input
-            label="SGL Rate"
-            name="room_rate_sgl"
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.room_rate_sgl}
-            onChange={handleChange}
-          />
-          <Input
-            label="DBL Rate"
-            name="room_rate_dbl"
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.room_rate_dbl}
-            onChange={handleChange}
-          />
-          <Input
-            label="TPL Rate"
-            name="room_rate_tpl"
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.room_rate_tpl}
-            onChange={handleChange}
           />
         </div>
       </div>
@@ -498,9 +605,12 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
               </div>
             </div>
 
-            <p className="text-surface-600 mb-4">
-              Creating an amendment will mark the current voucher as &quot;Amended&quot; and create a new voucher with your changes.
-            </p>
+            <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <p className="text-sm text-orange-800">
+                The current voucher will be marked as <strong>Amended</strong> and a new voucher will be
+                created with your current changes. The original is permanently preserved for audit purposes.
+              </p>
+            </div>
 
             <Input
               label="Amendment Confirmed By"
@@ -515,7 +625,7 @@ export function VoucherEditor({ voucher }: VoucherEditorProps) {
                 Cancel
               </Button>
               <Button onClick={handleAmend} loading={isAmending} disabled={isAmending}>
-                Create Amendment
+                Confirm Amendment
               </Button>
             </div>
           </div>

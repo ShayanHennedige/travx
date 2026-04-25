@@ -6,7 +6,7 @@ export default function AnalyticsPage() {
     <AppLayout>
       <Header
         title="Insight Horizon"
-        subtitle="Intelligent analytics for the TraveX guest experience"
+        subtitle="Intelligent analytics for the TravX guest experience"
       />
       <div className="p-8">
         <AnalyticsDashboard />

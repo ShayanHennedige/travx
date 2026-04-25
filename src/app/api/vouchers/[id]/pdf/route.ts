@@ -15,7 +15,23 @@ export async function GET(request: Request, { params }: RouteParams) {
 
   const { data: voucher, error } = await supabase
     .from("hotel_vouchers")
-    .select("*")
+    .select(`
+      *,
+      inquiries (
+        inquiry_number,
+        first_name,
+        last_name,
+        passport_no,
+        country
+      ),
+      group_inquiries (
+        inquiry_number,
+        head_first_name,
+        head_last_name,
+        head_passport_no,
+        country
+      )
+    `)
     .eq("id", id)
     .single();
 
@@ -24,23 +40,17 @@ export async function GET(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Voucher not found" }, { status: 404 });
   }
 
-  // Fetch related inquiry separately (no FK constraints in schema)
-  let inquiry: any = null;
-  if (voucher.inquiry_id) {
-    const { data } = await supabase
-      .from("inquiries")
-      .select("inquiry_number, first_name, last_name, passport_no, country")
-      .eq("id", voucher.inquiry_id)
-      .single();
-    inquiry = data;
-  } else if (voucher.group_inquiry_id) {
-    const { data } = await supabase
-      .from("group_inquiries")
-      .select("inquiry_number, head_first_name, head_last_name, head_passport_no, country")
-      .eq("id", voucher.group_inquiry_id)
-      .single();
-    inquiry = data;
+  const inquiry = voucher.inquiries || voucher.group_inquiries;
+  const travelerName = voucher.inquiries
+    ? `${voucher.inquiries.first_name || ""} ${voucher.inquiries.last_name || ""}`.trim()
+    : voucher.group_inquiries
+      ? `${voucher.group_inquiries.head_first_name || ""} ${voucher.group_inquiries.head_last_name || ""}`.trim()
+      : "";
+
+  if (travelerName) {
+    voucher.guest_name = travelerName;
   }
+
   const tourNo = inquiry?.inquiry_number || "N/A";
   const totalPax = (voucher.pax_adults || 0) + (voucher.pax_children || 0) + (voucher.pax_infants || 0);
 
@@ -75,10 +85,14 @@ export async function GET(request: Request, { params }: RouteParams) {
       ? `${displayVoucherNumber}-Amendment.pdf`
       : `${displayVoucherNumber}.pdf`;
 
+    const { searchParams } = new URL(request.url);
+    const isView = searchParams.get("view") === "true";
+    const disposition = isView ? "inline" : `attachment; filename="${filename}"`;
+
     return new Response(pdfBuffer as any, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": disposition,
       },
     });
   } catch (e) {

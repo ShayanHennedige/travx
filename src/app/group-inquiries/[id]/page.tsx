@@ -8,6 +8,8 @@ import { InquiryStatus } from "@/types/database";
 import { GroupItineraryQuickActions } from "./GroupItineraryQuickActions";
 import { RoomingListManager } from "./RoomingListManager";
 import { GenerateFeedbackLinkButton } from "../../inquiries/[id]/GenerateFeedbackLinkButton";
+import { getEffectiveStatus } from "@/lib/utils/status";
+import { GroupInquiryStatusUpdate } from "./GroupInquiryStatusUpdate";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -76,7 +78,7 @@ export default async function GroupInquiryDetailPage({ params }: PageProps) {
                   <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
-                  Back to Intelligence
+                  Back
                 </Button>
               </Link>
             </div>
@@ -103,9 +105,10 @@ export default async function GroupInquiryDetailPage({ params }: PageProps) {
                   <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.2em]">Group Pipeline</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <Badge variant="purple" className="px-4 py-1.5 text-xs font-black uppercase tracking-widest border border-purple-500/30">Group Booking</Badge>
-                <StatusBadge status={inquiry.status as InquiryStatus} />
+                <StatusBadge status={getEffectiveStatus(inquiry.status, inquiry.arriving_date, inquiry.departure_date) as InquiryStatus} />
+                <GroupInquiryStatusUpdate inquiryId={inquiry.id} currentStatus={inquiry.status as InquiryStatus} />
               </div>
             </div>
           </div>
@@ -161,53 +164,38 @@ export default async function GroupInquiryDetailPage({ params }: PageProps) {
                   </svg>
                 </div>
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                  Logistics & Schedule
+                  Group Logistics
                 </h2>
               </div>
-              <div className="space-y-8">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 bg-slate-50 rounded-2xl border border-slate-100 gap-4 sm:gap-2">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Arrival Window</p>
-                    <p className="text-4 font-bold text-slate-800">{inquiry.arriving_date ? format(new Date(inquiry.arriving_date), "MMM d, yyyy") : "TBD"}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Arrival</p>
+                    <p className="text-sm font-bold text-slate-800">{inquiry.arriving_date ? format(new Date(inquiry.arriving_date), "MMM d, yyyy") : "TBD"}</p>
+                    {inquiry.arrival_flight_no && (
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        {inquiry.arrival_flight_no}{inquiry.arrival_time ? ` @ ${inquiry.arrival_time}` : ""}
+                      </p>
+                    )}
                   </div>
-                  <div className="hidden sm:flex w-14 h-14 rounded-full bg-white items-center justify-center shadow-sm border border-slate-100">
-                    <svg className="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
+                    <svg className="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                     </svg>
                   </div>
-                  <div className="sm:text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Departure</p>
-                    <p className="text-4 font-bold text-slate-800">{inquiry.departure_date ? format(new Date(inquiry.departure_date), "MMM d, yyyy") : "TBD"}</p>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Departure</p>
+                    <p className="text-sm font-bold text-slate-800">{inquiry.departure_date ? format(new Date(inquiry.departure_date), "MMM d, yyyy") : "TBD"}</p>
+                    {inquiry.departure_flight_no && (
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        {inquiry.departure_flight_no}{inquiry.departure_time ? ` @ ${inquiry.departure_time}` : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Group Capacity</p>
-                    <p className="text-4 font-bold text-slate-900">{`${totalPax} Members`}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Active Duration</p>
-                    <p className="text-4 font-bold text-slate-900">{`${inquiry.no_of_nights || 0} Nights Total`}</p>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-100 pt-6">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-5 italic">Flight Intelligence</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Arrival Flight</p>
-                      <p className="text-4 font-bold text-slate-900 mb-2">{inquiry.inbound_flight_no || "N/A"}</p>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Arrival Time</p>
-                      <p className="text-4 font-bold text-slate-900">{inquiry.inbound_arrival_time || "N/A"}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Departure Flight</p>
-                      <p className="text-4 font-bold text-slate-900 mb-2">{inquiry.outbound_flight_no || "N/A"}</p>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Departure Time</p>
-                      <p className="text-4 font-bold text-slate-900">{inquiry.outbound_departure_time || "N/A"}</p>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <InfoItem label="Group Capacity" value={`${totalPax} Members`} />
+                  <InfoItem label="Active Duration" value={`${inquiry.no_of_nights || 0} Nights`} />
                 </div>
               </div>
             </div>
@@ -232,10 +220,10 @@ export default async function GroupInquiryDetailPage({ params }: PageProps) {
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Accommodation Standards</p>
                   <div className="grid grid-cols-1 gap-4">
                     <div className="grid grid-cols-2 gap-4">
-                      <InfoItem label="Category" value={inquiry.hotel_type || "Premium Selection"} />
-                      <InfoItem label="Class" value={inquiry.room_category || "Standardized"} />
+                      <InfoItem label="Category" value={(Array.isArray(inquiry.hotel_type) ? inquiry.hotel_type.join(", ") : inquiry.hotel_type) || "Premium Selection"} />
+                      <InfoItem label="Class" value={(Array.isArray(inquiry.room_category) ? inquiry.room_category.join(", ") : inquiry.room_category) || "Standardized"} />
                     </div>
-                    <InfoItem label="Meal Plan" value={inquiry.meal_plan || "Not Specified"} />
+                    <InfoItem label="Meal Plan" value={(Array.isArray(inquiry.meal_plan) ? inquiry.meal_plan.join(", ") : inquiry.meal_plan) || "Not Specified"} />
                   </div>
                 </div>
                 <div>
@@ -295,11 +283,84 @@ export default async function GroupInquiryDetailPage({ params }: PageProps) {
             } : null}
           />
 
+          {/* Activities */}
+          {inquiry.activities && (inquiry.activities as string[]).length > 0 && (
+            <div className="bg-white rounded-[2rem] p-10 shadow-sm border border-slate-100">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-600">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Experience Preferences</h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(inquiry.activities as string[]).map((activity: string) => (
+                  <span key={activity} className="px-4 py-2 bg-slate-50 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 hover:bg-primary-50 hover:text-primary-700 hover:border-primary-100 transition-all cursor-default">
+                    {activity}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Adult Members Manifest */}
+          {adultMembers.length > 0 && (
+            <div className="bg-white rounded-[2rem] p-10 shadow-sm border border-slate-100">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                  Adult Members <span className="text-slate-400 font-medium text-base">({adultMembers.length})</span>
+                </h2>
+              </div>
+              <div className="space-y-3">
+                {adultMembers.map((member, i) => (
+                  <div key={member.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <span className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-black text-slate-600 flex-shrink-0">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800 truncate">{member.full_name}</p>
+                      {member.passport_no && <p className="text-xs text-slate-500 font-medium">PP: {member.passport_no}</p>}
+                    </div>
+                    {member.special_requirements && (
+                      <span className="text-xs text-amber-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg font-medium truncate max-w-[140px]">{member.special_requirements}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {childMembers.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-slate-100">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
+                    Children ({childMembers.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {childMembers.map((member, i) => (
+                      <div key={member.id} className="flex items-center gap-4 p-4 bg-amber-50/30 rounded-2xl border border-amber-100">
+                        <span className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-xs font-black text-amber-600 flex-shrink-0">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-800 truncate">{member.full_name}</p>
+                          {member.passport_no && <p className="text-xs text-slate-500 font-medium">PP: {member.passport_no}</p>}
+                        </div>
+                        {member.special_requirements && (
+                          <span className="text-xs text-amber-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg font-medium truncate max-w-[140px]">{member.special_requirements}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {inquiry.client_desires && (
             <div className="bg-white rounded-[2rem] p-10 shadow-sm border border-slate-100">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 italic">Client Desires & Preferred Places</h3>
               <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 italic text-slate-700 text-sm leading-relaxed">
-                "{inquiry.client_desires}"
+                &ldquo;{inquiry.client_desires}&rdquo;
               </div>
             </div>
           )}

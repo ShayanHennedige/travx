@@ -28,7 +28,7 @@ export function DownloadPDFButton({ itineraryId, inquiryNumber, size = "md", cos
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleDownload = async (type: "standard" | "with_rates") => {
+  const handleDownload = async (type: "standard" | "with_rates", action: "view" | "download") => {
     setIsDownloading(true);
     setDownloadType(type);
     setShowDropdown(false);
@@ -41,14 +41,7 @@ export function DownloadPDFButton({ itineraryId, inquiryNumber, size = "md", cos
       const response = await fetch(url);
 
       if (!response.ok) {
-        let errorMsg = `Server returned ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMsg = errorData.error || errorMsg;
-        } catch {
-          // response wasn't JSON
-        }
-        throw new Error(errorMsg);
+        throw new Error("Failed to generate PDF");
       }
 
       // Get the blob from the response
@@ -56,21 +49,26 @@ export function DownloadPDFButton({ itineraryId, inquiryNumber, size = "md", cos
 
       // Create download link
       const blobUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      const suffix = type === "with_rates" ? "-Rates" : "";
-      a.download = inquiryNumber
-        ? `${inquiryNumber}-Itinerary${suffix}.pdf`
-        : `TraveX-Itinerary${suffix}.pdf`;
-      document.body.appendChild(a);
-      a.click();
+      
+      if (action === "view") {
+        window.open(blobUrl, "_blank");
+      } else {
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        const suffix = type === "with_rates" ? "-Rates" : "";
+        a.download = inquiryNumber
+          ? `${inquiryNumber}-Itinerary${suffix}.pdf`
+          : `TravX-Itinerary${suffix}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
 
       // Cleanup
-      window.URL.revokeObjectURL(blobUrl);
-      document.body.removeChild(a);
-    } catch (error: any) {
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
+    } catch (error) {
       console.error("Failed to download PDF:", error);
-      alert(`Failed to generate PDF: ${error?.message || 'Unknown error'}. Please try again.`);
+      alert("Failed to generate PDF. Please try again.");
     } finally {
       setIsDownloading(false);
       setDownloadType(null);
@@ -110,25 +108,44 @@ export function DownloadPDFButton({ itineraryId, inquiryNumber, size = "md", cos
       {/* Dropdown Menu */}
       {showDropdown && !isDownloading && (
         <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+          {/* PREVIEW STANDARD */}
           <button
-            onClick={() => handleDownload("standard")}
+            onClick={() => handleDownload("standard", "view")}
             className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center gap-3 group"
           >
             <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
               <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-900">Standard PDF</p>
-              <p className="text-xs text-slate-500">Itinerary without pricing</p>
+              <p className="text-sm font-bold text-slate-900">Preview Standard PDF</p>
+              <p className="text-xs text-slate-500">View itinerary in browser</p>
+            </div>
+          </button>
+
+          {/* DOWNLOAD STANDARD */}
+          <button
+            onClick={() => handleDownload("standard", "download")}
+            className="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center gap-3 group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center group-hover:bg-slate-100 transition-colors">
+              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-900">Download Standard PDF</p>
+              <p className="text-xs text-slate-500">Save to your computer</p>
             </div>
           </button>
 
           <div className="h-px bg-slate-100 my-1 mx-3" />
 
+          {/* PREVIEW WITH RATES */}
           <button
-            onClick={() => canDownloadWithRates && handleDownload("with_rates")}
+            onClick={() => canDownloadWithRates && handleDownload("with_rates", "view")}
             disabled={!canDownloadWithRates}
             className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 group ${canDownloadWithRates
                 ? "hover:bg-slate-50 cursor-pointer"
@@ -140,14 +157,42 @@ export function DownloadPDFButton({ itineraryId, inquiryNumber, size = "md", cos
                 : "bg-slate-100"
               }`}>
               <svg className={`w-4 h-4 ${canDownloadWithRates ? "text-emerald-600" : "text-slate-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
             </div>
             <div>
-              <p className={`text-sm font-bold ${canDownloadWithRates ? "text-slate-900" : "text-slate-400"}`}>PDF with Rates & T&C</p>
+              <p className={`text-sm font-bold ${canDownloadWithRates ? "text-slate-900" : "text-slate-400"}`}>Preview PDF with Rates</p>
               <p className="text-xs text-slate-500">
                 {canDownloadWithRates
-                  ? "Include pricing and terms"
+                  ? "View in browser with pricing"
+                  : "Finalize costing sheet first"}
+              </p>
+            </div>
+          </button>
+
+          {/* DOWNLOAD WITH RATES */}
+          <button
+            onClick={() => canDownloadWithRates && handleDownload("with_rates", "download")}
+            disabled={!canDownloadWithRates}
+            className={`w-full px-4 py-3 text-left transition-colors flex items-center gap-3 group ${canDownloadWithRates
+                ? "hover:bg-slate-50 cursor-pointer"
+                : "opacity-50 cursor-not-allowed"
+              }`}
+          >
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${canDownloadWithRates
+                ? "bg-slate-50 group-hover:bg-slate-100"
+                : "bg-slate-100"
+              }`}>
+              <svg className={`w-4 h-4 ${canDownloadWithRates ? "text-slate-600" : "text-slate-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </div>
+            <div>
+              <p className={`text-sm font-bold ${canDownloadWithRates ? "text-slate-900" : "text-slate-400"}`}>Download PDF with Rates</p>
+              <p className="text-xs text-slate-500">
+                {canDownloadWithRates
+                  ? "Save document with pricing"
                   : "Finalize costing sheet first"}
               </p>
             </div>

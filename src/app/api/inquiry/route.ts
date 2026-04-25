@@ -4,6 +4,12 @@ import { publicInquirySchema } from "@/lib/validations/inquiry";
 import { generateBaseReferenceNumber } from "@/lib/utils/reference-generator";
 import { sendInquiryNotification } from "@/lib/email";
 
+// Strip HTML tags and trim to prevent stored XSS
+function sanitize(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.replace(/<[^>]*>/g, "").trim() || null;
+}
+
 // Create a Supabase client for public submissions
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,81 +70,45 @@ export async function POST(request: Request) {
       }
     }
 
-    // Calculate number of nights from dates
-    const arrivingDate = new Date(result.data.arriving_date);
-    const departureDate = new Date(result.data.departure_date);
-    const diffTime = departureDate.getTime() - arrivingDate.getTime();
-    const no_of_nights = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-
-    // Prepare insert payload
-    const insertPayload = {
-      first_name: result.data.first_name || null,
-      last_name: result.data.last_name || null,
-      client_name: `${result.data.first_name || ""} ${result.data.last_name || ""}`.trim() || null,
-      passport_no: result.data.passport_no || null,
-      contact_number: result.data.contact_number || null,
-      client_email: result.data.client_email || null,
-      agent_name: result.data.agent_name || null,
-      agent_email: result.data.agent_email || null,
-      agent_company: result.data.agent_company || null,
-      arranged_by_agent: result.data.arranged_by_agent || false,
-      inbound_flight_no: result.data.inbound_flight_no || null,
-      inbound_arrival_date: result.data.inbound_arrival_date || null,
-      inbound_arrival_time: result.data.inbound_arrival_time || null,
-      outbound_flight_no: result.data.outbound_flight_no || null,
-      outbound_departure_date: result.data.outbound_departure_date || null,
-      outbound_departure_time: result.data.outbound_departure_time || null,
-      country: result.data.country || null,
-      arriving_date: result.data.arriving_date,
-      departure_date: result.data.departure_date,
-      no_of_nights,
-      no_of_pax: result.data.no_of_pax,
-      no_of_children: result.data.no_of_children,
-      hotel_type: result.data.hotel_type,
-      room_category: result.data.room_category,
-      meal_plan: result.data.meal_plan || null,
-      rooms_dbl: result.data.rooms_dbl,
-      rooms_sgl: result.data.rooms_sgl,
-      rooms_tpl: result.data.rooms_tpl,
-      rooms_qtpl: result.data.rooms_qtpl,
-      activities: result.data.activities,
-      client_desires: result.data.client_desires || null,
-      status: "new",
-      priority: "medium",
-      inquiry_number: finalRef, // Use generated number
-    };
-
-    // Insert inquiry with fallback for missing fields
-    let { data: inquiry, error } = await supabaseAdmin
+    // Insert inquiry
+    const { data: inquiry, error } = await supabaseAdmin
       .from("inquiries")
-      .insert(insertPayload)
+      .insert({
+        first_name: sanitize(result.data.first_name),
+        last_name: sanitize(result.data.last_name),
+        client_name: sanitize(`${result.data.first_name || ""} ${result.data.last_name || ""}`.trim()),
+        passport_no: sanitize(result.data.passport_no),
+        contact_number: sanitize(result.data.contact_number),
+        client_email: result.data.client_email || null,
+        agent_name: sanitize(result.data.agent_name),
+        agent_email: result.data.agent_email || null,
+        agent_company: sanitize(result.data.agent_company),
+        is_tour_agent: result.data.is_tour_agent || false,
+        country: sanitize(result.data.country),
+        arriving_date: result.data.arriving_date,
+        arrival_flight_no: result.data.arrival_flight_no || null,
+        arrival_time: result.data.arrival_time || null,
+        departure_date: result.data.departure_date,
+        departure_flight_no: result.data.departure_flight_no || null,
+        departure_time: result.data.departure_time || null,
+        no_of_pax: result.data.no_of_pax,
+        no_of_children: result.data.no_of_children,
+        hotel_type: result.data.hotel_type,
+        room_category: result.data.room_category,
+        meal_plan: result.data.meal_plan,
+        mixed_mode: result.data.mixed_mode || false,
+        rooms_dbl: result.data.rooms_dbl,
+        rooms_sgl: result.data.rooms_sgl,
+        rooms_tpl: result.data.rooms_tpl,
+        rooms_qtpl: result.data.rooms_qtpl,
+        activities: result.data.activities,
+        client_desires: sanitize(result.data.client_desires),
+        status: "new",
+        priority: "medium",
+        inquiry_number: finalRef, // Use generated number
+      })
       .select()
       .single();
-
-    // Fallback if migration hasn't been run (missing columns)
-    if (error && (error.code === '42703' || error.message.includes('column'))) {
-      console.warn("Database schema mismatch, falling back to legacy insert. Please run migrations.");
-      
-      const { 
-        arranged_by_agent, 
-        inbound_flight_no, 
-        inbound_arrival_date, 
-        inbound_arrival_time, 
-        outbound_flight_no, 
-        outbound_departure_date, 
-        outbound_departure_time, 
-        ...safePayload 
-      } = insertPayload;
-
-      const retry = await supabaseAdmin
-        .from("inquiries")
-        .insert(safePayload)
-        .select()
-        .single();
-      
-      inquiry = retry.data;
-      error = retry.error;
-    }
 
     if (error) {
       console.error("Database error:", error);

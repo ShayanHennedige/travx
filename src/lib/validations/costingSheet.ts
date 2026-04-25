@@ -19,21 +19,21 @@ export const vehicleRates: Record<string, number> = {
 
 // Accommodation row schema
 export const accommodationRowSchema = z.object({
-    day: z.string().min(1, "Day is required"),
-    location: z.string().min(1, "Location is required"),
-    hotel: z.string().min(1, "Hotel is required"),
+    day: z.string().default(""),
+    location: z.string().default(""),
+    hotel: z.string().default(""),
     room_category: z.string().default("Standard"),
-    basis: z.string().min(1, "Basis is required"), // BB, HB, FB, etc.
+    basis: z.string().default("BB"),
     sgl: z.number().min(0).default(0),
     dbl: z.number().min(0).default(0),
     tri: z.number().min(0).default(0),
     quad: z.number().min(0).default(0),
-    quad_triple: z.number().min(0).default(0), // Quad/Triple column
+    quad_triple: z.number().min(0).default(0),
 });
 
 // Transport row schema
 export const transportRowSchema = z.object({
-    description: z.string().min(1, "Description is required"),
+    description: z.string().default(""),
     mileage: z.number().min(0).default(0),
     rate: z.number().min(0).default(0),
     total: z.number().min(0).default(0),
@@ -41,7 +41,7 @@ export const transportRowSchema = z.object({
 
 // Extras row schema
 export const extrasRowSchema = z.object({
-    name: z.string().min(1, "Name is required"),
+    name: z.string().default(""),
     description: z.string().default(""),
     count: z.number().min(0).default(0),
     unit_price: z.number().min(0).default(0),

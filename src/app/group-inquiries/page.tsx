@@ -4,6 +4,7 @@ import { StatusBadge, Button, Badge } from "@/components/ui";
 import Link from "next/link";
 import { format } from "date-fns";
 import { InquiryStatus } from "@/types/database";
+import { getEffectiveStatus } from "@/lib/utils/status";
 
 export default async function GroupInquiriesPage() {
   const supabase = await createClient();
@@ -118,7 +119,7 @@ export default async function GroupInquiriesPage() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <StatusBadge status={inquiry.status as InquiryStatus} />
+                        <StatusBadge status={getEffectiveStatus(inquiry.status, inquiry.arriving_date, inquiry.departure_date) as InquiryStatus} />
                       </td>
                       <td className="px-6 py-4 text-right">
                         <Link href={`/group-inquiries/${inquiry.id}`}>

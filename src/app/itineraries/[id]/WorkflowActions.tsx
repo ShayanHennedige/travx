@@ -36,6 +36,11 @@ interface WorkflowActionsProps {
         rooms_dbl?: number;
         rooms_tpl?: number;
         rooms_qtpl?: number;
+        arrival_flight_no?: string | null;
+        arrival_time?: string | null;
+        departure_flight_no?: string | null;
+        departure_time?: string | null;
+        is_tour_agent?: boolean;
     } | null;
     costingSheet: (CostingSheet & { id: string }) | null;
     existingTour: {
@@ -55,6 +60,8 @@ interface WorkflowActionsProps {
     totalDistance?: string;
     hotelType: string;
     paymentVouchersCount?: number;
+    isDeclined?: boolean;
+    declineReason?: string | null;
 }
 
 export function WorkflowActions({
@@ -79,6 +86,8 @@ export function WorkflowActions({
     totalDistance,
     hotelType,
     paymentVouchersCount = 0,
+    isDeclined = false,
+    declineReason,
 }: WorkflowActionsProps) {
     // Determine step statuses
     const isCostingComplete = costingSheet?.status === "finalized" || costingSheet?.status === "approved";
@@ -186,40 +195,59 @@ export function WorkflowActions({
                             </Button>
                         )}
                         {hasInvoice && (
-                            <Link href={`/invoices?itinerary_id=${itineraryId}`}>
-                                <Button size="sm" variant="ghost" className="rounded-lg text-primary-600">
-                                    View Invoices →
-                                </Button>
-                            </Link>
+                            <>
+                                <Link href={`/invoices/new?itinerary_id=${itineraryId}&type=extra`}>
+                                    <Button size="sm" variant="secondary" className="rounded-lg border-dashed border-amber-300 text-amber-700 hover:bg-amber-50">
+                                        <svg className="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                        </svg>
+                                        Extra Invoice
+                                    </Button>
+                                </Link>
+                                <Link href={`/invoices?itinerary_id=${itineraryId}`}>
+                                    <Button size="sm" variant="ghost" className="rounded-lg text-primary-600">
+                                        View Invoices →
+                                    </Button>
+                                </Link>
+                            </>
                         )}
                     </div>
                 </div>
 
                 {/* Step 3: Finalize Tour */}
-                <div className={`p-3 rounded-lg border transition-all ${isTourFinalized
-                    ? "bg-green-50 border-green-200"
-                    : hasInvoice
-                        ? "bg-surface-50 border-surface-100"
-                        : "bg-slate-50 border-slate-200 opacity-60"
+                <div className={`p-3 rounded-lg border transition-all ${isDeclined
+                    ? "bg-red-50 border-red-200"
+                    : isTourFinalized
+                        ? "bg-green-50 border-green-200"
+                        : hasInvoice
+                            ? "bg-surface-50 border-surface-100"
+                            : "bg-slate-50 border-slate-200 opacity-60"
                     }`}>
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isTourFinalized
-                                ? "bg-green-500 text-white"
-                                : hasInvoice
-                                    ? "bg-purple-100 text-purple-700"
-                                    : "bg-slate-200 text-slate-400"
+                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isDeclined
+                                ? "bg-red-500 text-white"
+                                : isTourFinalized
+                                    ? "bg-green-500 text-white"
+                                    : hasInvoice
+                                        ? "bg-purple-100 text-purple-700"
+                                        : "bg-slate-200 text-slate-400"
                                 }`}>
-                                {isTourFinalized ? "✓" : "3"}
+                                {isDeclined ? "✕" : isTourFinalized ? "✓" : "3"}
                             </span>
                             <span className="text-xs font-bold text-surface-700">Finalize Tour</span>
                         </div>
-                        {isTourFinalized ? (
+                        {isDeclined ? (
+                            <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-[9px] font-bold uppercase">Declined</span>
+                        ) : isTourFinalized ? (
                             <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[9px] font-bold uppercase">Finalized</span>
                         ) : (
                             <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase">Pending</span>
                         )}
                     </div>
+                    {declineReason && isDeclined && (
+                        <p className="text-xs text-red-600 mb-2 italic">Reason: {declineReason}</p>
+                    )}
                     {inquiry && (
                         <FinalizeTourButton
                             itineraryId={itineraryId}
@@ -234,6 +262,12 @@ export function WorkflowActions({
                             hasCostingSheet={isCostingComplete}
                             hasVouchers={hasVouchers}
                             hasInvoice={hasInvoice}
+                            arrivalFlightNo={inquiry.arrival_flight_no}
+                            arrivalTime={inquiry.arrival_time}
+                            departureFlightNo={inquiry.departure_flight_no}
+                            departureTime={inquiry.departure_time}
+                            isDeclined={isDeclined}
+                            declineReason={declineReason}
                         />
                     )}
                 </div>
@@ -378,7 +412,11 @@ export function WorkflowActions({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                         <span className="text-[10px] text-surface-500 uppercase font-bold block mb-0.5">Meal Plan</span>
-                        <span className="text-xs font-semibold text-surface-900">{inquiry?.meal_plan || "Not Specified"}</span>
+                        <span className="text-xs font-semibold text-surface-900">
+                            {costingSheet?.accommodation_data?.length 
+                                ? Array.from(new Set(costingSheet.accommodation_data.map(a => a.basis))).filter(Boolean).join(" / ")
+                                : (inquiry?.meal_plan || "Not Specified")}
+                        </span>
                     </div>
                     <div>
                         <span className="text-[10px] text-surface-500 uppercase font-bold block mb-0.5">Hotel Type</span>
@@ -386,7 +424,11 @@ export function WorkflowActions({
                     </div>
                     <div>
                         <span className="text-[10px] text-surface-500 uppercase font-bold block mb-0.5">Room Category</span>
-                        <span className="text-xs font-semibold text-surface-900">{inquiry?.room_category || "Standard"}</span>
+                        <span className="text-xs font-semibold text-surface-900">
+                            {costingSheet?.accommodation_data?.length
+                                ? Array.from(new Set(costingSheet.accommodation_data.map(a => a.room_category))).filter(Boolean).join(" / ")
+                                : (inquiry?.room_category || "Standard")}
+                        </span>
                     </div>
                     <div>
                         <span className="text-[10px] text-surface-500 uppercase font-bold block mb-0.5">Rooms</span>

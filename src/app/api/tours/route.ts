@@ -9,6 +9,16 @@ export async function GET() {
     .from("tours")
     .select(`
       *,
+      inquiries (
+        id,
+        first_name,
+        last_name
+      ),
+      group_inquiries (
+        id,
+        head_first_name,
+        head_last_name
+      ),
       drivers (
         id,
         name,
@@ -30,7 +40,24 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ tours });
+  const normalizedTours = (tours || []).map((tour: any) => {
+    const inquiry = Array.isArray(tour.inquiries) ? tour.inquiries[0] : tour.inquiries;
+    const groupInquiry = Array.isArray(tour.group_inquiries) ? tour.group_inquiries[0] : tour.group_inquiries;
+
+    const inquiryName = inquiry
+      ? `${inquiry.first_name || ""} ${inquiry.last_name || ""}`.trim()
+      : "";
+    const groupHeadName = groupInquiry
+      ? `${groupInquiry.head_first_name || ""} ${groupInquiry.head_last_name || ""}`.trim()
+      : "";
+
+    return {
+      ...tour,
+      client_name: inquiryName || groupHeadName || tour.client_name,
+    };
+  });
+
+  return NextResponse.json({ tours: normalizedTours });
 }
 
 // POST - Create a tour from a finalized itinerary
@@ -50,6 +77,10 @@ export async function POST(request: Request) {
       pax_children,
       driver_id,
       notes,
+      arrival_flight_no,
+      arrival_time,
+      departure_flight_no,
+      departure_time,
     } = body;
 
     // Validate prerequisites before finalizing tour
@@ -88,19 +119,44 @@ export async function POST(request: Request) {
       }, { status: 200 });
     }
 
+    let resolvedClientName = (client_name || "").trim();
+    if (inquiry_id) {
+      const { data: inquiry } = await supabase
+        .from("inquiries")
+        .select("first_name, last_name")
+        .eq("id", inquiry_id)
+        .maybeSingle();
+
+      const inquiryName = `${inquiry?.first_name || ""} ${inquiry?.last_name || ""}`.trim();
+      if (inquiryName) resolvedClientName = inquiryName;
+    } else if (group_inquiry_id) {
+      const { data: groupInquiry } = await supabase
+        .from("group_inquiries")
+        .select("head_first_name, head_last_name")
+        .eq("id", group_inquiry_id)
+        .maybeSingle();
+
+      const headName = `${groupInquiry?.head_first_name || ""} ${groupInquiry?.head_last_name || ""}`.trim();
+      if (headName) resolvedClientName = headName;
+    }
+
     const { data: tour, error } = await supabase
       .from("tours")
       .insert({
         itinerary_id,
         inquiry_id: inquiry_id || null,
         group_inquiry_id: group_inquiry_id || null,
-        client_name,
+        client_name: resolvedClientName || null,
         start_date,
         end_date,
         pax_adults: pax_adults || 0,
         pax_children: pax_children || 0,
         driver_id: driver_id || null,
         notes: notes || null,
+        arrival_flight_no: arrival_flight_no || null,
+        arrival_time: arrival_time || null,
+        departure_flight_no: departure_flight_no || null,
+        departure_time: departure_time || null,
         status: "upcoming",
       })
       .select()

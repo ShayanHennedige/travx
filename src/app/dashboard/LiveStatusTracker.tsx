@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { Badge, Button, Select } from "@/components/ui";
@@ -39,30 +39,7 @@ interface LiveStatusTrackerProps {
 export function LiveStatusTracker({ items }: LiveStatusTrackerProps) {
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [isMounted, setIsMounted] = useState(false);
   const itemsPerPage = 8;
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  if (!isMounted) {
-    return (
-      <div className="card">
-        <div className="px-6 py-4 border-b border-surface-200 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-surface-900">
-            Operations Tracker
-          </h2>
-          <span className="text-xs text-surface-500 font-medium bg-surface-100 px-2.5 py-1 rounded-full">
-            Total: {items.length}
-          </span>
-        </div>
-        <div className="p-12 text-center text-surface-500">
-          Loading tracker...
-        </div>
-      </div>
-    );
-  }
 
   const totalPages = Math.ceil(items.length / itemsPerPage);
   const offset = (currentPage - 1) * itemsPerPage;
@@ -100,7 +77,7 @@ export function LiveStatusTracker({ items }: LiveStatusTrackerProps) {
       ) : (
         <div>
           <div className="overflow-x-auto">
-            <table className="w-full relative">
+            <table className="w-full relative" suppressHydrationWarning>
               <thead className="sticky top-0 z-20">
                 <tr className="border-b border-surface-200 bg-surface-50">
                   <th className="px-6 py-3 text-left text-xs font-medium text-surface-500 uppercase tracking-wider">
@@ -239,7 +216,7 @@ function StatusBadge({ status }: StatusBadgeProps) {
     in_progress: { label: "In Progress", color: "bg-blue-100 text-blue-700" },
     quoted: { label: "Quoted", color: "bg-purple-100 text-purple-700" },
     confirmed: { label: "Confirmed", color: "bg-green-100 text-green-700" },
-    cancelled: { label: "Cancelled", color: "bg-accent-200 text-accent-900" },
+    cancelled: { label: "Cancelled", color: "bg-red-200 text-red-900" },
     completed: { label: "Completed", color: "bg-green-100 text-green-700" },
   };
 

@@ -44,7 +44,7 @@ export async function GET(request: Request, context: RouteContext) {
 
     const supabase = await createClient();
 
-    // Fetch itinerary first (separate query, same pattern as the page)
+    // Fetch itinerary with inquiry data (both individual and group)
     const { data: itinerary, error } = await supabase
       .from("itineraries")
       .select(`
@@ -52,70 +52,57 @@ export async function GET(request: Request, context: RouteContext) {
         content,
         created_at,
         inquiry_id,
-        group_inquiry_id
+        group_inquiry_id,
+        inquiries (
+          inquiry_number,
+          first_name,
+          last_name,
+          client_email,
+          arriving_date,
+          departure_date,
+          no_of_nights,
+          no_of_pax,
+          no_of_children,
+          hotel_type,
+          room_category,
+          meal_plan
+        ),
+        group_inquiries (
+          inquiry_number,
+          head_first_name,
+          head_last_name,
+          client_email,
+          agent_name,
+          agent_company,
+          arriving_date,
+          departure_date,
+          no_of_nights,
+          no_of_adults,
+          no_of_children,
+          hotel_type,
+          room_category,
+          meal_plan,
+          rooms_dbl,
+          rooms_sgl,
+          rooms_tpl,
+          rooms_qtpl
+        )
       `)
       .eq("id", id)
       .single();
 
     if (error || !itinerary) {
-      console.error("PDF route - Itinerary query error:", error);
       return NextResponse.json(
-        { error: "Itinerary not found", details: error?.message || "No data returned" },
+        { error: "Itinerary not found" },
         { status: 404 }
       );
     }
 
     const content = itinerary.content as ItineraryContent;
 
-    // Fetch individual inquiry if exists (separate query)
-    const { data: individualInquiry } = itinerary.inquiry_id
-      ? await supabase
-          .from("inquiries")
-          .select(`
-            inquiry_number,
-            first_name,
-            last_name,
-            client_email,
-            arriving_date,
-            departure_date,
-            no_of_nights,
-            no_of_pax,
-            no_of_children,
-            hotel_type,
-            room_category,
-            meal_plan
-          `)
-          .eq("id", itinerary.inquiry_id)
-          .single()
-      : { data: null };
-
-    // Fetch group inquiry if exists (separate query)
-    const { data: groupInquiry } = itinerary.group_inquiry_id
-      ? await supabase
-          .from("group_inquiries")
-          .select(`
-            inquiry_number,
-            head_first_name,
-            head_last_name,
-            client_email,
-            agent_name,
-            agent_company,
-            arriving_date,
-            departure_date,
-            no_of_nights,
-            no_of_adults,
-            no_of_children,
-            hotel_type,
-            room_category,
-            meal_plan,
-            rooms_dbl,
-            rooms_sgl,
-            rooms_tpl,
-            rooms_qtpl
-          `)
-          .eq("id", itinerary.group_inquiry_id)
-          .single()
-      : { data: null };
+    // Handle both individual and group inquiries
+    const individualInquiry = itinerary.inquiries as any;
+    const groupInquiry = itinerary.group_inquiries as any;
 
     // Normalize inquiry data
     const inquiry = individualInquiry ? {
@@ -169,38 +156,41 @@ export async function GET(request: Request, context: RouteContext) {
     // Generate HTML with rates option
     const html = generateItineraryHTML(content, inquiry, { includeRates, costingData });
 
-    // Launch Puppeteer and generate PDF
+    // Launch Puppeteer and generate PDF — always close browser in finally
     const browser = await launchBrowser();
+    let pdfBuffer: Uint8Array;
 
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: "networkidle0" });
 
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: {
-        top: "10mm",
-        right: "10mm",
-        bottom: "25mm",
-        left: "10mm",
-      },
-      displayHeaderFooter: true,
-      headerTemplate: "<div></div>",
-      footerTemplate: `
-        <div style="width: 100%; text-align: center; font-size: 9px; color: #666; padding-top: 15px; font-family: Times New Roman, serif;">
-          <div style="margin-bottom: 5px;">TraveX</div>
-          <div>Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>
-        </div>
-      `,
-    });
-
-    await browser.close();
+      pdfBuffer = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        margin: {
+          top: "10mm",
+          right: "10mm",
+          bottom: "25mm",
+          left: "10mm",
+        },
+        displayHeaderFooter: true,
+        headerTemplate: "<div></div>",
+        footerTemplate: `
+          <div style="width: 100%; text-align: center; font-size: 9px; color: #666; padding-top: 15px; font-family: Times New Roman, serif;">
+            <div style="margin-bottom: 5px;">TravX</div>
+            <div>Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>
+          </div>
+        `,
+      });
+    } finally {
+      await browser.close();
+    }
 
     // Generate filename
     const suffix = includeRates ? "-Rates" : "";
     const filename = inquiry
       ? `${inquiry.inquiry_number}-Itinerary${suffix}.pdf`
-      : `TraveX-Itinerary${suffix}-${id.slice(0, 8)}.pdf`;
+      : `TravX-Itinerary${suffix}-${id.slice(0, 8)}.pdf`;
 
     // Return PDF as response
     return new Response(pdfBuffer as any, {
@@ -209,10 +199,10 @@ export async function GET(request: Request, context: RouteContext) {
         "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
-  } catch (err: any) {
-    console.error("PDF generation error:", err?.message || err, err?.stack);
+  } catch (err) {
+    console.error("PDF generation error:", err);
     return NextResponse.json(
-      { error: `Failed to generate PDF: ${err?.message || 'Unknown error'}` },
+      { error: "Failed to generate PDF" },
       { status: 500 }
     );
   }

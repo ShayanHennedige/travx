@@ -4,6 +4,11 @@ import { groupInquirySchema } from "@/lib/validations/groupInquiry";
 import { generateBaseReferenceNumber } from "@/lib/utils/reference-generator";
 import { sendInquiryNotification } from "@/lib/email";
 
+function sanitize(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.replace(/<[^>]*>/g, "").trim() || null;
+}
+
 // Create a Supabase client for public submissions
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,7 +30,7 @@ export async function POST(request: Request) {
     }
 
     const {
-      arranged_by_agent,
+      is_tour_agent,
       agent_name,
       agent_email,
       agent_company,
@@ -36,13 +41,11 @@ export async function POST(request: Request) {
       client_email,
       country,
       arriving_date,
+      arrival_flight_no,
+      arrival_time,
       departure_date,
-      inbound_flight_no,
-      inbound_arrival_date,
-      inbound_arrival_time,
-      outbound_flight_no,
-      outbound_departure_date,
-      outbound_departure_time,
+      departure_flight_no,
+      departure_time,
       no_of_adults,
       no_of_children,
       hotel_type,
@@ -96,77 +99,50 @@ export async function POST(request: Request) {
       }
     }
 
-    // Calculate number of nights
+    // Calculate number of nights (Math.floor: check-in day 1, check-out day 2 = 1 night)
     const arrivingDate = new Date(arriving_date);
     const departureDate = new Date(departure_date);
     const diffTime = departureDate.getTime() - arrivingDate.getTime();
-    const no_of_nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const no_of_nights = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-    const insertPayload = {
-        agent_name: agent_name || null,
+    // Insert group inquiry
+    const { data: groupInquiry, error: inquiryError } = await supabase
+      .from("group_inquiries")
+      .insert({
+        is_tour_agent: is_tour_agent || false,
+        agent_name: sanitize(agent_name),
         agent_email: agent_email || null,
-        agent_company: agent_company || null,
-        arranged_by_agent: arranged_by_agent || false,
-        inbound_flight_no: inbound_flight_no || null,
-        inbound_arrival_date: inbound_arrival_date || null,
-        inbound_arrival_time: inbound_arrival_time || null,
-        outbound_flight_no: outbound_flight_no || null,
-        outbound_departure_date: outbound_departure_date || null,
-        outbound_departure_time: outbound_departure_time || null,
-        head_first_name: head_first_name || null,
-        head_last_name: head_last_name || null,
-        head_passport_no: head_passport_no || null,
-        contact_number: contact_number || null,
+        agent_company: sanitize(agent_company),
+        head_first_name: sanitize(head_first_name),
+        head_last_name: sanitize(head_last_name),
+        head_passport_no: sanitize(head_passport_no),
+        contact_number: sanitize(contact_number),
         client_email: client_email || null,
-        country: country || null,
+        country: sanitize(country),
         arriving_date,
+        arrival_flight_no: arrival_flight_no || null,
+        arrival_time: arrival_time || null,
         departure_date,
+        departure_flight_no: departure_flight_no || null,
+        departure_time: departure_time || null,
         no_of_nights,
         no_of_adults,
         no_of_children: no_of_children || 0,
-        hotel_type,
-        room_category,
-        meal_plan: meal_plan || null,
+        hotel_type: hotel_type,
+        room_category: room_category,
+        meal_plan: meal_plan && meal_plan.length > 0 ? meal_plan : null,
         rooms_dbl,
         rooms_sgl,
         rooms_tpl,
         rooms_qtpl,
         activities,
-        client_desires: client_desires || null,
+        client_desires: sanitize(client_desires),
         status: "new",
         priority: "medium",
         inquiry_number: finalRef,
-    };
-
-    // Insert group inquiry
-    let { data: groupInquiry, error: inquiryError } = await supabase
-      .from("group_inquiries")
-      .insert(insertPayload)
+      })
       .select()
       .single();
-
-    // Fallback if migration hasn't been run
-    if (inquiryError && (inquiryError.code === '42703' || inquiryError.message.includes('column'))) {
-      const { 
-        arranged_by_agent, 
-        inbound_flight_no, 
-        inbound_arrival_date, 
-        inbound_arrival_time, 
-        outbound_flight_no, 
-        outbound_departure_date, 
-        outbound_departure_time, 
-        ...safePayload 
-      } = insertPayload;
-
-      const retry = await supabase
-        .from("group_inquiries")
-        .insert(safePayload)
-        .select()
-        .single();
-      
-      groupInquiry = retry.data;
-      inquiryError = retry.error;
-    }
 
     if (inquiryError) {
       console.error("Database error:", inquiryError);

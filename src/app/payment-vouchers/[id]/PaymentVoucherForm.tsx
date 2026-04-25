@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
-import { paymentModes, payeeTypes, voucherStatuses, formatAmountInWords } from "@/lib/validations/paymentVoucher";
+import { paymentModes, payeeTypes, voucherCategories, formatAmountInWords } from "@/lib/validations/paymentVoucher";
+import { AdminPinModal } from "@/components/AdminPinModal";
+import { VersionHistoryPanel } from "@/components/VersionHistoryPanel";
 
 interface PaymentVoucherFormProps {
     voucher: any;
@@ -13,6 +15,18 @@ interface PaymentVoucherFormProps {
 export function PaymentVoucherForm({ voucher, onSave }: PaymentVoucherFormProps) {
     const router = useRouter();
     const [saving, setSaving] = useState(false);
+    const [showPinModal, setShowPinModal] = useState(false);
+    const [showVersionHistory, setShowVersionHistory] = useState(false);
+    const [pinAuthorized, setPinAuthorized] = useState(false);
+
+    // Check if this is a past document (voucher date < today)
+    const isPastDocument = () => {
+        const vDate = new Date(voucher.voucher_date || new Date());
+        vDate.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return vDate < today;
+    };
     const [formData, setFormData] = useState({
         voucher_date: voucher.voucher_date || new Date().toISOString().split("T")[0],
         hotel_invoice_no: voucher.hotel_invoice_no || "",
@@ -33,6 +47,7 @@ export function PaymentVoucherForm({ voucher, onSave }: PaymentVoucherFormProps)
         checked_by: voucher.checked_by || "",
         authorized_by: voucher.authorized_by || "",
         bill_image_url: voucher.bill_image_url || "",
+        voucher_category: voucher.voucher_category || "hotel",
     });
 
     const handleChange = (field: string, value: any) => {
@@ -62,8 +77,33 @@ export function PaymentVoucherForm({ voucher, onSave }: PaymentVoucherFormProps)
     };
 
     const handleSave = async () => {
+        // If past document and not yet authorized, show PIN modal
+        if (isPastDocument() && !pinAuthorized) {
+            setShowPinModal(true);
+            return;
+        }
+
+        await performSave();
+    };
+
+    const performSave = async () => {
         setSaving(true);
         try {
+            // Save version snapshot before editing (for past documents)
+            if (isPastDocument()) {
+                await fetch("/api/document-versions", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        document_type: "payment_voucher",
+                        document_id: voucher.id,
+                        content: voucher,
+                        edited_by: "Admin",
+                        edit_reason: "Manual edit after PIN authorization",
+                    }),
+                });
+            }
+
             const amountInWords = formatAmountInWords(formData.total_usd);
 
             const response = await fetch("/api/payment-vouchers", {
@@ -82,7 +122,6 @@ export function PaymentVoucherForm({ voucher, onSave }: PaymentVoucherFormProps)
 
             router.refresh();
             onSave?.();
-            // Redirect back to payment vouchers list, preserving tour_id filter if present
             const returnUrl = voucher.tour_id
                 ? `/payment-vouchers?tour_id=${voucher.tour_id}`
                 : "/payment-vouchers";
@@ -118,7 +157,7 @@ export function PaymentVoucherForm({ voucher, onSave }: PaymentVoucherFormProps)
     return (
         <div className="space-y-6">
             {/* Header Info */}
-            <div className="card p-6 bg-linear-to-br from-primary-50 to-surface-50 border border-primary-100">
+            <div className="card p-6 bg-gradient-to-br from-primary-50 to-surface-50 border border-primary-100">
                 <div className="flex items-center justify-between">
                     <div>
                         <p className="text-[10px] uppercase font-bold text-primary-600 tracking-wider mb-1">Voucher Number</p>
@@ -182,6 +221,22 @@ export function PaymentVoucherForm({ voucher, onSave }: PaymentVoucherFormProps)
                 {/* Right Column - Payee Info */}
                 <div className="card p-6 space-y-4">
                     <h3 className="text-sm font-bold text-surface-900 border-b border-surface-100 pb-2">Payee Information</h3>
+
+                    <div>
+                        <label className="block text-xs font-medium text-surface-600 mb-1">Voucher Category</label>
+                        <select
+                            value={formData.voucher_category}
+                            onChange={(e) => handleChange("voucher_category", e.target.value)}
+                            className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        >
+                            {voucherCategories.map(cat => (
+                                <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                            ))}
+                        </select>
+                        {formData.voucher_category === "admin" && (
+                            <p className="text-[10px] text-amber-600 mt-1 font-medium">Admin vouchers are for office use and will not reflect on tour P&L</p>
+                        )}
+                    </div>
 
                     <div>
                         <label className="block text-xs font-medium text-surface-600 mb-1">Payee Type</label>
@@ -337,7 +392,7 @@ export function PaymentVoucherForm({ voucher, onSave }: PaymentVoucherFormProps)
 
                 {formData.bill_image_url ? (
                     <div className="flex items-center gap-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <svg className="w-8 h-8 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-8 h-8 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div className="flex-1">
@@ -354,7 +409,7 @@ export function PaymentVoucherForm({ voucher, onSave }: PaymentVoucherFormProps)
                         <button
                             type="button"
                             onClick={() => handleChange("bill_image_url", "")}
-                            className="px-3 py-1.5 text-xs font-medium text-accent-500 hover:bg-accent-500/10 rounded-lg transition-colors"
+                            className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                             Remove
                         </button>
@@ -447,22 +502,58 @@ export function PaymentVoucherForm({ voucher, onSave }: PaymentVoucherFormProps)
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3">
-                <Button
-                    variant="secondary"
-                    onClick={() => {
-                        const returnUrl = voucher.tour_id
-                            ? `/payment-vouchers?tour_id=${voucher.tour_id}`
-                            : "/payment-vouchers";
-                        router.push(returnUrl);
-                    }}
-                >
-                    Cancel
-                </Button>
-                <Button variant="primary" onClick={handleSave} disabled={saving}>
-                    {saving ? "Saving..." : "Save Changes"}
-                </Button>
+            <div className="flex items-center justify-between">
+                <div>
+                    {isPastDocument() && (
+                        <Button
+                            variant="ghost"
+                            onClick={() => setShowVersionHistory(true)}
+                            className="text-xs text-surface-500"
+                        >
+                            <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Version History
+                        </Button>
+                    )}
+                </div>
+                <div className="flex gap-3">
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            const returnUrl = voucher.tour_id
+                                ? `/payment-vouchers?tour_id=${voucher.tour_id}`
+                                : "/payment-vouchers";
+                            router.push(returnUrl);
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button variant="primary" onClick={handleSave} disabled={saving}>
+                        {saving ? "Saving..." : isPastDocument() && !pinAuthorized ? "🔒 Save Changes" : "Save Changes"}
+                    </Button>
+                </div>
             </div>
+
+            {/* PIN Auth Modal */}
+            <AdminPinModal
+                isOpen={showPinModal}
+                onClose={() => setShowPinModal(false)}
+                onAuthorized={() => {
+                    setPinAuthorized(true);
+                    performSave();
+                }}
+                title="Edit Past Voucher"
+                description={`This voucher is dated ${voucher.voucher_date}. Enter the admin PIN to authorize editing.`}
+            />
+
+            {/* Version History */}
+            <VersionHistoryPanel
+                documentType="payment_voucher"
+                documentId={voucher.id}
+                isOpen={showVersionHistory}
+                onClose={() => setShowVersionHistory(false)}
+            />
         </div>
     );
 }

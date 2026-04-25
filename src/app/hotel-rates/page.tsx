@@ -258,8 +258,8 @@ function HotelRatesContent() {
         return (
             <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-surface-100 flex items-center justify-center">
                 <div className="max-w-md w-full bg-white rounded-xl shadow-xl p-8 text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent-500/10 flex items-center justify-center">
-                        <svg className="w-8 h-8 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </div>
@@ -292,7 +292,7 @@ function HotelRatesContent() {
                             <span className="text-white font-bold">SH</span>
                         </div>
                         <div>
-                            <h1 className="text-lg font-semibold text-surface-900">TraveX</h1>
+                            <h1 className="text-lg font-semibold text-surface-900">TravX</h1>
                             <p className="text-xs text-surface-500">Hotel Rate Submission Form</p>
                         </div>
                     </div>
@@ -347,7 +347,7 @@ function HotelRatesContent() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-surface-700 mb-1">
-                                    Hotel Name <span className="text-accent-500">*</span>
+                                    Hotel Name <span className="text-red-500">*</span>
                                 </label>
                                 <Input
                                     type="text"
@@ -359,7 +359,7 @@ function HotelRatesContent() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-surface-700 mb-1">
-                                    Hotel Email <span className="text-accent-500">*</span>
+                                    Hotel Email <span className="text-red-500">*</span>
                                 </label>
                                 <Input
                                     type="email"
@@ -407,7 +407,7 @@ function HotelRatesContent() {
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => removeRoomCategory(catIndex)}
-                                        className="text-accent-500 hover:text-accent-700"
+                                        className="text-red-500 hover:text-red-700"
                                     >
                                         Remove Category
                                     </Button>
@@ -417,7 +417,7 @@ function HotelRatesContent() {
                             {/* Room Category Name */}
                             <div className="mb-6">
                                 <label className="block text-sm font-medium text-surface-700 mb-1">
-                                    Room Category Name <span className="text-accent-500">*</span>
+                                    Room Category Name <span className="text-red-500">*</span>
                                 </label>
                                 <div className="flex gap-2">
                                     <Input
@@ -456,7 +456,7 @@ function HotelRatesContent() {
                                                 <button
                                                     type="button"
                                                     onClick={() => removeRatePlan(catIndex, planIndex)}
-                                                    className="text-accent-500 hover:text-accent-700 text-sm"
+                                                    className="text-red-500 hover:text-red-700 text-sm"
                                                 >
                                                     Remove
                                                 </button>
@@ -599,7 +599,7 @@ function HotelRatesContent() {
 
                     {/* Error Message */}
                     {error && (
-                        <div className="p-4 bg-accent-500/10 border border-accent-500/30 rounded-lg text-accent-600 text-sm">
+                        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                             {error}
                         </div>
                     )}
@@ -622,7 +622,7 @@ function HotelRatesContent() {
             {/* Footer */}
             <footer className="border-t border-surface-200 mt-12 py-6">
                 <div className="max-w-5xl mx-auto px-4 text-center text-sm text-surface-500">
-                    <p>Thank you for partnering with TraveX</p>
+                    <p>Thank you for partnering with TravX</p>
                 </div>
             </footer>
         </div>

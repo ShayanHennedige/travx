@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import Link from "next/link";
 import Image from "next/image";
-import { useTheme } from "@/lib/ThemeContext";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -13,8 +12,7 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState(process.env.NEXT_PUBLIC_LOGO_URL || "/Serendia.png");
-  const [companyName, setCompanyName] = useState("TraveX");
-  const { theme, toggleTheme } = useTheme();
+  const [companyName, setCompanyName] = useState("TravX");
 
   useEffect(() => {
     const savedLogo = localStorage.getItem("logoUrl");
@@ -22,6 +20,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     if (savedLogo) setLogoUrl(savedLogo);
     if (savedName) setCompanyName(savedName);
 
+    // Prevent scrolling when mobile sidebar is open
     if (isSidebarOpen) {
       document.body.style.overflow = "hidden";
     } else {
@@ -30,15 +29,15 @@ export function AppLayout({ children }: AppLayoutProps) {
   }, [isSidebarOpen]);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "var(--bg-base)" }}>
+    <div className="min-h-screen bg-[var(--bg-base)]">
       {/* Mobile Top Bar */}
-      <div className="lg:hidden flex items-center justify-between h-16 px-4 bg-surface-900 text-white border-b border-surface-800 sticky top-0 z-30 shadow-lg">
+      <div className="lg:hidden flex items-center justify-between h-16 px-4 bg-surface-900 text-surface-100 border-b border-surface-800 light:bg-white light:text-surface-900 light:border-surface-200 sticky top-0 z-30 shadow-md">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="p-2 rounded-lg bg-surface-800 text-surface-400 hover:text-white hover:bg-surface-700 transition-colors"
+            className="p-2 rounded-lg bg-white/5 text-surface-400 hover:text-surface-100 light:bg-surface-100 light:text-surface-600 light:hover:text-surface-900"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
@@ -51,24 +50,8 @@ export function AppLayout({ children }: AppLayoutProps) {
               unoptimized={logoUrl.startsWith("data:")}
             />
           </div>
-          <span className="font-bold text-sm tracking-tight text-white">{companyName}</span>
+          <span className="font-bold text-sm tracking-tight">{companyName}</span>
         </div>
-        {/* Mobile Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className="p-2 rounded-lg bg-surface-800 text-surface-400 hover:text-accent-400 hover:bg-surface-700 transition-all duration-200"
-          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {theme === "dark" ? (
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          ) : (
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
-          )}
-        </button>
       </div>
 
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />

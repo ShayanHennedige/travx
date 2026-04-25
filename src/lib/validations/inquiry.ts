@@ -73,10 +73,8 @@ export const inquiryPriorities = ["low", "medium", "high", "urgent"] as const;
 
 // Public inquiry form schema (for client submission)
 export const publicInquirySchema = z.object({
-  // Agent Arrangement
-  arranged_by_agent: z.boolean().default(false),
-  
   // Travel Agent Details (Optional)
+  is_tour_agent: z.boolean().default(false),
   agent_name: z.string().optional(),
   agent_email: z.string().email("Please enter a valid agent email address").optional().or(z.literal("")),
   agent_company: z.string().optional(),
@@ -97,18 +95,16 @@ export const publicInquirySchema = z.object({
   country: z.string().optional().or(z.literal("")),
   arriving_date: z.string().min(1, "Arriving date is required"),
   departure_date: z.string().min(1, "Departure date is required"),
-  // Flight Details (Optional)
-  inbound_flight_no: z.string().optional().or(z.literal("")),
-  inbound_arrival_date: z.string().optional().or(z.literal("")),
-  inbound_arrival_time: z.string().optional().or(z.literal("")),
-  outbound_flight_no: z.string().optional().or(z.literal("")),
-  outbound_departure_date: z.string().optional().or(z.literal("")),
-  outbound_departure_time: z.string().optional().or(z.literal("")),
+  arrival_flight_no: z.string().optional(),
+  arrival_time: z.string().optional(),
+  departure_flight_no: z.string().optional(),
+  departure_time: z.string().optional(),
   no_of_pax: z.coerce.number().min(1, "At least 1 person is required").max(50).default(1),
   no_of_children: z.coerce.number().min(0).max(20).default(0),
-  hotel_type: z.string().min(1, "Please select a hotel type"),
-  room_category: z.string().min(1, "Please select a room category"),
-  meal_plan: z.string().optional(),
+  hotel_type: z.array(z.string()).min(1, "Please select at least one hotel type"),
+  room_category: z.array(z.string()).min(1, "Please select at least one room category"),
+  meal_plan: z.array(z.string()).min(1, "Please select at least one meal plan"),
+  mixed_mode: z.boolean().default(false),
   // Room quantities
   rooms_dbl: z.coerce.number().min(0).max(20).default(0),
   rooms_sgl: z.coerce.number().min(0).max(20).default(0),
@@ -117,6 +113,19 @@ export const publicInquirySchema = z.object({
   activities: z.array(z.string()).min(1, "Please select at least one activity"),
   client_desires: z.string().optional(),
 }).refine(
+  (data) => {
+    if (data.arriving_date) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return new Date(data.arriving_date) >= today;
+    }
+    return true;
+  },
+  {
+    message: "Arrival date cannot be in the past",
+    path: ["arriving_date"],
+  }
+).refine(
   (data) => {
     if (data.arriving_date && data.departure_date) {
       return new Date(data.departure_date) > new Date(data.arriving_date);
@@ -156,3 +165,17 @@ export const signupSchema = z.object({
 });
 
 export type SignupFormData = z.infer<typeof signupSchema>;
+
+// Passenger Manifest schema for deferred data collection
+export const passengerManifestSchema = z.object({
+  first_name: z.string().min(2, "First name is required"),
+  last_name: z.string().min(2, "Last name is required"),
+  passport_number: z.string().min(4, "Valid passport number is required"),
+  passport_expiry: z.string().min(1, "Passport expiry date is required"),
+  nationality: z.string().min(2, "Nationality is required"),
+  date_of_birth: z.string().min(1, "Date of birth is required"),
+  dietary_requirements: z.string().optional(),
+  is_lead_passenger: z.boolean().default(false),
+});
+
+export type PassengerManifestFormData = z.infer<typeof passengerManifestSchema>;

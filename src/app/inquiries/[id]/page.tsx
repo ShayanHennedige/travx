@@ -5,8 +5,11 @@ import { StatusBadge, Button } from "@/components/ui";
 import Link from "next/link";
 import { format } from "date-fns";
 import { InquiryStatus } from "@/types/database";
-import { ItineraryQuickActions } from "./ItineraryQuickActions";
+import { ProposalQuickActions } from "./ProposalQuickActions";
 import { GenerateFeedbackLinkButton } from "./GenerateFeedbackLinkButton";
+import { getEffectiveStatus } from "@/lib/utils/status";
+import { InquiryStatusUpdate } from "./InquiryStatusUpdate";
+import { InquiryQuickEdit } from "./InquiryQuickEdit";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -34,14 +37,21 @@ export default async function InquiryDetailPage({ params }: PageProps) {
     .order("created_at", { ascending: false })
     .limit(10);
 
-  // Fetch existing itinerary if any
-  const { data: existingItinerary } = await supabase
-    .from("itineraries")
-    .select("id, content, created_at")
+  // Fetch proposals alongside their itinerary versions
+  const { data: proposals } = await supabase
+    .from("proposals")
+    .select("*, itinerary_versions(*)")
     .eq("inquiry_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+    .order("created_at", { ascending: false });
+
+  // For the GenerateFeedbackLinkButton backwards compatibility:
+  let existingItinerary = null;
+  if (proposals && proposals.length > 0) {
+     const earliestProposal = proposals[proposals.length - 1]; // or the accepted one
+     if (earliestProposal.itinerary_versions && earliestProposal.itinerary_versions.length > 0) {
+        existingItinerary = { id: earliestProposal.itinerary_versions[0].itinerary_id };
+     }
+  }
 
   // Fetch tour if exists
   const { data: tour } = await supabase
@@ -64,13 +74,13 @@ export default async function InquiryDetailPage({ params }: PageProps) {
                 tourId={tour?.id}
               />
               <Link href="/inquiries" className="w-full sm:w-auto">
-                <Button variant="secondary" className="w-full sm:w-auto bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm">
+                <Button variant="secondary" className="w-full sm:w-auto bg-surface-800 text-surface-100 border-surface-700 hover:bg-surface-700 shadow-sm light:bg-white light:text-surface-700 light:border-surface-200 light:hover:bg-surface-50">
                   <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                   <span className="xs:hidden sm:inline">Back</span>
                   <span className="hidden xs:inline sm:hidden">Back to Inquiries</span>
-                  <span className="hidden sm:inline">Back to Intelligence</span>
+                  <span className="hidden sm:inline"></span>
                 </Button>
               </Link>
             </div>
@@ -83,7 +93,7 @@ export default async function InquiryDetailPage({ params }: PageProps) {
         <div className="lg:col-span-3 space-y-8 animate-in fade-in slide-in-from-left-4 duration-700">
 
           {/* Status Dash */}
-          <div className="relative overflow-hidden bg-[#0f172a] rounded-[2rem] p-8 shadow-2xl border border-white/10 group">
+          <div className="relative overflow-hidden bg-surface-900 rounded-[2rem] p-8 shadow-2xl border border-white/10 group">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-[80px] -mr-32 -mt-32" />
             <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex items-center gap-4 sm:gap-6">
@@ -94,13 +104,14 @@ export default async function InquiryDetailPage({ params }: PageProps) {
                 </div>
                 <div>
                   <h3 className="text-white text-lg sm:text-xl font-bold tracking-tight mb-0.5 sm:mb-1">Workflow Status</h3>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">Inquiry Pipeline</p>
+                  <p className="text-surface-400 text-[10px] font-bold uppercase tracking-[0.2em]">Inquiry Pipeline</p>
                 </div>
               </div>
               <div className="flex items-center gap-4 md:gap-8">
                 <div className="h-10 w-px bg-white/10 hidden md:block" />
-                <div className="w-full md:w-auto">
-                  <StatusBadge status={inquiry.status as InquiryStatus} />
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <StatusBadge status={getEffectiveStatus(inquiry.status, inquiry.arriving_date, inquiry.departure_date) as InquiryStatus} />
+                  <InquiryStatusUpdate inquiryId={inquiry.id} currentStatus={inquiry.status as InquiryStatus} />
                 </div>
               </div>
             </div>
@@ -161,50 +172,35 @@ export default async function InquiryDetailPage({ params }: PageProps) {
                   Logistics & Schedule
                 </h2>
               </div>
-              <div className="space-y-8">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 bg-slate-50 rounded-2xl border border-slate-100 gap-4 sm:gap-2">
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 gap-4 sm:gap-2">
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Arrival Window</p>
-                    <p className="text-4 font-bold text-slate-800">{inquiry.arriving_date ? format(new Date(inquiry.arriving_date), "MMM d, yyyy") : "TBD"}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Arrival Window</p>
+                    <p className="text-sm font-bold text-slate-800">{inquiry.arriving_date ? format(new Date(inquiry.arriving_date), "MMM d, yyyy") : "TBD"}</p>
+                    {inquiry.arrival_flight_no && (
+                      <p className="text-xs text-slate-500 mt-1 font-medium">
+                        {inquiry.arrival_flight_no} {inquiry.arrival_time ? `@ ${inquiry.arrival_time}` : ""}
+                      </p>
+                    )}
                   </div>
-                  <div className="hidden sm:flex w-14 h-14 rounded-full bg-white items-center justify-center shadow-sm border border-slate-100">
-                    <svg className="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="hidden sm:flex w-8 h-8 rounded-full bg-white items-center justify-center shadow-sm">
+                    <svg className="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                     </svg>
                   </div>
                   <div className="sm:text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Departure</p>
-                    <p className="text-4 font-bold text-slate-800">{inquiry.departure_date ? format(new Date(inquiry.departure_date), "MMM d, yyyy") : "TBD"}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Departure</p>
+                    <p className="text-sm font-bold text-slate-800">{inquiry.departure_date ? format(new Date(inquiry.departure_date), "MMM d, yyyy") : "TBD"}</p>
+                    {inquiry.departure_flight_no && (
+                      <p className="text-xs text-slate-500 mt-1 font-medium">
+                        {inquiry.departure_flight_no} {inquiry.departure_time ? `@ ${inquiry.departure_time}` : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Group Capacity</p>
-                    <p className="text-4 font-bold text-slate-900">{`${(inquiry.no_of_pax || 0) + (inquiry.no_of_children || 0)} Members`}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Active Duration</p>
-                    <p className="text-4 font-bold text-slate-900">{`${inquiry.no_of_nights || 0} Nights Total`}</p>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-100 pt-6">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-5 italic">Flight Intelligence</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Arrival Flight</p>
-                      <p className="text-4 font-bold text-slate-900 mb-2">{inquiry.inbound_flight_no || "N/A"}</p>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Arrival Time</p>
-                      <p className="text-4 font-bold text-slate-900">{inquiry.inbound_arrival_time || "N/A"}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Departure Flight</p>
-                      <p className="text-4 font-bold text-slate-900 mb-2">{inquiry.outbound_flight_no || "N/A"}</p>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Departure Time</p>
-                      <p className="text-4 font-bold text-slate-900">{inquiry.outbound_departure_time || "N/A"}</p>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <InfoItem label="Group Capacity" value={`${(inquiry.no_of_pax || 0) + (inquiry.no_of_children || 0)} Members`} />
+                  <InfoItem label="Active Duration" value={`${inquiry.no_of_nights || 0} Nights Total`} />
                 </div>
               </div>
             </div>
@@ -224,9 +220,21 @@ export default async function InquiryDetailPage({ params }: PageProps) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6 sm:gap-10 mb-10">
-              <InfoItem label="Service Category" value={inquiry.hotel_type || "Premium Selection"} />
-              <InfoItem label="Room Class" value={inquiry.room_category || "Standardized"} />
-              <InfoItem label="Meal Plan" value={inquiry.meal_plan || "Not Specified"} />
+              <InfoItem label="Service Category" value={
+                Array.isArray(inquiry.hotel_type) && inquiry.hotel_type.length > 0
+                  ? <div className="flex flex-wrap gap-1">{inquiry.hotel_type.map((t: string) => <span key={t} className="px-2 py-0.5 bg-primary-50 text-primary-700 rounded-lg text-[10px] font-bold border border-primary-100">{t}</span>)}</div>
+                  : "Premium Selection"
+              } />
+              <InfoItem label="Room Class" value={
+                Array.isArray(inquiry.room_category) && inquiry.room_category.length > 0
+                  ? <div className="flex flex-wrap gap-1">{inquiry.room_category.map((r: string) => <span key={r} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-bold border border-blue-100">{r}</span>)}</div>
+                  : "Standardized"
+              } />
+              <InfoItem label="Meal Plan" value={
+                Array.isArray(inquiry.meal_plan) && inquiry.meal_plan.length > 0
+                  ? <div className="flex flex-wrap gap-1">{inquiry.meal_plan.map((m: string) => <span key={m} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-100">{m}</span>)}</div>
+                  : "Not Specified"
+              } />
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Inventory Mix</p>
                 <div className="flex flex-wrap gap-2">
@@ -255,41 +263,38 @@ export default async function InquiryDetailPage({ params }: PageProps) {
               )}
             </div>
 
-            {inquiry.client_desires && (
-              <div className="pt-8 mt-8 border-t border-slate-100">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 italic">Client Desires & Preferred Places</h3>
-                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 italic text-slate-700 text-sm leading-relaxed">
-                  "{inquiry.client_desires}"
-                </div>
-              </div>
-            )}
+            <div className="pt-8 mt-8 border-t border-slate-100">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 italic">Client Desires & Preferred Places</h3>
+              <InquiryQuickEdit
+                inquiryId={inquiry.id}
+                field="client_desires"
+                label="Client Desires"
+                initialValue={inquiry.client_desires || null}
+              />
+            </div>
           </div>
 
-          <ItineraryQuickActions
+          <ProposalQuickActions
             inquiryId={inquiry.id}
-            existingItinerary={existingItinerary ? {
-              id: existingItinerary.id,
-              title: (existingItinerary.content as { title: string }).title,
-              days: ((existingItinerary.content as { days: { day: number }[] }).days || []).length,
-              created_at: existingItinerary.created_at,
-            } : null}
+            existingProposals={proposals || []}
           />
 
-          {inquiry.notes && (
-            <div className="bg-[#fffbeb] rounded-[2rem] p-8 border border-amber-100">
-              <div className="flex items-center gap-3 mb-4">
-                <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                <h2 className="text-sm font-black text-amber-900 uppercase tracking-widest">
-                  Strategic Intelligence Notes
-                </h2>
-              </div>
-              <p className="text-amber-800 text-sm leading-relaxed whitespace-pre-wrap font-medium">
-                {inquiry.notes}
-              </p>
+          <div className="bg-accent-50 rounded-[2rem] p-8 border border-accent-200">
+            <div className="flex items-center gap-3 mb-4">
+              <svg className="w-5 h-5 text-accent-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <h2 className="text-sm font-black text-accent-900 uppercase tracking-widest">
+                Strategic Intelligence Notes
+              </h2>
             </div>
-          )}
+            <InquiryQuickEdit
+              inquiryId={inquiry.id}
+              field="notes"
+              label="Notes"
+              initialValue={inquiry.notes || null}
+            />
+          </div>
         </div>
 
         {/* Intelligence Sidebar */}
@@ -310,35 +315,31 @@ export default async function InquiryDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          <div className="bg-[#0f172a] rounded-[2rem] p-8 shadow-2xl overflow-hidden">
-            <h3 className="text-sm font-bold text-white mb-6 pb-4 border-b border-white/10">
-              Operational Logs
-            </h3>
-            {activities && activities.length > 0 ? (
+          {activities && activities.length > 0 && (
+            <div className="bg-surface-900 rounded-[2rem] p-8 shadow-2xl overflow-hidden mt-8">
+              <h3 className="text-sm font-bold text-white mb-6 pb-4 border-b border-white/10">
+                Operational Logs
+              </h3>
               <div className="space-y-6">
                 {activities.map((activity, index) => (
                   <div key={activity.id} className="relative pl-6">
                     {index !== activities.length - 1 && (
                       <div className="absolute left-[3px] top-4 bottom-[-24px] w-0.5 bg-white/5" />
                     )}
-                    <div className="absolute left-0 top-1.5 w-2 h-2 rounded-full bg-primary-500 shadow-[0_0_8px_rgba(224,67,68,0.5)]" />
+                    <div className="absolute left-0 top-1.5 w-2 h-2 rounded-full bg-primary-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                     <div>
-                      <p className="text-slate-200 text-xs font-bold capitalize mb-1">
+                      <p className="text-surface-200 text-xs font-bold capitalize mb-1">
                         {activity.action.replace("_", " ")}
                       </p>
-                      <p className="text-slate-500 text-[10px] font-medium">
+                      <p className="text-surface-500 text-[10px] font-medium">
                         {activity.profiles ? (activity.profiles as any).full_name : "System"} · {format(new Date(activity.created_at), "MMM d, HH:mm")}
                       </p>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="text-center py-10 opacity-20">
-                <p className="text-white text-xs font-bold uppercase tracking-widest">No Logs Found</p>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>

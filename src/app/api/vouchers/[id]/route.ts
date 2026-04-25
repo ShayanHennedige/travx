@@ -41,7 +41,15 @@ export async function GET(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(voucher);
+  const inquiry = Array.isArray((voucher as any).inquiries) ? (voucher as any).inquiries[0] : (voucher as any).inquiries;
+  const groupInquiry = Array.isArray((voucher as any).group_inquiries) ? (voucher as any).group_inquiries[0] : (voucher as any).group_inquiries;
+  const inquiryName = inquiry ? `${inquiry.first_name || ""} ${inquiry.last_name || ""}`.trim() : "";
+  const groupHeadName = groupInquiry ? `${groupInquiry.head_first_name || ""} ${groupInquiry.head_last_name || ""}`.trim() : "";
+
+  return NextResponse.json({
+    ...voucher,
+    guest_name: inquiryName || groupHeadName || (voucher as any).guest_name,
+  });
 }
 
 // PUT - Update voucher
@@ -52,29 +60,6 @@ export async function PUT(request: Request, { params }: RouteParams) {
   try {
     const body = await request.json();
 
-    const optionalStringFields = [
-      "arrival_time",
-      "departure_time",
-      "confirmed_by",
-      "confirmed_date",
-      "booked_by",
-      "booked_date",
-      "remarks",
-      "nationality",
-      "room_rate_currency",
-    ] as const;
-
-    const numericFields = [
-      "pax_adults",
-      "pax_children",
-      "pax_infants",
-      "no_of_rooms",
-      "no_of_nights",
-      "room_rate_sgl",
-      "room_rate_dbl",
-      "room_rate_tpl",
-    ] as const;
-
     // Remove fields that shouldn't be updated directly
     const {
       id: _id,
@@ -84,29 +69,38 @@ export async function PUT(request: Request, { params }: RouteParams) {
       ...updateData
     } = body;
 
-    for (const field of optionalStringFields) {
-      if (field in updateData && updateData[field] === "") {
-        updateData[field] = null;
-      }
-    }
+    // Sanitize data before update
+    const sanitizedData = { ...updateData };
 
-    for (const field of numericFields) {
-      if (!(field in updateData)) continue;
-      const value = updateData[field];
-      if (value === "" || value === null || value === undefined) {
-        updateData[field] = null;
-        continue;
+    // Handle numeric fields
+    const numericFields = [
+      "pax_adults", "pax_children", "pax_infants",
+      "no_of_rooms", "no_of_nights",
+      "room_rate_sgl", "room_rate_dbl", "room_rate_tpl", "room_rate_qtpl",
+      "rooms_sgl", "rooms_dbl", "rooms_tpl", "rooms_qtpl"
+    ];
+
+    numericFields.forEach(field => {
+      if (sanitizedData[field] === "") {
+        sanitizedData[field] = null;
+      } else if (typeof sanitizedData[field] === "string") {
+        const val = parseFloat(sanitizedData[field]);
+        sanitizedData[field] = isNaN(val) ? null : val;
       }
-      const parsed = Number(value);
-      if (!Number.isNaN(parsed)) {
-        updateData[field] = parsed;
-      }
-    }
+    });
+
+    // Handle date fields
+    const dateFields = ["confirmed_date", "booked_date", "check_in_date", "check_out_date"];
+    dateFields.forEach(field => {
+        if (sanitizedData[field] === "") {
+            sanitizedData[field] = null;
+        }
+    });
 
     const { data: voucher, error } = await supabase
       .from("hotel_vouchers")
       .update({
-        ...updateData,
+        ...sanitizedData,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
@@ -114,12 +108,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
       .single();
 
     if (error) {
-      console.error("Error updating voucher:", {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
-      });
+      console.error("Error updating voucher:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

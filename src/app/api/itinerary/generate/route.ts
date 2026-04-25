@@ -16,6 +16,7 @@ Core Rules (Must Follow Strictly):
    - Driving times between locations (be realistic - Sri Lanka roads can be slow)
    - Accurate driving distances in kilometers (km) between locations
    - Overnight location with hotel recommendation matching the star category
+   - SITE DESCRIPTIONS: Every activity MUST include a brief 1-2 sentence description of the attraction, city, or site being visited. This description should highlight what makes the location special, its historical/cultural significance, or natural beauty. This is mandatory for all activities.
 3. Geographic Logic: Plan routes that minimize backtracking
 4. Activity Distribution: Spread selected activities logically across days
 5. Realistic Pacing: Don't overload days - factor in rest, meals, and travel fatigue
@@ -44,12 +45,16 @@ Output your response as a valid JSON object with this structure:
       "title": "Day title",
       "overnight_location": "City/Area name",
       "hotel_suggestion": "Hotel name or area (X star)",
+      "hotel_tier": "The specific star category for this day (e.g., 5 Star, 3 Star, Boutique)",
+      "room_category": "Room category for this day (e.g., Deluxe, Standard, Superior)",
+      "meal_plan": "Meal plan for this day (e.g., BB, HB, FB, AI)",
       "day_total_km": "X km",
       "activities": [
         {
           "time": "Morning/Afternoon/Evening",
           "activity": "Description",
           "location": "Place name",
+          "site_description": "1-2 sentence description of the attraction, city, or site highlighting its significance, history, or natural beauty",
           "duration": "X hours",
           "driving_time": "X hours from previous" (optional),
           "driving_distance_km": "X km from [Origin Location] to [Destination Location]" (optional, e.g., "10 km from Katunayake to CMB", "150 km from Negombo to Sigiriya")
@@ -97,6 +102,15 @@ export async function POST(request: Request) {
     }
 
     // Build the user prompt with inquiry data
+    const hotelTypesStr = Array.isArray(inquiry.hotel_type) ? inquiry.hotel_type.join(", ") : (inquiry.hotel_type || "4-5 Star");
+    const mealPlanStr = Array.isArray(inquiry.meal_plan) ? inquiry.meal_plan.join(", ") : (inquiry.meal_plan || "Not specified");
+    const roomCategoryStr = Array.isArray(inquiry.room_category) ? inquiry.room_category.join(", ") : (inquiry.room_category || "Deluxe");
+    const isMixedMode = inquiry.mixed_mode === true;
+
+    const mixedModeInstruction = isMixedMode
+      ? `\n\nIMPORTANT - MIXED MODE ENABLED: The client has requested a MIXED setup. You MUST assign DIFFERENT hotel tiers and meal plans to DIFFERENT days based on the "Client Desires" text below. Do NOT use the same hotel tier for every day. Read the client's preferences carefully and map specific tiers to specific days. For example, if they want luxury in the city and budget in the countryside, assign "5-Star" to city days and "3-Star" to rural days.`
+      : "";
+
     const userPrompt = `Generate a detailed day-by-day itinerary for Sri Lanka with the following requirements:
 
 **Trip Details:**
@@ -104,6 +118,12 @@ export async function POST(request: Request) {
 - Departure Date: ${inquiry.departure_date}
 - Number of Nights: ${inquiry.no_of_nights}
 - Arrival Airport: CMB (Colombo Bandaranaike International Airport)
+- Arrival Flight: ${inquiry.arrival_flight_no || "TBA"} at ${inquiry.arrival_time || "TBA"}
+- Departure Flight: ${inquiry.departure_flight_no || "TBA"} at ${inquiry.departure_time || "TBA"}
+
+CRITICAL FLIGHT LOGISTICS: You MUST explicitly factor in the Arrival Time and Departure Time when scheduling activities. 
+- If arrival time is late afternoon or evening, limit Day 1 to just airport transfer and hotel check-in/rest.
+- If departure time is early morning, the final day should focus strictly on airport transit.
 
 **Travelers:**
 - Adults: ${inquiry.no_of_pax || 1}
@@ -111,10 +131,11 @@ export async function POST(request: Request) {
 - Total Travelers: ${(inquiry.no_of_pax || 1) + (inquiry.no_of_children || 0)}
 
 **Accommodation:**
-- Hotel Star Category: ${inquiry.hotel_type || "4-5 Star"}
-- Room Category: ${inquiry.room_category || "Deluxe"}
-- Meal Plan: ${inquiry.meal_plan || "Not specified"}
+- Hotel Star Category Options: ${hotelTypesStr}
+- Room Category Options: ${roomCategoryStr}
+- Meal Plan Options: ${mealPlanStr}
 - Rooms Required: ${(inquiry.rooms_dbl || 0)} Double, ${(inquiry.rooms_sgl || 0)} Single, ${(inquiry.rooms_tpl || 0)} Triple, ${(inquiry.rooms_qtpl || 0)} Quad
+${mixedModeInstruction}
 
 **Client Desires & Preferences:**
 ${inquiry.client_desires || "No specific desires mentioned. Please follow standard best practices for the chosen activities."}
@@ -124,15 +145,21 @@ ${inquiry.activities && (inquiry.activities as string[]).length > 0
         ? (inquiry.activities as string[]).map((a: string) => `- ${a}`).join("\n")
         : "- General sightseeing and cultural experiences"}
 
+CRITICAL: For EVERY day in your output, you MUST include these structured fields:
+- "hotel_tier": The specific hotel star category for THIS day (e.g., "5 Star", "3 Star", "Boutique")
+- "room_category": The room category for THIS day (e.g., "Deluxe", "Standard", "Superior")  
+- "meal_plan": The meal plan for THIS day (e.g., "BB", "HB", "FB")
+
 Please create a realistic, well-paced itinerary that:
 1. Starts from Colombo airport (Katunayake) on Day 1
 2. Ends back at Colombo airport (Katunayake) on the final day
 3. Incorporates the selected activities logically
-4. Suggesting appropriate hotels for the ${inquiry.hotel_type || "4-5 Star"} category and considering the ${inquiry.meal_plan || "selected"} meal plan
+4. Suggests appropriate hotels for the ${hotelTypesStr} category and considering the ${mealPlanStr} meal plan
 5. Considers the group has ${inquiry.no_of_children || 0} children (if any, include family-friendly options)
 6. Closely following the "Client Desires & Preferences" mentioned above to reform and personalize the itinerary
 7. The mileage for each day itinerary should be displayed in km.
 8. MANDATORY FORMAT: Every driving_distance_km field MUST be "X km from [Origin] to [Destination]". Examples: "10 km from Katunayake Airport to Negombo", "150 km from Negombo to Sigiriya", "80 km from Kandy to Nuwara Eliya". Never use incomplete formats.
+9. MANDATORY: Every activity MUST include a site_description field with 1-2 engaging sentences describing the attraction, city, or site being visited. Highlight its historical significance, cultural importance, or natural beauty.
 
 Return ONLY the JSON object, no additional text.`;
 
@@ -186,34 +213,61 @@ Return ONLY the JSON object, no additional text.`;
       );
     }
 
-    // Save to database
-    const { data: itinerary, error: saveError } = await supabase
+    // Prevent duplicate: if an itinerary already exists for this inquiry, update it instead
+    const { data: existing } = await supabase
       .from("itineraries")
-      .insert({
-        inquiry_id,
-        content: itineraryContent,
-        raw_response: rawContent,
-        model: openaiData.model,
-        tokens_used: openaiData.usage?.total_tokens,
-        generation_time_ms: generationTime,
-        status: "completed",
-      })
-      .select()
+      .select("id")
+      .eq("inquiry_id", inquiry_id)
+      .limit(1)
       .single();
 
-    if (saveError) {
-      console.error("Failed to save itinerary:", saveError);
-      return NextResponse.json(
-        { error: "Failed to save itinerary", details: saveError.message },
-        { status: 500 }
-      );
+    let itinerary;
+    if (existing?.id) {
+      const { data: updated, error: updateError } = await supabase
+        .from("itineraries")
+        .update({
+          content: itineraryContent,
+          raw_response: rawContent,
+          model: openaiData.model,
+          tokens_used: openaiData.usage?.total_tokens,
+          generation_time_ms: generationTime,
+          status: "completed",
+        })
+        .eq("id", existing.id)
+        .select()
+        .single();
+      if (updateError) {
+        console.error("Failed to update itinerary:", updateError);
+        return NextResponse.json({ error: "Failed to update itinerary", details: updateError.message }, { status: 500 });
+      }
+      itinerary = updated;
+    } else {
+      const { data: inserted, error: saveError } = await supabase
+        .from("itineraries")
+        .insert({
+          inquiry_id,
+          content: itineraryContent,
+          raw_response: rawContent,
+          model: openaiData.model,
+          tokens_used: openaiData.usage?.total_tokens,
+          generation_time_ms: generationTime,
+          status: "completed",
+        })
+        .select()
+        .single();
+      if (saveError) {
+        console.error("Failed to save itinerary:", saveError);
+        return NextResponse.json({ error: "Failed to save itinerary", details: saveError.message }, { status: 500 });
+      }
+      itinerary = inserted;
     }
 
-    // Automatically update inquiry status to 'in_progress'
+    // Update inquiry status to 'in_progress' only if still at 'new'
     await supabase
       .from("inquiries")
       .update({ status: "in_progress" })
-      .eq("id", inquiry_id);
+      .eq("id", inquiry_id)
+      .eq("status", "new");
 
     return NextResponse.json({
       success: true,

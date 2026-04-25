@@ -43,8 +43,8 @@ export function generateCostingSheetHTML(costingSheet: CostingSheet & { id: stri
         : "N/A";
 
     const logoHtml = logoBase64
-        ? `<img src="${logoBase64}" alt="TraveX" style="height: 110px; width: auto;">` 
-        : `<div style="font-size: 13px; font-weight: bold; color: #2c2c2c; letter-spacing: 2px; text-transform: uppercase;">TRAVEX</div>`;
+        ? `<img src="${logoBase64}" alt="TravX" style="height: 42px; width: auto;">`
+        : `<div style="font-size: 13px; font-weight: bold; color: #2c2c2c; letter-spacing: 2px; text-transform: uppercase;">TRAVX</div>`;
 
     return `
 <!DOCTYPE html>
@@ -67,24 +67,24 @@ export function generateCostingSheetHTML(costingSheet: CostingSheet & { id: stri
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 14px 0 16px;
-            border-bottom: 2px solid #2c2c2c;
-            margin-bottom: 20px;
+            align-items: flex-end;
+            padding-bottom: 10px;
+            border-bottom: 1.5px solid #2c2c2c;
+            margin-bottom: 16px;
         }
         .company-info {
             text-align: right;
-            font-size: 12px;
-            color: #444;
-            line-height: 1.65;
+            font-size: 9px;
+            color: #555;
+            line-height: 1.45;
         }
         .company-name {
-            font-size: 17px;
+            font-size: 13px;
             font-weight: bold;
             color: #2c2c2c;
-            letter-spacing: 3px;
+            letter-spacing: 2px;
             text-transform: uppercase;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         /* Title */
@@ -224,9 +224,9 @@ export function generateCostingSheetHTML(costingSheet: CostingSheet & { id: stri
     <div class="header">
         <div>${logoHtml}</div>
         <div class="company-info">
-            <div class="company-name">TraveX</div>
+            <div class="company-name">TravX</div>
             63A, Old Road, Pannipitiya, Sri Lanka<br>
-            +94 77 346 9998 &nbsp;·&nbsp; info@Travex.com
+            +94 77 346 9998 &nbsp;·&nbsp; info@serendiaholidays.com
         </div>
     </div>
 
@@ -346,7 +346,7 @@ export function generateCostingSheetHTML(costingSheet: CostingSheet & { id: stri
     <!-- Footer -->
     <div class="footer">
         <div class="footer-line"></div>
-        TraveX (Pvt) Ltd.
+        TravX
     </div>
 </body>
 </html>

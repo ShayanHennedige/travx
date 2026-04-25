@@ -12,55 +12,71 @@ interface ItineraryContent {
 export default async function ItinerariesPage() {
   const supabase = await createClient();
 
-  // Fetch all itineraries (core columns only — no embedded joins, FK not defined in schema)
-  const { data: rawItineraries, error: itinError } = await supabase
+  // Fetch all itineraries with their linked inquiry info (individual)
+  const { data: individualItineraries, error: indError } = await supabase
     .from("itineraries")
-    .select("id, content, created_at, updated_at, inquiry_id, group_inquiry_id, status")
+    .select(`
+      id,
+      content,
+      created_at,
+      updated_at,
+      inquiry_id,
+      group_inquiry_id,
+      status,
+      inquiries (
+        id,
+        inquiry_number,
+        first_name,
+        last_name,
+        client_email,
+        arriving_date,
+        departure_date,
+        no_of_nights,
+        no_of_pax,
+        no_of_children
+      )
+    `)
+    .not("inquiry_id", "is", null)
     .order("created_at", { ascending: false });
 
-  if (itinError) {
-    console.error("Error fetching itineraries:", itinError.message, itinError.code);
-  }
-
-  // Collect IDs for related lookups
-  const inquiryIds = (rawItineraries || []).map(i => i.inquiry_id).filter(Boolean) as string[];
-  const groupInquiryIds = (rawItineraries || []).map(i => i.group_inquiry_id).filter(Boolean) as string[];
-
-  // Fetch individual inquiries
-  const { data: inquiriesData, error: indError } = inquiryIds.length > 0
-    ? await supabase
-        .from("inquiries")
-        .select("id, inquiry_number, first_name, last_name, client_email, arriving_date, departure_date, no_of_nights, no_of_pax, no_of_children")
-        .in("id", inquiryIds)
-    : { data: [] as any[], error: null };
-
   if (indError) {
-    console.error("Error fetching individual inquiries:", indError.message, indError.code);
+    console.error("Error fetching individual itineraries:", indError);
   }
 
-  // Fetch group inquiries
-  const { data: groupInquiriesData, error: grpError } = groupInquiryIds.length > 0
-    ? await supabase
-        .from("group_inquiries")
-        .select("id, inquiry_number, head_first_name, head_last_name, client_email, arriving_date, departure_date, no_of_nights, no_of_adults, no_of_children")
-        .in("id", groupInquiryIds)
-    : { data: [] as any[], error: null };
+  // Fetch all itineraries with their linked group inquiry info
+  const { data: groupItineraries, error: grpError } = await supabase
+    .from("itineraries")
+    .select(`
+      id,
+      content,
+      created_at,
+      updated_at,
+      inquiry_id,
+      group_inquiry_id,
+      status,
+      group_inquiries (
+        id,
+        inquiry_number,
+        head_first_name,
+        head_last_name,
+        client_email,
+        arriving_date,
+        departure_date,
+        no_of_nights,
+        no_of_adults,
+        no_of_children
+      )
+    `)
+    .not("group_inquiry_id", "is", null)
+    .order("created_at", { ascending: false });
 
   if (grpError) {
-    console.error("Error fetching group inquiries:", grpError.message, grpError.code);
+    console.error("Error fetching group itineraries:", grpError);
   }
 
-  // Build lookup maps
-  const inquiryMap = new Map((inquiriesData || []).map((i: any) => [i.id, i]));
-  const groupInquiryMap = new Map((groupInquiriesData || []).map((i: any) => [i.id, i]));
-
-  // Split into individual vs group itineraries
-  const individualItineraries = (rawItineraries || []).filter(i => i.inquiry_id);
-  const groupItineraries = (rawItineraries || []).filter(i => i.group_inquiry_id);
-
   // Transform the data for the client component
-  const transformedIndividual = individualItineraries.map((itinerary) => {
-    const inquiryData = itinerary.inquiry_id ? (inquiryMap.get(itinerary.inquiry_id) as {
+  const transformedIndividual = (individualItineraries || []).map((itinerary) => {
+    const inquiryData = itinerary.inquiries as unknown as {
       id: string;
       inquiry_number: string;
       first_name: string;
@@ -71,7 +87,7 @@ export default async function ItinerariesPage() {
       no_of_nights: number;
       no_of_pax: number;
       no_of_children: number;
-    } | undefined) : null;
+    } | null;
 
     return {
       id: itinerary.id as string,
@@ -96,8 +112,8 @@ export default async function ItinerariesPage() {
     };
   });
 
-  const transformedGroup = groupItineraries.map((itinerary) => {
-    const inquiryData = itinerary.group_inquiry_id ? (groupInquiryMap.get(itinerary.group_inquiry_id) as {
+  const transformedGroup = (groupItineraries || []).map((itinerary) => {
+    const inquiryData = itinerary.group_inquiries as unknown as {
       id: string;
       inquiry_number: string;
       head_first_name: string;
@@ -108,7 +124,7 @@ export default async function ItinerariesPage() {
       no_of_nights: number;
       no_of_adults: number;
       no_of_children: number;
-    } | undefined) : null;
+    } | null;
 
     return {
       id: itinerary.id as string,

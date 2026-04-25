@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button, Badge } from "@/components/ui";
 
 interface GroupMember {
@@ -48,6 +48,17 @@ export function RoomingListManager({
   const [hasChanges, setHasChanges] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [draggedMember, setDraggedMember] = useState<GroupMember | null>(null);
+
+  // Auto-expand if navigating via anchor link
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#rooming-list") {
+      setIsExpanded(true);
+      // Wait for layout calculation then smooth scroll into view
+      setTimeout(() => {
+          document.getElementById("rooming-list")?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
+  }, []);
 
   // Interconnections: Array of room ID pairs that are interconnected
   const [interconnections, setInterconnections] = useState<number[][]>(initialInterconnections);
@@ -369,7 +380,7 @@ export function RoomingListManager({
   };
 
   return (
-    <div className="card overflow-hidden">
+    <div id="rooming-list" className="card overflow-hidden">
       {/* Header */}
       <div
         onClick={() => setIsExpanded(!isExpanded)}
@@ -651,7 +662,7 @@ export function RoomingListManager({
                                 e.stopPropagation();
                                 removeMemberFromRoom(member.id);
                               }}
-                              className="p-1 text-surface-400 hover:text-accent-500 hover:bg-accent-500/10 rounded transition-colors flex-shrink-0"
+                              className="p-1 text-surface-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors flex-shrink-0"
                             >
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

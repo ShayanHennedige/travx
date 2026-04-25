@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { startOfMonth, endOfMonth, format, parseISO, subMonths } from "date-fns";
 
-// GET - Get monthly P&L summary for completed tours
+const INCOME_STATUSES = ["confirmed", "sent", "paid", "overdue"] as const;
+
+// GET - Get monthly P&L summary for tours in the selected month
 export async function GET(request: Request) {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
@@ -58,11 +60,10 @@ async function getMonthlyPnl(supabase: any, monthStart: Date, monthEnd: Date) {
     const startStr = monthStart.toISOString().split("T")[0];
     const endStr = monthEnd.toISOString().split("T")[0];
 
-    // Get completed tours for this month (tours that ended within this month)
+    // Get tours for this month (tours that ended within this month)
     const { data: tours } = await supabase
         .from("tours")
         .select("id, client_name, start_date, end_date, status")
-        .or(`status.eq.completed,end_date.lt.${new Date().toISOString()}`)
         .gte("end_date", startStr)
         .lte("end_date", endStr);
 
@@ -88,13 +89,14 @@ async function getMonthlyPnl(supabase: any, monthStart: Date, monthEnd: Date) {
         .from("customer_invoices")
         .select("tour_id, total_amount, status")
         .in("tour_id", tourIds)
-        .in("status", ["confirmed", "paid"]);
+        .in("status", INCOME_STATUSES as any);
 
-    // Get vouchers for these tours
+    // Get vouchers for these tours (excluding admin category)
     const { data: vouchers } = await supabase
         .from("payment_vouchers")
         .select("tour_id, total_usd, payee_type")
-        .in("tour_id", tourIds);
+        .in("tour_id", tourIds)
+        .neq("voucher_category", "admin");
 
     // Calculate totals
     const totalIncome = invoices?.reduce((sum: number, inv: any) => sum + (inv.total_amount || 0), 0) || 0;

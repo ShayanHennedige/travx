@@ -11,8 +11,8 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "TraveX - Travel Agency Inquiry Management",
-  description: "Professional inquiry management system for travel agencies",
+  title: "TravX - Travel Management",
+  description: "Travel management system",
   icons: {
     icon: [
       { url: "/Serendia.png" },
@@ -22,27 +22,13 @@ export const metadata: Metadata = {
   },
 };
 
-// Inline script: apply saved theme before first paint (prevents flash)
-const themeScript = `
-  (function() {
-    try {
-      var t = localStorage.getItem('theme');
-      if (t === 'light') document.documentElement.classList.add('light');
-    } catch(e) {}
-  })();
-`;
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={dmSans.variable} suppressHydrationWarning>
-      <head>
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
+    <html lang="en" className={`${dmSans.variable} light`} suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
         <ThemeProvider>
           <SessionProvider>{children}</SessionProvider>
