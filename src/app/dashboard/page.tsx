@@ -158,14 +158,8 @@ export default async function DashboardPage() {
         (groupInquiryId && v.group_inquiry_id === groupInquiryId)
     ) || [];
 
-    // Get voucher status (if all vouchers have same status, use it, otherwise null)
-    // Refine: If any vouchers exist and all are NOT draft, consider it in_progress or completed
-    const voucherStatuses = voucherList.map(v => v.status).filter(Boolean);
-    const voucherStatus = voucherStatuses.length > 0 && voucherStatuses.every(s => s === "completed")
-      ? "completed"
-      : voucherList.length > 0
-        ? "in_progress"
-        : null;
+    // Get voucher status - if any vouchers exist, mark as completed
+    const voucherStatus = voucherList.length > 0 ? "completed" : null;
 
     // 2.5 Find invoices (linked by itinerary or tour)
     const linkedInvoices = customerInvoices?.filter(
@@ -177,14 +171,8 @@ export default async function DashboardPage() {
     const invoiceStatuses = linkedInvoices.map(inv => inv.status);
     let invoiceStatus: "new" | "in_progress" | "completed" | null = null;
 
-    if (invoiceStatuses.length > 0) {
-      if (invoiceStatuses.some(s => s === "paid" || s === "sent" || s === "confirmed")) {
-        invoiceStatus = "completed";
-      } else if (invoiceStatuses.some(s => s === "overdue")) {
-        invoiceStatus = "in_progress";
-      } else {
-        invoiceStatus = "new";
-      }
+    if (linkedInvoices.length > 0) {
+      invoiceStatus = "completed";
     }
 
     // 3. Find tour via itinerary_id (tour has itinerary_id)

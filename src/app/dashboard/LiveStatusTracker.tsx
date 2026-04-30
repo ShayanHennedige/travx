@@ -265,7 +265,7 @@ function ProgressBarTracker({
       key: "itinerary",
       label: "Itinerary",
       exists: hasItinerary,
-      status: hasItinerary ? (item.itinerary_status || "new") : "pending",
+      status: hasItinerary ? "completed" : "pending",
       componentKey: "itinerary" as const,
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -277,7 +277,7 @@ function ProgressBarTracker({
       key: "invoices",
       label: "Invoices",
       exists: hasInvoices,
-      status: hasInvoices ? (item.invoice_status || "new") : "pending",
+      status: hasInvoices ? (item.invoice_status || "completed") : "pending",
       // If invoices exist (hasInvoices), show status. If none, pending.
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -289,7 +289,7 @@ function ProgressBarTracker({
       key: "vouchers",
       label: "Vouchers",
       exists: hasVouchers,
-      status: hasVouchers ? (item.voucher_status || "new") : "pending",
+      status: hasVouchers ? (item.voucher_status || "completed") : "pending",
       componentKey: "voucher" as const,
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
