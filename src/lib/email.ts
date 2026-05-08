@@ -4,16 +4,11 @@ if (!process.env.RESEND_API_KEY) {
   console.warn("WARNING: RESEND_API_KEY is not defined in environment variables!");
 }
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendInquiryNotification(inquiry: any) {
   try {
     console.log("Attempting to send email notification for inquiry:", inquiry.inquiry_number);
-
-    if (!resend) {
-      console.warn("Skipping email notification: RESEND_API_KEY is missing");
-      return { success: false, error: "Missing RESEND_API_KEY" };
-    }
 
     const { data, error } = await resend.emails.send({
       from: "TravX Notifications <onboarding@resend.dev>",

@@ -37,6 +37,8 @@ export async function updateSession(request: NextRequest) {
     "/api/inquiry",
     "/feedback",
     "/api/feedback",
+    "/hotel-rates",
+    "/api/hotel-rates",
     "/login",
     "/auth",
     "/api/debug-emails",
