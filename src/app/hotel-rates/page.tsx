@@ -5,11 +5,13 @@ import { Button, Input } from "@/components/ui";
 import { useSearchParams } from "next/navigation";
 import { mealPlanOptions, currencyOptions, roomCategoryPresets, RatePlan, RoomCategory } from "@/lib/validations/hotel-rates";
 
+import { SRI_LANKA_LOCATIONS } from "@/lib/utils/sriLankaMap";
+
 interface HotelInfo {
     name: string;
     email: string;
     contact: string;
-    address: string;
+    location: string;
 }
 
 interface RequestInfo {
@@ -27,14 +29,11 @@ const createEmptyRatePlan = (): RatePlan => ({
     valid_from: "",
     valid_to: "",
     currency: "USD",
-    sell_mode: "per_room",
     rate_sgl: null,
     rate_dbl: null,
     rate_tpl: null,
     rate_child: null,
     rate_extra_adult: null,
-    min_nights: 1,
-    remarks: null,
 });
 
 const createEmptyRoomCategory = (): RoomCategory => ({
@@ -68,7 +67,7 @@ function HotelRatesContent() {
         name: "",
         email: "",
         contact: "",
-        address: "",
+        location: "",
     });
     const [requestInfo, setRequestInfo] = useState<RequestInfo | null>(null);
     const [roomCategories, setRoomCategories] = useState<RoomCategory[]>([createEmptyRoomCategory()]);
@@ -216,7 +215,7 @@ function HotelRatesContent() {
                 body: JSON.stringify({
                     token,
                     hotel_name: hotelInfo?.name,
-                    hotel_address: hotelInfo?.address,
+                    hotel_location: hotelInfo?.location,
                     hotel_contact: hotelInfo?.contact,
                     hotel_email: hotelInfo?.email,
                     room_categories: roomCategories,
@@ -382,14 +381,20 @@ function HotelRatesContent() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-surface-700 mb-1">
-                                    Hotel Address
+                                    Hotel Location
                                 </label>
-                                <Input
-                                    type="text"
-                                    value={hotelInfo?.address || ""}
-                                    onChange={(e) => setHotelInfo({ ...hotelInfo!, address: e.target.value })}
-                                    placeholder="Enter hotel address"
-                                />
+                                <select
+                                    value={hotelInfo?.location || ""}
+                                    onChange={(e) => setHotelInfo({ ...hotelInfo!, location: e.target.value })}
+                                    className="w-full px-3 py-2 border border-surface-300 rounded-lg text-sm bg-white"
+                                >
+                                    <option value="" disabled>Select hotel location</option>
+                                    {Object.keys(SRI_LANKA_LOCATIONS).sort().map((location) => (
+                                        <option key={location} value={location}>
+                                            {location}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -399,7 +404,7 @@ function HotelRatesContent() {
                         <div key={catIndex} className="card p-6 border-l-4 border-l-primary-500">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-semibold text-surface-900">
-                                    Room Category {catIndex + 1}
+                                    {category.room_category || `Room Category ${catIndex + 1}`}
                                 </h3>
                                 {roomCategories.length > 1 && (
                                     <Button

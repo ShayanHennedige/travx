@@ -22,7 +22,7 @@ export async function POST(request: Request) {
         const {
             token,
             hotel_name,
-            hotel_address,
+            hotel_location,
             hotel_contact,
             hotel_email,
             room_categories
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
                     hotel_name: hotel_name || "Unknown Hotel",
                     hotel_email: hotel_email,
                     hotel_contact: hotel_contact || null,
-                    hotel_address: hotel_address || null,
+                    hotel_address: hotel_location || null,
                     requested_by: "Public Link",
                     token: CryptoToken,
                     expires_at: expiresAt.toISOString(),
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
                     status: "submitted",
                     submitted_at: new Date().toISOString(),
                     hotel_name: hotel_name || rateRequest.hotel_name,
-                    hotel_address: hotel_address || rateRequest.hotel_address,
+                    hotel_address: hotel_location || rateRequest.hotel_address,
                     hotel_contact: hotel_contact || rateRequest.hotel_contact,
                     hotel_email: hotel_email || rateRequest.hotel_email,
                     updated_at: new Date().toISOString(),
@@ -115,14 +115,11 @@ export async function POST(request: Request) {
                     valid_from: plan.valid_from,
                     valid_to: plan.valid_to,
                     currency: plan.currency,
-                    sell_mode: plan.sell_mode,
                     rate_sgl: plan.rate_sgl || null,
                     rate_dbl: plan.rate_dbl || null,
                     rate_tpl: plan.rate_tpl || null,
                     rate_child: plan.rate_child || null,
                     rate_extra_adult: plan.rate_extra_adult || null,
-                    min_nights: plan.min_nights || 1,
-                    remarks: plan.remarks || null,
                 });
             }
         }

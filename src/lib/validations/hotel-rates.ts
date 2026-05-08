@@ -6,14 +6,11 @@ export const ratePlanSchema = z.object({
     valid_from: z.string().min(1, "Start date is required"),
     valid_to: z.string().min(1, "End date is required"),
     currency: z.string().default("USD"),
-    sell_mode: z.enum(["per_room", "per_person"]).default("per_room"),
     rate_sgl: z.number().min(0).optional().nullable(),
     rate_dbl: z.number().min(0).optional().nullable(),
     rate_tpl: z.number().min(0).optional().nullable(),
     rate_child: z.number().min(0).optional().nullable(),
     rate_extra_adult: z.number().min(0).optional().nullable(),
-    min_nights: z.number().min(1).default(1),
-    remarks: z.string().optional().nullable(),
 });
 
 // Room category with multiple rate plans
@@ -26,7 +23,7 @@ export const roomCategorySchema = z.object({
 export const hotelRatesSubmissionSchema = z.object({
     token: z.string().optional().nullable(),
     hotel_name: z.string().min(1, "Hotel name is required"),
-    hotel_address: z.string().optional(),
+    hotel_location: z.string().optional(),
     hotel_contact: z.string().optional(),
     hotel_email: z.string().email("Valid hotel email is required"),
     room_categories: z.array(roomCategorySchema).min(1, "At least one room category is required"),
