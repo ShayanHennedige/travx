@@ -89,19 +89,28 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[var(--bg-base)] relative overflow-hidden">
+    <div
+      className="min-h-screen flex bg-[var(--bg-base)] relative overflow-hidden"
+      style={{
+        backgroundImage: `url('/loginimage.png')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed',
+      }}
+    >
       {/* Background blobs for depth */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary-100/50 rounded-full blur-[120px] -z-10" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[30%] h-[30%] bg-primary-100/30 rounded-full blur-[100px] -z-10" />
 
       {/* Left side - Branding */}
-      <div className="hidden lg:flex lg:w-3/5 bg-surface-900 light:bg-surface-50 relative overflow-hidden items-center justify-center">
+      <div className="hidden lg:flex lg:w-3/5 bg-transparent relative overflow-hidden items-center justify-center">
         {/* Subtle texture for premium feel - dark stroke for light bg */}
-        <div className="absolute inset-0 opacity-[0.4]" style={{
+        <div className="absolute inset-0 opacity-[0.12]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 30L0 0M30 0L0 30M60 60L30 30M60 30L30 60' stroke='%23cbd5e1' stroke-width='1'/%3E%3C/svg%3E")`,
         }} />
 
-          <div className="relative z-10 flex flex-col justify-center px-24 py-12 w-full h-full max-w-4xl text-surface-200 light:text-surface-600">
+          <div className="relative z-10 flex flex-col justify-center px-24 py-12 w-full h-full max-w-4xl text-white">
           {/* Logo - Increased Size */}
           <div className="mb-12 transition-all duration-700 animate-in fade-in slide-in-from-left-8 text-center lg:text-left">
             <div className="relative w-[340px] h-[120px] -ml-2">
@@ -116,9 +125,9 @@ export default function LoginPage() {
           </div>
 
           {/* New Creative Content - Summary */}
-          <div className="space-y-8 animate-in fade-in slide-in-from-left-12 duration-700 delay-200 leading-relaxed font-light text-lg">
-            <p className="border-l-4 border-primary-600 pl-6 text-xl text-surface-100 light:text-surface-900 font-medium">
-              Established in 2019, <strong className="text-primary-400 light:text-primary-700">TravX Travel Management</strong> is a premier travel management company specializing in bespoke round trips across Sri Lanka & Maldives.
+            <div className="space-y-8 animate-in fade-in slide-in-from-left-12 duration-700 delay-200 leading-relaxed font-light text-lg">
+            <p className="border-l-4 border-primary-600 pl-6 text-xl text-white font-medium">
+              Established in 2019, <strong className="text-primary-300">TravX Travel Management</strong> is a premier travel management company specializing in bespoke round trips across Sri Lanka & Maldives.
             </p>
 
             <div className="pl-6 space-y-4">
@@ -127,10 +136,10 @@ export default function LoginPage() {
               </p>
 
               <div className="flex flex-wrap gap-3 pt-2">
-                <span className="px-3 py-1 bg-surface-800 light:bg-white border border-surface-700 light:border-surface-200 rounded-full text-sm font-semibold text-surface-200 light:text-surface-700 shadow-sm">Itinerary Planning</span>
-                <span className="px-3 py-1 bg-surface-800 light:bg-white border border-surface-700 light:border-surface-200 rounded-full text-sm font-semibold text-surface-200 light:text-surface-700 shadow-sm">Hotel Bookings</span>
-                <span className="px-3 py-1 bg-surface-800 light:bg-white border border-surface-700 light:border-surface-200 rounded-full text-sm font-semibold text-surface-200 light:text-surface-700 shadow-sm">Ground Transport</span>
-                <span className="px-3 py-1 bg-surface-800 light:bg-white border border-surface-700 light:border-surface-200 rounded-full text-sm font-semibold text-surface-200 light:text-surface-700 shadow-sm">Tourism</span>
+                <span className="px-3 py-1 bg-white/10 border border-white/20 rounded-full text-sm font-semibold text-white shadow-sm">Itinerary Planning</span>
+                <span className="px-3 py-1 bg-white/10 border border-white/20 rounded-full text-sm font-semibold text-white shadow-sm">Hotel Bookings</span>
+                <span className="px-3 py-1 bg-white/10 border border-white/20 rounded-full text-sm font-semibold text-white shadow-sm">Ground Transport</span>
+                <span className="px-3 py-1 bg-white/10 border border-white/20 rounded-full text-sm font-semibold text-white shadow-sm">Tourism</span>
               </div>
             </div>
           </div>
