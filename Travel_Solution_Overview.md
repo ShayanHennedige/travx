@@ -1,7 +1,7 @@
-# TripSuite - Comprehensive Solution Architecture & Process Flow
+# Trav X - Comprehensive Solution Architecture & Process Flow
 
 ## 1. Executive Summary
-TripSuite (formerly Serendia) is an advanced, 360° Travel Agency Management System built to orchestrate the end-to-end lifecycle of a travel agency's operations. The platform seamlessly bridges the gap between initial client acquisition, complex multi-day itinerary generation, on-ground logistical tracking, and final financial reconciliation. 
+Trav X is an advanced, 360° Travel Agency Management System built to orchestrate the end-to-end lifecycle of a travel agency's operations. The platform seamlessly bridges the gap between initial client acquisition, complex multi-day itinerary generation, on-ground logistical tracking, and final financial reconciliation. 
 
 ## 2. High-Level System Architecture
 

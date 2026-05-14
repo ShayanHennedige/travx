@@ -1,4 +1,4 @@
-# Serendia Hub - 360° Travel Agency Management System
+# Trav X - 360° Travel Agency Management System
 
 🔗 [GitHub Repository](https://github.com/tharukaGamage01/Serendia.git)
 
