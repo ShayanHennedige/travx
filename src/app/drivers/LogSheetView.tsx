@@ -48,7 +48,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
     const [tourInfo, setTourInfo] = useState<TourData | null>(null);
     const [limits, setLimits] = useState<Limits | null>(null);
     const [company, setCompany] = useState<any>(null);
-    
+
     const [costs, setCosts] = useState({
         paging: 0,
         highway: 0,
@@ -56,7 +56,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
         tickets: 0,
         other: 0,
     });
-    
+
     const [actualExcessRate, setActualExcessRate] = useState<number | null>(null);
     const [totalActualKmOverride, setTotalActualKmOverride] = useState<number | null>(null);
     const [editableLimits, setEditableLimits] = useState({
@@ -66,12 +66,77 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
         highwayLimit: 0,
         battaLimit: 0,
     });
-    
+
     const [tourAdvance, setTourAdvance] = useState<number>(0);
 
     const [finalizing, setFinalizing] = useState(false);
     const [isFinalized, setIsFinalized] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+    const handleDownloadPdf = async () => {
+        setDownloadingPdf(true);
+        try {
+            // 1. Fetch clean HTML from server (no Tailwind/lab() colors)
+            const res = await fetch(`/api/driver-log-sheet/${tourId}/pdf?format=html`);
+            if (!res.ok) throw new Error("Failed to fetch HTML");
+            const { html, name } = await res.json();
+
+            // 2. Render in a hidden container
+            const container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.left = '-9999px';
+            container.style.top = '0';
+            container.style.width = '800px';
+            container.style.background = '#fff';
+            container.innerHTML = html;
+            document.body.appendChild(container);
+
+            // 3. Wait for images to load
+            await new Promise(r => setTimeout(r, 500));
+
+            // 4. Capture with html2canvas
+            const html2canvas = (await import('html2canvas')).default;
+            const canvas = await html2canvas(container, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff',
+            });
+
+            // 5. Convert to PDF
+            const { jsPDF } = await import('jspdf');
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 10;
+            const contentWidth = pageWidth - margin * 2;
+            const imgHeight = (canvas.height * contentWidth) / canvas.width;
+
+            let yOffset = margin;
+            let remainingHeight = imgHeight;
+            pdf.addImage(imgData, 'JPEG', margin, yOffset, contentWidth, imgHeight);
+            remainingHeight -= (pageHeight - margin * 2);
+
+            while (remainingHeight > 0) {
+                pdf.addPage();
+                yOffset = yOffset - (pageHeight - margin * 2);
+                pdf.addImage(imgData, 'JPEG', margin, yOffset, contentWidth, imgHeight);
+                remainingHeight -= (pageHeight - margin * 2);
+            }
+
+            pdf.save(`LogSheet-${(name || tourName).replace(/\s+/g, '-')}.pdf`);
+
+            // 6. Cleanup
+            document.body.removeChild(container);
+        } catch (err) {
+            console.error('PDF download error:', err);
+            alert('Failed to generate PDF.');
+        } finally {
+            setDownloadingPdf(false);
+        }
+    };
 
     useEffect(() => {
         if (isOpen && tourId) {
@@ -84,7 +149,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
         try {
             // Fetch finalized status
             const statusRes = await fetch(`/api/tours/${tourId}`);
-            
+
             // Handle session expiration redirect
             if (statusRes.redirected || statusRes.url.includes('/login')) {
                 alert("Your session has expired. Redirecting to login page...");
@@ -174,7 +239,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
     const baseTransportCost = editableLimits.baseTransportCost || 0;
     const mileageLimit = editableLimits.totalMileageLimit || 0;
     const rate = actualExcessRate !== null ? actualExcessRate : (limits?.mileageRate || 0);
-    
+
     // Formula: Total Actual KM * Rate
     const mileageCost = totalActualKm * rate;
 
@@ -244,7 +309,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
             });
 
             if (!res.ok) throw new Error("Failed to save draft");
-            
+
             alert("Log sheet progress saved successfully!");
         } catch (err) {
             console.error("Error saving draft:", err);
@@ -278,11 +343,11 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                             </svg>
                             Excel
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => window.open(`/api/driver-log-sheet/${tourId}/pdf`, '_blank')} className="bg-white border shadow-sm flex items-center h-9 text-primary-700 hover:text-primary-800 hover:bg-primary-50 border-primary-200">
+                        <Button variant="ghost" size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf} loading={downloadingPdf} className="bg-white border shadow-sm flex items-center h-9 text-primary-700 hover:text-primary-800 hover:bg-primary-50 border-primary-200">
                             <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                             </svg>
-                            PDF
+                            {downloadingPdf ? 'Generating...' : 'PDF'}
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => window.print()} className="bg-white border shadow-sm flex items-center h-9">
                             <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -313,11 +378,11 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                     <div className="text-[14px] font-bold text-[#2c2c2c] tracking-[2px] uppercase mb-0.5 font-sans">
                                         TravX
                                     </div>
-                                    {company?.address || "63A, Old Road, Pannipitiya, Sri Lanka"}<br/>
+                                    {company?.address || "63A, Old Road, Pannipitiya, Sri Lanka"}<br />
                                     {company?.phone || "+94 77 346 9998"} &nbsp;&middot;&nbsp; {company?.email || "info@serendiaholidays.com"}
                                 </div>
                             </div>
-                            
+
                             <div className="text-center mb-6">
                                 <h1 className="text-[18px] font-normal italic text-[#2c2c2c]">Driver Log Sheet</h1>
                                 <div className="w-[50px] h-[1.5px] bg-accent-500 mx-auto mt-1.5"></div>
@@ -372,7 +437,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                 type="number" min="0" value={editableLimits.totalMileageLimit || ""}
                                                 onChange={e => updateEditableLimit('totalMileageLimit', parseFloat(e.target.value) || 0)}
                                                 disabled={isFinalized}
-                                                className="w-full bg-transparent border-none outline-none font-bold text-[14px]" 
+                                                className="w-full bg-transparent border-none outline-none font-bold text-[14px]"
                                             />
                                         </div>
                                         <div className="px-3 py-1.5 border-b border-r border-[#e5e0d8] flex items-center bg-[#faf9f7]">
@@ -381,7 +446,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                 type="number" min="0" value={editableLimits.battaLimit || ""}
                                                 onChange={e => updateEditableLimit('battaLimit', parseFloat(e.target.value) || 0)}
                                                 disabled={isFinalized}
-                                                className="w-full bg-transparent border-none outline-none font-bold text-[14px]" 
+                                                className="w-full bg-transparent border-none outline-none font-bold text-[14px]"
                                             />
                                         </div>
                                     </>
@@ -471,7 +536,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                     type="number" min="0" value={editableLimits.pagingLimit || ""}
                                                     onChange={e => updateEditableLimit('pagingLimit', parseFloat(e.target.value) || 0)}
                                                     disabled={isFinalized}
-                                                    className="w-full text-center bg-transparent border-none outline-none text-[#999] text-[10px] placeholder-gray-300 py-1" 
+                                                    className="w-full text-center bg-transparent border-none outline-none text-[#999] text-[10px] placeholder-gray-300 py-1"
                                                     placeholder="-"
                                                 />
                                             </td>
@@ -480,7 +545,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                     type="number" min="0" value={costs.paging || ""}
                                                     onChange={e => updateCost('paging', parseFloat(e.target.value) || 0)}
                                                     disabled={isFinalized}
-                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2" 
+                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2"
                                                 />
                                             </td>
                                         </tr>
@@ -491,7 +556,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                     type="number" min="0" value={editableLimits.highwayLimit || ""}
                                                     onChange={e => updateEditableLimit('highwayLimit', parseFloat(e.target.value) || 0)}
                                                     disabled={isFinalized}
-                                                    className="w-full text-center bg-transparent border-none outline-none text-[#999] text-[10px] placeholder-gray-300 py-1" 
+                                                    className="w-full text-center bg-transparent border-none outline-none text-[#999] text-[10px] placeholder-gray-300 py-1"
                                                     placeholder="-"
                                                 />
                                             </td>
@@ -500,7 +565,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                     type="number" min="0" value={costs.highway || ""}
                                                     onChange={e => updateCost('highway', parseFloat(e.target.value) || 0)}
                                                     disabled={isFinalized}
-                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2" 
+                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2"
                                                 />
                                             </td>
                                         </tr>
@@ -511,7 +576,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                     type="number" min="0" value={editableLimits.battaLimit || ""}
                                                     onChange={e => updateEditableLimit('battaLimit', parseFloat(e.target.value) || 0)}
                                                     disabled={isFinalized}
-                                                    className="w-full text-center bg-transparent border-none outline-none text-[#999] text-[10px] placeholder-gray-300 py-1" 
+                                                    className="w-full text-center bg-transparent border-none outline-none text-[#999] text-[10px] placeholder-gray-300 py-1"
                                                     placeholder="-"
                                                 />
                                             </td>
@@ -520,7 +585,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                     type="number" min="0" value={costs.batta || ""}
                                                     onChange={e => updateCost('batta', parseFloat(e.target.value) || 0)}
                                                     disabled={isFinalized}
-                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2" 
+                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2"
                                                 />
                                             </td>
                                         </tr>
@@ -532,7 +597,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                     type="number" min="0" value={costs.tickets || ""}
                                                     onChange={e => updateCost('tickets', parseFloat(e.target.value) || 0)}
                                                     disabled={isFinalized}
-                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2" 
+                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2"
                                                 />
                                             </td>
                                         </tr>
@@ -544,7 +609,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                     type="number" min="0" value={costs.other || ""}
                                                     onChange={e => updateCost('other', parseFloat(e.target.value) || 0)}
                                                     disabled={isFinalized}
-                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2" 
+                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2"
                                                 />
                                             </td>
                                         </tr>
@@ -561,7 +626,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                                     type="number" min="0" value={tourAdvance || ""}
                                                     onChange={e => setTourAdvance(parseFloat(e.target.value) || 0)}
                                                     disabled={isFinalized}
-                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2 placeholder-gray-300" 
+                                                    className="w-full text-right bg-transparent border-none focus:ring-1 focus:ring-[#c09853] outline-none font-bold text-[12px] py-1 px-2 placeholder-gray-300"
                                                     placeholder="0"
                                                 />
                                             </td>
@@ -638,7 +703,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                     <p className="text-sm text-gray-500">This action will lock the sheet</p>
                                 </div>
                             </div>
-                            
+
                             <div className="bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100 space-y-3">
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-500 font-medium">Actual KM Logged:</span>
@@ -649,7 +714,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                                     <span className="font-bold text-green-700">Rs. {totalExpenses.toLocaleString()}</span>
                                 </div>
                             </div>
-                            
+
                             <div className="flex items-center justify-end gap-3 mt-8">
                                 <Button variant="secondary" onClick={() => setShowConfirm(false)} disabled={finalizing} className="bg-gray-100 border-transparent hover:bg-gray-200">
                                     Review Again
@@ -668,7 +733,7 @@ export function LogSheetView({ tourId, tourName, isOpen, onClose, onFinalized }:
                     </div>
                 )}
             </div>
-            
+
             <style jsx global>{`
                 @media print {
                     @page { margin: 0.5cm; }
