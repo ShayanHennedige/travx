@@ -102,13 +102,13 @@ export function DashboardContent({ stats, recentInquiries, tours, drivers, statu
         <div className="relative bg-surface-100 rounded-full p-1 flex items-center">
           {/* Sliding Background */}
           <div
-            className={`absolute top-1 bottom-1 w-1/2 bg-white rounded-full shadow-md transition-all duration-300 ease-out ${viewMode === "tracker" ? "left-1/2 -translate-x-1" : "left-1"
+            className={`absolute top-1 bottom-1 w-1/2 bg-accent-500 rounded-full shadow-md transition-all duration-300 ease-out ${viewMode === "tracker" ? "left-1/2 -translate-x-1" : "left-1"
               }`}
           />
 
           <button
             onClick={() => setViewMode("dashboard")}
-            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${viewMode === "dashboard" ? "text-surface-900" : "text-surface-500 hover:text-surface-700"
+            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${viewMode === "dashboard" ? "text-black" : "text-surface-500 hover:text-surface-700"
               }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -119,7 +119,7 @@ export function DashboardContent({ stats, recentInquiries, tours, drivers, statu
 
           <button
             onClick={() => setViewMode("tracker")}
-            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${viewMode === "tracker" ? "text-surface-900" : "text-surface-500 hover:text-surface-700"
+            className={`relative z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${viewMode === "tracker" ? "text-black" : "text-surface-500 hover:text-surface-700"
               }`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

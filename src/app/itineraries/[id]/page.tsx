@@ -240,7 +240,8 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
               costingSheetStatus={costingSheet?.status || null}
             />
 
-            {/* Web View Button */}
+            {/* Web View Button - Hidden as requested */}
+            {/* 
             {itinerary.proposal_id && (
               <a
                 href={`/quote/${itinerary.proposal_id}`}
@@ -254,7 +255,8 @@ export default async function ItineraryDetailPage({ params }: PageProps) {
                   Client Web Portal
                 </Button>
               </a>
-            )}
+            )} 
+            */}
 
             {/* Link to Back */}
             <Link href="/itineraries">
