@@ -56,6 +56,12 @@ npm run dev
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+NEXT_PUBLIC_SUPABASE_URL=https://jxrlakoykbmsjvpfrisg.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4cmxha295a2Jtc2p2cGZyaXNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNDQ1NDQsImV4cCI6MjA5MjYyMDU0NH0.ZhiK9ZXFb20EupS45rko4oDBsTEfvs2D9gnhetqGkW4
+OPENAI_API_KEY=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
+NEXT_PUBLIC_LOGO_URL=https://jxrlakoykbmsjvpfrisg.supabase.co/storage/v1/object/public/travX/Travex_logo.png
+
+
 ## Project Structure
 
 ```
