@@ -57,9 +57,6 @@ npm run dev
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 
-OPENAI_API_KEY=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
-NEXT_PUBLIC_LOGO_URL=https://jxrlakoykbmsjvpfrisg.supabase.co/storage/v1/object/public/travX/Travex_logo.png
-
 
 ## Project Structure
 
